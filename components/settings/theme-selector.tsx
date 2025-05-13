@@ -1,6 +1,6 @@
 "use client";
 
-"use client";
+
 
 import { themes, Theme } from "@/lib/themes";
 import { Check } from "lucide-react";

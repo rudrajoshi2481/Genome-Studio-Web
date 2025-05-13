@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { useState } from 'react';
 import { SettingsSidebar } from '@/components/settings/settings-sidebar';
@@ -19,10 +20,10 @@ export default function SettingsPage() {
       <div className="container max-w-5xl p-6 mx-auto">
         <div className="mb-8">
           <Button variant="ghost" className="-ml-2 text-muted-foreground hover:text-foreground" asChild>
-            <a href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2" prefetch>
               <ArrowLeft className="h-4 w-4" />
               <span>Back to Dashboard</span>
-            </a>
+            </Link>
           </Button>
         </div>
 
