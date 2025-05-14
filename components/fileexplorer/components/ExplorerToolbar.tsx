@@ -1,5 +1,5 @@
 import React from 'react';
-import { File, Folder, ChevronRight } from 'lucide-react';
+import { File, Folder, ChevronRight, CopyMinus } from 'lucide-react';
 import { useFileExplorerStore } from '../store';
 
 interface ExplorerToolbarProps {
@@ -14,8 +14,14 @@ export const ExplorerToolbar: React.FC<ExplorerToolbarProps> = ({
   const { reset, fetchFileTree } = useFileExplorerStore();
 
   return (
-    <div className="flex items-center gap-0.5">
-      <button
+    <div className="flex items-center gap-0.5 border-b w-full">
+       <div className="h-8  w-full  bg-muted/20 px-4 flex items-center justify-between backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex  justify-between w-full ">
+  <div>
+    <span className="font-medium">Files</span>
+  </div>
+      <div className='flex gap-1'>
+        <button
         className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
         title="New File"
         onClick={onNewFile}
@@ -37,8 +43,12 @@ export const ExplorerToolbar: React.FC<ExplorerToolbarProps> = ({
           fetchFileTree('/app', 3);
         }}
       >
-        <ChevronRight className="w-3.5 h-3.5" />
+        {/* <ChevronRight className="w-3.5 h-3.5" /> */}
+        <CopyMinus className="w-3.5 h-3.5"/>
       </button>
+      </div>
+        </div>
+      </div>
     </div>
   );
 };

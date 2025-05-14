@@ -9,7 +9,7 @@ interface AIChatProps {
 
 export function AIChat({ className }: AIChatProps) {
   return (
-    <div className={cn("h-full flex flex-col", className)}>
+    <div className={cn("h-[97vh] flex flex-col ", className)}>
       <div className="h-12 border-b bg-muted/20 px-4 flex items-center justify-between backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-2">
           <span className="font-medium">AI Assistant</span>

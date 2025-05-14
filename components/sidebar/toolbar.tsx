@@ -47,7 +47,7 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       name: "AI Chat",
       icon: MessageSquare,
       type: "sidebar",
-      component: () => <div><AIChat /></div>
+      component: () => <AIChat />
     },
     {
       name: "Manage Container",

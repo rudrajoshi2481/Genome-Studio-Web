@@ -110,7 +110,7 @@ export function Canvas() {
         className="bg-background"
       >
         <Background />
-        <MiniMap />
+        {/* <MiniMap /> */}
         <Controls />
       </ReactFlow>
     </div>
