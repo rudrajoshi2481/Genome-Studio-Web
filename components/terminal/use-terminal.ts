@@ -1,49 +1,73 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+
 // Dynamic imports to avoid SSR issues
-let XTerm: typeof import('xterm').Terminal;
-let FitAddon: typeof import('xterm-addon-fit').FitAddon;
-let WebLinksAddon: typeof import('xterm-addon-web-links').WebLinksAddon;
-let Unicode11Addon: typeof import('xterm-addon-unicode11').Unicode11Addon;
+interface ITerminal {
+  new(options?: any): any;
+}
+
+interface IFitAddon {
+  new(): any;
+}
+
+interface IWebLinksAddon {
+  new(): any;
+}
+
+interface IUnicode11Addon {
+  new(): any;
+}
+
+let Terminal: ITerminal;
+let FitAddon: IFitAddon;
+let WebLinksAddon: IWebLinksAddon;
+let Unicode11Addon: IUnicode11Addon;
 
 if (typeof window !== 'undefined') {
-  // Only import on client side
-  Promise.all([
-    import('xterm'),
-    import('xterm-addon-fit'),
-    import('xterm-addon-web-links'),
-    import('xterm-addon-unicode11')
-  ]).then(([xtermModule, fitModule, webLinksModule, unicode11Module]) => {
-    XTerm = xtermModule.Terminal;
-    FitAddon = fitModule.FitAddon;
-    WebLinksAddon = webLinksModule.WebLinksAddon;
-    Unicode11Addon = unicode11Module.Unicode11Addon;
-  });
+  Terminal = require('xterm').Terminal;
+  FitAddon = require('xterm-addon-fit').FitAddon;
+  WebLinksAddon = require('xterm-addon-web-links').WebLinksAddon;
+  Unicode11Addon = require('xterm-addon-unicode11').Unicode11Addon;
 }
-import { TerminalDimensions } from './types';
+
 import { useThemePreferences } from '@/lib/states/theme-preferences';
 import { themes } from '@/lib/themes';
 import { config } from '@/lib/config';
 
-export function useTerminal(containerRef: React.RefObject<HTMLDivElement>) {
+export interface TerminalDimensions {
+  cols: number;
+  rows: number;
+}
+
+export interface UseTerminalReturn {
+  isConnected: boolean;
+  dimensions: TerminalDimensions;
+  fitTerminal: () => void;
+  terminal: any;
+}
+
+export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseTerminalReturn {
   const { theme } = useThemePreferences();
   const themeColors = themes[theme];
-  const termRef = useRef<InstanceType<typeof XTerm> | null>(null);
+  const termRef = useRef<any>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [dimensions, setDimensions] = useState<TerminalDimensions>({ cols: 80, rows: 24 });
   const commandHistoryRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number>(-1);
-  const currentLineBufferRef = useRef<string>('');
-  const fitAddonRef = useRef<InstanceType<typeof FitAddon> | null>(null);
+  const currentCommandRef = useRef<string>('');
+  const fitAddonRef = useRef<any>(null);
+  const promptRef = useRef<string>('');
 
   useEffect(() => {
-    if (!containerRef.current || typeof window === 'undefined') return;
+    console.log('[Terminal] Initializing terminal...');
+    if (!containerRef.current || typeof window === 'undefined') {
+      console.log('[Terminal] No container or not in browser, aborting');
+      return;
+    }
 
-    if (!XTerm) return;
-
-    const term = new XTerm({
+    const term = new Terminal({
       convertEol: true,
       cursorBlink: true,
       fontSize: 14,
@@ -56,9 +80,8 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>) {
       allowProposedApi: true,
       scrollback: 10000,
       screenReaderMode: true,
-      rows: 24,
-      cols: 80,
       disableStdin: false,
+      cursorStyle: 'block',
       scrollOnUserInput: true,
     });
 
@@ -71,14 +94,20 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>) {
     term.loadAddon(unicode11Addon);
     term.unicode.activeVersion = '11';
 
+    console.log('[Terminal] Opening terminal in container...');
     term.open(containerRef.current);
     fitAddon.fit();
 
     const { cols, rows } = term;
+    console.log(`[Terminal] Initial dimensions: ${cols}x${rows}`);
     setDimensions({ cols, rows });
     
     termRef.current = term;
     fitAddonRef.current = fitAddon;
+    
+    // Write initial prompt
+    console.log('[Terminal] Writing initial prompt...');
+    // writePrompt(term);
 
     const socket = new WebSocket(
       `ws://${config.wsUrl}/ws?rows=${rows}&cols=${cols}`
@@ -86,104 +115,93 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>) {
     socketRef.current = socket;
 
     socket.onopen = () => {
+      console.log('[Terminal] WebSocket connected');
       setIsConnected(true);
-      term.write('\x1b[32m$\x1b[0m ');
+      // term.write('\r\n\x1b[32mConnected to server\x1b[0m\r\n');
+      
     };
 
-    socket.onmessage = (event) => {
-      term.write(event.data);
+    socket.onmessage = (event: MessageEvent) => {
+      const response = event.data.toString();
+      console.log('[Terminal] Received from server:', response);
+      term.write(response);
+      // if (!response.endsWith('\n')) {
+      //   term.write('\r\n');
+      // }
+      // writePrompt(term);
     };
 
     socket.onclose = () => {
       setIsConnected(false);
-      term.write('\r\n\x1b[31mConnection closed. Refresh page to reconnect.\x1b[0m\r\n');
+      // term.write('\r\n\x1b[31mConnection closed. Refresh page to reconnect.\x1b[0m\r\n');
     };
 
-    socket.onerror = (error) => {
+    socket.onerror = (error: Event) => {
       console.error('WebSocket Error:', error);
-      term.write('\r\n\x1b[31mConnection error. Refresh page.\x1b[0m\r\n');
+      // term.write('\r\n\x1b[31mConnection error. Refresh page.\x1b[0m\r\n');
     };
 
     const handleResize = () => {
-      requestAnimationFrame(() => {
-        fitAddon.fit();
-        const { cols, rows } = term;
-        setDimensions({ cols, rows });
-        
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(`\x1b[8;${rows};${cols}t`);
-        }
-      });
+      fitAddon.fit();
+      const { cols, rows } = term;
+      setDimensions({ cols, rows });
+      
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(`\x1b[8;${rows};${cols}t`);
+      }
     };
 
     const handleData = (data: string) => {
+      console.log('[Terminal] User input:', data, 'charCode:', data.charCodeAt(0));
       if (socket.readyState !== WebSocket.OPEN) {
-        term.write('\r\n\x1b[31mNot connected. Refresh page.\x1b[0m\r\n');
+        console.log('[Terminal] WebSocket not connected');
+        // term.write('\r\n\x1b[31mNot connected. Refresh page.\x1b[0m\r\n');
         return;
       }
 
       const charCode = data.charCodeAt(0);
 
-      if (charCode === 3) { // Ctrl+C
-        socket.send('\x03');
-        currentLineBufferRef.current = '';
-        term.write('^C\r\n\x1b[32m$\x1b[0m ');
-        return;
-      }
-
-      if (charCode === 13) { // Enter
-        const currentLine = currentLineBufferRef.current;
-        if (currentLine.trim().length > 0) {
-          commandHistoryRef.current.push(currentLine);
-          historyIndexRef.current = commandHistoryRef.current.length;
-          socket.send(currentLine + '\n');
-        } else {
-          socket.send('\n');
-        }
-        currentLineBufferRef.current = '';
-        return;
-      }
-
-      if (charCode === 127 || charCode === 8) { // Backspace
-        if (currentLineBufferRef.current.length > 0) {
-          term.write('\b \b');
-          currentLineBufferRef.current = currentLineBufferRef.current.slice(0, -1);
-        }
-        return;
-      }
-
-      if (charCode === 27 && data.length >= 2 && data[1] === '[') { // Arrow Keys
-        const arrowKey = data[2];
-        if (arrowKey === 'A' || arrowKey === 'B') {
-          if (commandHistoryRef.current.length === 0) return;
+      // Handle special keys
+      switch (true) {
+        case charCode === 3: // Ctrl+C
+          term.write('^C\r\n');
+          currentCommandRef.current = '';
           
-          term.write('\x1b[2K\r\x1b[32m$\x1b[0m ');
-          
-          if (arrowKey === 'A') {
-            if (historyIndexRef.current > 0) {
-              historyIndexRef.current--;
-            }
-          } else {
-            if (historyIndexRef.current < commandHistoryRef.current.length - 1) {
-              historyIndexRef.current++;
-            } else {
-              historyIndexRef.current = commandHistoryRef.current.length;
-            }
+          return;
+
+        case charCode === 13: // Enter
+          console.log('[Terminal] Enter pressed, command:', currentCommandRef.current);
+          term.write('\r'); // Add newline when user presses enter
+          const command = currentCommandRef.current;
+          if (command.trim()) {
+            commandHistoryRef.current.push(command);
+            historyIndexRef.current = commandHistoryRef.current.length;
+            console.log('[Terminal] Added to history, new length:', commandHistoryRef.current.length);
           }
-          
-          if (historyIndexRef.current < commandHistoryRef.current.length) {
-            currentLineBufferRef.current = commandHistoryRef.current[historyIndexRef.current];
-            term.write(currentLineBufferRef.current);
-          } else {
-            currentLineBufferRef.current = '';
-          }
-        }
-        return;
-      }
+          console.log('[Terminal] Sending command to server:', command);
+          socket.send(command + '\n'); // Send command with newline to server
+          currentCommandRef.current = '';
+          return;
 
-      if (charCode >= 32) { // Printable characters
-        currentLineBufferRef.current += data;
-        term.write(data);
+        case charCode === 127: // Backspace
+          console.log('[Terminal] Backspace pressed, current command:', currentCommandRef.current);
+          if (currentCommandRef.current.length > 0) {
+            term.write('\b \b');
+            currentCommandRef.current = currentCommandRef.current.slice(0, -1);
+            console.log('[Terminal] After backspace:', currentCommandRef.current);
+          }
+          return;
+
+        case charCode === 27: // Arrow keys (first part of escape sequence)
+          // We'd need to handle the full escape sequence for arrow keys
+          return;
+
+        default:
+          // Printable characters
+          if (charCode >= 32 && charCode <= 126) {
+            term.write(data);
+            currentCommandRef.current += data;
+          }
       }
     };
 
@@ -192,16 +210,23 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>) {
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      term.dispose();
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.close();
-      }
+      if (socketRef.current) socketRef.current.close();
+      if (termRef.current) termRef.current.dispose();
     };
-  }, [theme]);
+  }, [containerRef, themeColors]);
+
+
+  const fitTerminal = () => {
+    console.log('[Terminal] Fitting terminal...');
+    if (fitAddonRef.current) {
+      fitAddonRef.current.fit();
+    }
+  };
 
   return {
     isConnected,
     dimensions,
-    fitTerminal: () => fitAddonRef.current?.fit(),
+    fitTerminal,
+    terminal: termRef.current
   };
 }

@@ -30,11 +30,7 @@ class WebSocketService {
 
   private getWebSocketUrl(path?: string): string {
     if (typeof window === 'undefined') return '';
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname;
-    const pathParam = path ? `?path=${encodeURIComponent(path)}` : '';
-    return `${protocol}//${host}:8000/api/files/watch${pathParam}`;
+    return `ws://localhost:8000/api/files/watch?path=${encodeURIComponent(path || '/app')}`;
   }
 
   connect(path: string = '/app') {

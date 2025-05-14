@@ -1,7 +1,7 @@
 export interface TerminalTab {
   id: string;
   name: string;
-  type: 'WEB' | 'DB';
+  type: 'tty' | 'DB' | null;
 }
 
 export interface TerminalProps {
