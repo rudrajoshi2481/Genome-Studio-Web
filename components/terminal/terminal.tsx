@@ -7,19 +7,13 @@ import { Plus, X, Terminal as TerminalIcon, Database, Split } from 'lucide-react
 import { useState } from 'react';
 import { useThemePreferences } from '@/lib/states/theme-preferences';
 import { themes } from '@/lib/themes';
+import { TerminalProps, TerminalTab } from './types';
+import { TerminalInstance } from './terminal-instance';
+import 'xterm/css/xterm.css';
 
-interface TerminalProps {
-  className?: string;
-}
 
-interface TerminalTab {
-  id: string;
-  name: string;
-  type: 'WEB' | 'DB';
-  content: string[];
-}
 
-export function Terminal({ className }: TerminalProps) {
+export function Terminal({ className, defaultHeight = 300 }: TerminalProps) {
   const { theme } = useThemePreferences();
   const themeColors = themes[theme];
   const [tabs, setTabs] = useState<TerminalTab[]>([
@@ -27,11 +21,6 @@ export function Terminal({ className }: TerminalProps) {
       id: 'web1',
       name: 'WEB1',
       type: 'WEB',
-      content: [
-        'Welcome to the oxide cloud shell! Type "help" to get started.',
-        'You are now interacting through this shell on instance WEB1',
-        'cameron@web1:~ $ ',
-      ],
     },
   ]);
   const [activeTab, setActiveTab] = useState('web1');
@@ -41,11 +30,6 @@ export function Terminal({ className }: TerminalProps) {
       id: `db${tabs.length + 1}`,
       name: `DB${tabs.length + 1}`,
       type: 'DB',
-      content: [
-        'Welcome to the oxide cloud shell! Type "help" to get started.',
-        `You are now interacting through this shell on instance DB${tabs.length + 1}`,
-        `cameron@db${tabs.length + 1}:~ $ `,
-      ],
     };
     setTabs([...tabs, newTab]);
     setActiveTab(newTab.id);
@@ -64,13 +48,16 @@ export function Terminal({ className }: TerminalProps) {
 
   return (
     <div 
-      className={cn('flex flex-col h-full', className)}
+      className={cn('flex flex-col rounded-lg border h-[calc(100vh-2rem)]', className)}
       style={{
         background: themeColors.background,
-        color: themeColors.foreground
+        color: themeColors.foreground,
+        borderColor: themeColors.accent,
+        minHeight: defaultHeight
       }}>
-      {/* Terminal Header */}
-      <div className="border-b" style={{ borderColor: themeColors.accent }}>
+            {/* Terminal Header */}
+      <div className="border-b " style={{ borderColor: themeColors.accent }}>
+
         {/* Instance Header */}
        
 
@@ -84,7 +71,7 @@ export function Terminal({ className }: TerminalProps) {
           <div className="flex items-center">
             <Tabs value={activeTab} className="w-[400px]">
               <TabsList 
-                className="p-0 h-7 border rounded-sm"
+                className="p-0.5 h-8 border rounded-md gap-1"
                 style={{
                   background: themeColors.muted,
                   borderColor: themeColors.accent
@@ -94,7 +81,7 @@ export function Terminal({ className }: TerminalProps) {
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    className="px-3 h-6 data-[state=active]:shadow-none rounded-none group hover:bg-accent/10"
+                    className="px-3 h-7 data-[state=active]:shadow-none rounded-md group hover:bg-accent/10 transition-colors"
                     style={{
                       backgroundColor: activeTab === tab.id ? themeColors.primary : 'transparent',
                       borderRight: `1px solid ${themeColors.accent}40`,
@@ -123,43 +110,35 @@ export function Terminal({ className }: TerminalProps) {
                 ))}
               </TabsList>
             </Tabs>
-            <div className="flex items-center gap-1">
-              <div 
-                role="button"
-                className="h-7 px-2 rounded-sm hover:bg-accent/10 flex items-center gap-1.5 border cursor-pointer"
-                style={{
-                  borderColor: themeColors.accent,
-                  color: themeColors.foreground,
-                  background: themeColors.muted
-                }}
-                onClick={addTab}
-              >
-                <Plus className="h-3.5 w-3.5" style={{ color: themeColors.accent }} />
-                <span className="text-xs font-medium">New Tab</span>
-              </div>
-
-              <div
-                role="button"
-                className="h-7 px-2 rounded-sm hover:bg-accent/10 flex items-center gap-1.5 border cursor-pointer"
-                style={{
-                  borderColor: themeColors.accent,
-                  color: themeColors.foreground,
-                  background: themeColors.muted
-                }}
-                onClick={() => {
-                  // Here you can handle opening a new terminal instance
-                  // This could involve splitting the panel or opening in a new window
-                  console.log('Open new terminal instance');
-                }}
-              >
-                <Split className="h-3.5 w-3.5" style={{ color: themeColors.accent }} />
-                <span className="text-xs font-medium">Split</span>
-              </div>
-            </div>
+          
           </div>
 
           {activeInstance && (
-            <div className="flex items-center gap-6 px-2">
+            <div className="flex items-center gap-4 px-3">
+              <div className="h-4 w-[1px]" style={{ background: themeColors.accent }} />
+              {/* Buttons to create new instance */}
+              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-md hover:bg-accent/10"
+                  onClick={addTab}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                {/* <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-md hover:bg-accent/10"
+                  onClick={() => {}}
+                >
+                  <Split className="h-4 w-4" />
+                </Button> */}
+              </div>
+
+             
+            </div>
               <div className="space-y-0.5">
                 <span 
                   className="text-[10px] font-medium tracking-wider"
@@ -183,14 +162,9 @@ export function Terminal({ className }: TerminalProps) {
         </div>
       </div>
 
-      {/* Terminal Content */}
-      <div className="flex-1 p-4 font-mono text-sm overflow-auto">
-        {activeInstance?.content.map((line, i) => (
-          <div key={i} className="whitespace-pre-wrap">
-            {line}
-          </div>
-        ))}
-      </div>
+      {activeInstance && (
+        <TerminalInstance key={activeInstance.id} />
+      )}
     </div>
   );
 }

@@ -24,16 +24,7 @@ export function FileTabs({ className }: FileTabsProps) {
     { id: '3', name: 'sidebar.tsx', path: '/components/sidebar/sidebar.tsx', isDirty: true },
     { id: '4', name: 'terminal.tsx', path: '/components/terminal/terminal.tsx' },
     { id: '5', name: 'app-bar.tsx', path: '/components/app-bar.tsx' },
-    { id: '6', name: 'manage-container.tsx', path: '/components/manage-container.tsx' },
-    { id: '7', name: 'settings.tsx', path: '/components/settings/settings.tsx' },
-    { id: '8', name: 'ai-chat.tsx', path: '/components/ai/ai-chat.tsx' },
-    { id: '9', name: 'ai-chat.tsx', path: '/components/ai/ai-chat.tsx' },
-    { id: '10', name: 'ai-chat.tsx', path: '/components/ai/ai-chat.tsx' },
-    { id: '11', name: 'ai-chat.tsx', path: '/components/ai/ai-chat.tsx' },
-    { id: '12', name: 'ai-chat.tsx', path: '/components/ai/ai-chat.tsx' },
-    { id: '13', name: 'ai-chat.tsx', path: '/components/ai/ai-chat.tsx' },
-    { id: '14', name: 'ai-chat.tsx', path: '/components/ai/ai-chat.tsx' },
-    { id: '15', name: 'ai-chat.tsx', path: '/components/ai/ai-chat.tsx' },
+
     
   ]);
   const [activeFile, setActiveFile] = useState<string>(files[0].id);

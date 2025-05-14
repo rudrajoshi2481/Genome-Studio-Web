@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { Folder, MessageSquare, Box, Settings, LucideIcon } from 'lucide-react'
 import { AIChat } from '../ai/ai-chat'
 import { useRouter } from 'next/navigation'
+import FileExplorer from '../fileexplorer/FileExplorer'
 
 /**
  * ToolbarItem represents an item in the sidebar toolbar
@@ -31,14 +32,16 @@ interface ToolbarProps {
  */
 function Toolbar({ onComponentChange }: ToolbarProps) {
   const router = useRouter()
-  const [activeItem, setActiveItem] = useState<string | null>(null)
+  const [activeItem, setActiveItem] = useState<string>("File Explorer")
 
   const TOOLBAR_ITEMS: ToolbarItem[] = [
+  // Define items outside component for better performance
+  
     {
       name: "File Explorer",
       icon: Folder,
       type: "sidebar",
-      component: () => <div>File Explorer</div>
+      component: () => <FileExplorer />
     },
     {
       name: "AI Chat",
@@ -74,6 +77,14 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       router.push(item.link)
     }
   }
+
+  // Set File Explorer as active component on mount
+  React.useEffect(() => {
+    const fileExplorer = TOOLBAR_ITEMS.find(item => item.name === "File Explorer")
+    if (fileExplorer && fileExplorer.type === "sidebar") {
+      onComponentChange(fileExplorer.component())
+    }
+  }, [])
 
   return (
     <nav className="flex flex-col items-center gap-2 p-2 border-r h-full bg-background">
