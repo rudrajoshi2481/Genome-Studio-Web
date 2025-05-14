@@ -137,7 +137,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
     };
 
     socket.onerror = (error: Event) => {
-      console.error('WebSocket Error:', error);
+      // console.error('WebSocket Error:', error);
       // term.write('\r\n\x1b[31mConnection error. Refresh page.\x1b[0m\r\n');
     };
 
@@ -164,9 +164,9 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
       // Handle special keys
       switch (true) {
         case charCode === 3: // Ctrl+C
-          term.write('^C\r\n');
+        socket.send('\x03'); // Send Ctrl+C character to server
+          // term.write('^C\r\n');
           currentCommandRef.current = '';
-          
           return;
 
         case charCode === 13: // Enter

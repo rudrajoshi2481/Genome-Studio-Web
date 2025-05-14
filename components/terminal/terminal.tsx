@@ -36,7 +36,7 @@ export function Terminal({ className, defaultHeight = 300 }: TerminalProps) {
 
   return (
     <div 
-      className={cn('flex flex-col rounded-lg border h-[calc(100vh-2rem)]', className)}
+      className={cn('flex flex-col rounded-lg border ', className)}
       style={{
         background: themeColors.background,
         color: themeColors.foreground,
