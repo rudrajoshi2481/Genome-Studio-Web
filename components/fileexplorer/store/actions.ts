@@ -2,9 +2,10 @@ import { StateCreator } from 'zustand';
 import { State, Actions, FileEvent } from './types';
 import { FileNode } from '../types';
 import { createWebSocketService } from '@/lib/websocket';
+import { config, getUrls } from '@/lib/config';
 
 // Initialize WebSocket service (will only be created on client side)
-const wsService = createWebSocketService('');
+const wsService = createWebSocketService(config.wsUrl);
 
 export const createActions = (
   set: (partial: State | Partial<State> | ((state: State) => State | Partial<State>)) => void,
@@ -14,7 +15,7 @@ export const createActions = (
     try {
       set({ isLoading: true, error: null });
       const response = await fetch(
-        `http://localhost:8000/api/files?path=${encodeURIComponent(path)}&depth=${depth}`,
+        getUrls.fileExplorer(`?path=${path}&depth=${depth}`),
         { 
           headers: { accept: 'application/json' },
           cache: 'no-store' // Disable caching to always get fresh data

@@ -1,6 +1,20 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+.react-flow__controls {
+  position: absolute !important;
+  bottom: 20px !important;
+  left: 20px !important;
+  z-index: 5 !important;
+}
+
+.react-flow__minimap {
+  position: absolute !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  z-index: 5 !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

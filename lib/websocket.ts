@@ -1,3 +1,5 @@
+import { config } from './config';
+
 type WebSocketCallback = (event: MessageEvent) => void;
 type WebSocketErrorCallback = (error: Error) => void;
 
@@ -25,12 +27,13 @@ class WebSocketService {
   private currentPath: string = '';
 
   constructor(url: string) {
-    this.url = url;
+    // Store base URL without protocol
+    this.url = url.replace(/^(ws|wss|http|https):\/\//, '');
   }
 
   private getWebSocketUrl(path?: string): string {
     if (typeof window === 'undefined') return '';
-    return `ws://localhost:8000/api/files/watch?path=${encodeURIComponent(path || '/app')}`;
+    return `ws://${config.wsUrl}/api/files/watch?path=${encodeURIComponent(path || '/app')}`;
   }
 
   connect(path: string = '/app') {
@@ -46,10 +49,8 @@ class WebSocketService {
       this.updateStatus('connecting');
       const wsUrl = this.getWebSocketUrl(path);
       
-      console.log('Attempting WebSocket connection to:', wsUrl);
-      
       if (this.ws) {
-        console.log('Closing existing connection before reconnecting');
+        // Close existing connection before reconnecting
         this.ws.close();
       }
       
@@ -58,15 +59,15 @@ class WebSocketService {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('Received WebSocket message:', data);
+          // Process message
           this.handleMessage(event);
         } catch (err) {
-          console.error('Failed to parse WebSocket message:', err);
+          this.handleError(new Error('Failed to parse WebSocket message'));
         }
       };
 
       this.ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason || 'No reason provided');
+        // WebSocket closed
         if (event.code !== 1000) { // 1000 is normal closure
           this.handleClose();
         } else {
@@ -83,7 +84,7 @@ class WebSocketService {
       };
 
       this.ws.onopen = () => {
-        console.log('WebSocket connected successfully to:', wsUrl);
+        // Connection successful
         this.reconnectAttempts = 0; // Reset reconnect attempts on successful connection
         this.updateStatus('connected');
       };
@@ -112,7 +113,7 @@ class WebSocketService {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts);
       this.reconnectAttempts++;
-      console.log(`Attempting reconnect ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+      // Attempting reconnect
       
       if (this.reconnectTimeout) {
         clearTimeout(this.reconnectTimeout);
@@ -181,3 +182,4 @@ class WebSocketService {
 }
 
 export const createWebSocketService = (url: string) => new WebSocketService(url);
+

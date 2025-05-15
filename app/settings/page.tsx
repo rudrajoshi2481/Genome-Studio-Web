@@ -9,8 +9,9 @@ import { SettingsSidebar } from '@/components/settings/settings-sidebar';
 import { AppearanceSettings } from '@/components/settings/appearance-settings';
 import { EditorSettings } from '@/components/settings/editor-settings';
 import { ProfileSettings } from '@/components/settings/profile-settings';
+import { ConnectionSettings } from '@/components/settings/connection-settings';
 
-type SettingsSection = 'appearance' | 'editor' | 'profile';
+type SettingsSection = 'appearance' | 'editor' | 'profile' | 'connection';
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
@@ -37,6 +38,7 @@ export default function SettingsPage() {
             {activeSection === 'appearance' && <AppearanceSettings />}
             {activeSection === 'editor' && <EditorSettings />}
             {activeSection === 'profile' && <ProfileSettings />}
+            {activeSection === 'connection' && <ConnectionSettings />}
           </div>
         </div>
       </div>

@@ -3,9 +3,10 @@
 import React, { useState } from 'react'
 import { Button } from '../ui/button'
 import { cn } from '@/lib/utils'
-import { Folder, MessageSquare, Box, Settings, LucideIcon } from 'lucide-react'
+import { Folder, MessageSquare, Box, Settings, LucideIcon, Workflow } from 'lucide-react'
 import { AIChat } from '../ai/ai-chat'
 import { useRouter } from 'next/navigation'
+import Nodebar from "./nodebar/Nodebar"
 import FileExplorer from '../fileexplorer/FileExplorer'
 
 /**
@@ -48,6 +49,12 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       icon: MessageSquare,
       type: "sidebar",
       component: () => <AIChat />
+    },
+    {
+      name: "Nodebar",
+      icon: Workflow,
+      type: "sidebar",
+      component: () => <Nodebar />
     },
     {
       name: "Manage Container",

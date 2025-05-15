@@ -24,7 +24,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         </div>
       </ResizablePanel>
 
-      <ResizableHandle />
+      <ResizableHandle withHandle />
 
       {/* Main Content Area */}
       <ResizablePanel defaultSize={60} className="h-screen bg-background">
@@ -44,7 +44,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </ResizablePanel>
 
-              <ResizableHandle />
+              <ResizableHandle withHandle />
 
               {/* Logs/Terminal Area */}
               <ResizablePanel defaultSize={25} minSize={10} maxSize={50}>
@@ -55,7 +55,6 @@ export function MainLayout({ children }: MainLayoutProps) {
         </div>
       </ResizablePanel>
 
-      <ResizableHandle />
 
      
     </ResizablePanelGroup>

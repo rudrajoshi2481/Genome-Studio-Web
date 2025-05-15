@@ -1,9 +1,9 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Settings, Paintbrush, User } from "lucide-react";
+import { Settings, Paintbrush, User, Network } from "lucide-react";
 
-type SettingsSection = 'appearance' | 'editor' | 'profile';
+type SettingsSection = 'appearance' | 'editor' | 'profile' | 'connection';
 
 interface SettingsSidebarProps {
   activeSection: SettingsSection;
@@ -38,6 +38,14 @@ export function SettingsSidebar({ activeSection, onSectionChange }: SettingsSide
         >
           <User className="h-4 w-4" />
           Profile
+        </Button>
+        <Button 
+          variant={activeSection === 'connection' ? 'default' : 'ghost'} 
+          className="w-full justify-start gap-2"
+          onClick={() => onSectionChange('connection')}
+        >
+          <Network className="h-4 w-4" />
+          Connection
         </Button>
       </div>
     </div>
