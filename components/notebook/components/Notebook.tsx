@@ -120,7 +120,6 @@ export const Notebook: React.FC<NotebookProps> = ({ onExecuteCell }) => {
             onMoveUp={() => moveCellUp(cell.id)}
             onMoveDown={() => moveCellDown(cell.id)}
             onDelete={() => deleteCell(cell.id)}
-            onToggleType={() => toggleCellType(cell.id)}
             onSelect={() => selectCell(cell.id)}
             onAddCodeCell={(afterCellId) => addCellAfter(afterCellId, 'code')}
             onAddMarkdownCell={(afterCellId) => addCellAfter(afterCellId, 'markdown')}

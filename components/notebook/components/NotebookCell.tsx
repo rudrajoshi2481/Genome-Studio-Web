@@ -22,22 +22,18 @@ interface NotebookCellProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
-  onToggleType: () => void;
   onSelect: () => void;
   onAddCodeCell: (afterCellId: string) => void;
   onAddMarkdownCell: (afterCellId: string) => void;
-  onLanguageChange?: (language: string) => void;
 }
 
 export const NotebookCell: React.FC<NotebookCellProps> = ({
   cell,
   isSelected,
   onContentChange,
-  onExecute,
   onMoveUp,
   onMoveDown,
   onDelete,
-  onToggleType,
   onSelect,
   onAddCodeCell,
   onAddMarkdownCell,
@@ -116,7 +112,7 @@ export const NotebookCell: React.FC<NotebookCellProps> = ({
           <CodeMirrorEditor
             cell={cell}
             onChange={onContentChange}
-            onExecute={cell.cell_type === 'code' ? onExecute : undefined}
+            onExecute={cell.cell_type === 'code' ? handleExecute : undefined}
           />
           {cell.cell_type === 'code' && (
             <div className="absolute top-1 right-1 z-10">
