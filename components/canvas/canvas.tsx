@@ -29,6 +29,7 @@ const initialNodes = [
     type: "bashNode",
     position: { x: 100, y: 100 },
     data: {
+      title: "BWA Alignment",
       status: "Completed",
       command: "bwa mem -SP5 -t 8 reference.fa R1.fastq R2.fastq > aligned.sam",
       logs: ["> BWA started...", "> Alignment complete"],
@@ -39,71 +40,20 @@ const initialNodes = [
     type: "bashNode",
     position: { x: 100, y: 250 },
     data: {
+      title: "SAM to BAM",
       status: "Completed",
       command: "samtools view -bS aligned.sam | samtools sort -o aligned.sorted.bam",
       logs: ["> Converting SAM to BAM...", "> Sorted BAM ready"],
     },
   },
-  {
-    id: "3",
-    type: "bashNode",
-    position: { x: 100, y: 400 },
-    data: {
-      status: "Completed",
-      command: "pairtools parse --chroms-path chrom.sizes -o parsed.pairs aligned.sorted.bam",
-      logs: ["> Parsing pairs...", "> Output: parsed.pairs"],
-    },
-  },
-  {
-    id: "4",
-    type: "bashNode",
-    position: { x: 100, y: 550 },
-    data: {
-      status: "Completed",
-      command: "pairtools sort -o sorted.pairs parsed.pairs",
-      logs: ["> Sorting pairs...", "> sorted.pairs created"],
-    },
-  },
-  {
-    id: "5",
-    type: "bashNode",
-    position: { x: 100, y: 700 },
-    data: {
-      status: "Completed",
-      command: "pairtools dedup -o dedup.pairs sorted.pairs",
-      logs: ["> Deduplicating...", "> dedup.pairs ready"],
-    },
-  },
-  {
-    id: "6",
-    type: "bashNode",
-    position: { x: 400, y: 250 },
-    data: {
-      status: "Completed",
-      command: "cooler cload pairs --assembly hg38 -c1 2 -p1 3 -c2 4 -p2 5 chrom.sizes:10000 dedup.pairs output.10k.cool",
-      logs: ["> Binning pairs into cooler...", "> output.10k.cool created"],
-    },
-  },
-  {
-    id: "7",
-    type: "bashNode",
-    position: { x: 400, y: 400 },
-    data: {
-      status: "Upcoming",
-      command: "cooltools diamond-arrowhead output.10k.cool --output arrowhead.bed",
-      logs: [],
-    },
-  },
+  
 ]
 
 // Edges between steps
 const initialEdges = [
   { id: "e1-2", source: "1", target: "2" },
   { id: "e2-3", source: "2", target: "3" },
-  { id: "e3-4", source: "3", target: "4" },
-  { id: "e4-5", source: "4", target: "5" },
-  { id: "e5-6", source: "5", target: "6" },
-  { id: "e6-7", source: "6", target: "7" },
+  
 ]
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
@@ -163,7 +113,7 @@ export function Canvas() {
   )
 
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
+    <div style={{ width: '100%', height: '100%' }} >
       <ReactFlowProvider>
         <div style={{ width: '100%', height: '100%' }}>
           <ReactFlow

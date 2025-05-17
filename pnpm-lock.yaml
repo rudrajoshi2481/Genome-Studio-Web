@@ -89,6 +89,12 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.6
         version: 1.2.6(@types/react-dom@19.1.4(@types/react@19.1.4))(@types/react@19.1.4)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@types/dagre':
+        specifier: ^0.7.52
+        version: 0.7.52
+      '@types/react-resizable':
+        specifier: ^3.0.8
+        version: 3.0.8
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -98,6 +104,9 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.1.4(@types/react@19.1.4))(@types/react@19.1.4)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      dagre:
+        specifier: ^0.8.5
+        version: 0.8.5
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -128,6 +137,9 @@ importers:
       react-hook-form:
         specifier: ^7.56.3
         version: 7.56.3(react@19.1.0)
+      react-resizable:
+        specifier: ^3.0.5
+        version: 3.0.5(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       react-resizable-panels:
         specifier: ^3.0.1
         version: 3.0.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -1245,6 +1257,9 @@ packages:
   '@types/d3@7.4.3':
     resolution: {integrity: sha512-lZXZ9ckh5R8uiFVt8ogUNf+pIrK4EsWrx2Np75WvF/eTpJ0FMHNhjXk8CKEx/+gpHbNQyJWehbFaTvqmHWB3ww==}
 
+  '@types/dagre@0.7.52':
+    resolution: {integrity: sha512-XKJdy+OClLk3hketHi9Qg6gTfe1F3y+UFnHxKA2rn9Dw+oXa4Gb378Ztz9HlMgZKSxpPmn4BNVh9wgkpvrK1uw==}
+
   '@types/geojson@7946.0.16':
     resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
 
@@ -1255,6 +1270,9 @@ packages:
     resolution: {integrity: sha512-WxYAszDYgsMV31OVyoG4jbAgJI1Gw0Xq9V19zwhy6+hUUJlJIdZ3r/cbdmTqFv++SktQkZ/X+46yGFxp5XJBEg==}
     peerDependencies:
       '@types/react': ^19.0.0
+
+  '@types/react-resizable@3.0.8':
+    resolution: {integrity: sha512-Pcvt2eGA7KNXldt1hkhVhAgZ8hK41m0mp89mFgQi7LAAEZiaLgm4fHJ5zbJZ/4m2LVaAyYrrRRv1LHDcrGQanA==}
 
   '@types/react@19.1.4':
     resolution: {integrity: sha512-EB1yiiYdvySuIITtD5lhW4yPyJ31RkJkkDw794LaQYrxCSaQV/47y5o1FMC4zF9ZyjUjzJMZwbovEnT5yHTW6g==}
@@ -1282,6 +1300,10 @@ packages:
 
   client-only@0.0.1:
     resolution: {integrity: sha512-IV3Ou0jSMzZrd3pZ48nLkT9DA7Ag1pnPzaiQhpW7c3RbcqqzvzzVu+L8gfqMp/8IM2MQtSiqaCxrrcfu8I8rMA==}
+
+  clsx@1.2.1:
+    resolution: {integrity: sha512-EcR6r5a8bj6pu3ycsa/E/cKVGuTgZJZdsyUYHOksG/UHIiKfjxzRxYJpyVBwYaQeOvghal9fcc4PidlgzugAQg==}
+    engines: {node: '>=6'}
 
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
@@ -1376,6 +1398,9 @@ packages:
     resolution: {integrity: sha512-b8AmV3kfQaqWAuacbPuNbL6vahnOJflOhexLzMMNLga62+/nh0JzvJ0aO/5a5MVgUFGS7Hu1P9P03o3fJkDCyw==}
     engines: {node: '>=12'}
 
+  dagre@0.8.5:
+    resolution: {integrity: sha512-/aTqmnRta7x7MCCpExk7HQL2O4owCT2h8NT//9I1OQ9vt29Pa0BzSAkR5lwFUcQ7491yVi/3CXU9jQ5o0Mn2Sw==}
+
   date-fns@4.1.0:
     resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
 
@@ -1422,6 +1447,9 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  graphlib@2.1.8:
+    resolution: {integrity: sha512-jcLLfkpoVGmH7/InMC/1hIvOPSUh38oJtGhvrOFGzioE1DZ+0YW16RgmOJhHiuWTvGiJQ9Z1Ik43JvkRPRvE+A==}
 
   input-otp@1.4.2:
     resolution: {integrity: sha512-l3jWwYNvrEa6NTCt7BECfCm48GvwuZzkoeG3gBL2w4CHeOXW3eKFmf9UNYkNfYc3mxMrthMnxjIE07MT0zLBQA==}
@@ -1596,6 +1624,12 @@ packages:
     peerDependencies:
       react: ^19.1.0
 
+  react-draggable@4.4.6:
+    resolution: {integrity: sha512-LtY5Xw1zTPqHkVmtM3X8MUOxNDOUhv/khTgBgrUvwaS064bwVvxT+q5El0uUFNx5IEPKXuRejr7UqLwBIg5pdw==}
+    peerDependencies:
+      react: '>= 16.3.0'
+      react-dom: '>= 16.3.0'
+
   react-hook-form@7.56.3:
     resolution: {integrity: sha512-IK18V6GVbab4TAo1/cz3kqajxbDPGofdF0w7VHdCo0Nt8PrPlOZcuuDq9YYIV1BtjcX78x0XsldbQRQnQXWXmw==}
     engines: {node: '>=18.0.0'}
@@ -1633,6 +1667,11 @@ packages:
     peerDependencies:
       react: ^16.14.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc
       react-dom: ^16.14.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+
+  react-resizable@3.0.5:
+    resolution: {integrity: sha512-vKpeHhI5OZvYn82kXOs1bC8aOXktGU5AmKAgaZS4F5JPburCtbmDPqE7Pzp+1kN4+Wb81LlF33VpGwWwtXem+w==}
+    peerDependencies:
+      react: '>= 16.3'
 
   react-smooth@4.0.4:
     resolution: {integrity: sha512-gnGKTpYwqL0Iii09gHobNolvX4Kiq4PKx6eWBCYYix+8cdw+cGo3do906l1NBPKkSWx1DghC1dlWG9L2uGd61Q==}
@@ -2918,6 +2957,8 @@ snapshots:
       '@types/d3-transition': 3.0.9
       '@types/d3-zoom': 3.0.8
 
+  '@types/dagre@0.7.52': {}
+
   '@types/geojson@7946.0.16': {}
 
   '@types/node@20.17.46':
@@ -2925,6 +2966,10 @@ snapshots:
       undici-types: 6.19.8
 
   '@types/react-dom@19.1.4(@types/react@19.1.4)':
+    dependencies:
+      '@types/react': 19.1.4
+
+  '@types/react-resizable@3.0.8':
     dependencies:
       '@types/react': 19.1.4
 
@@ -2951,6 +2996,8 @@ snapshots:
   classcat@5.0.5: {}
 
   client-only@0.0.1: {}
+
+  clsx@1.2.1: {}
 
   clsx@2.1.1: {}
 
@@ -3052,6 +3099,11 @@ snapshots:
       d3-selection: 3.0.0
       d3-transition: 3.0.1(d3-selection@3.0.0)
 
+  dagre@0.8.5:
+    dependencies:
+      graphlib: 2.1.8
+      lodash: 4.17.21
+
   date-fns@4.1.0: {}
 
   decimal.js-light@2.5.1: {}
@@ -3089,6 +3141,10 @@ snapshots:
   get-nonce@1.0.1: {}
 
   graceful-fs@4.2.11: {}
+
+  graphlib@2.1.8:
+    dependencies:
+      lodash: 4.17.21
 
   input-otp@1.4.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:
@@ -3235,6 +3291,13 @@ snapshots:
       react: 19.1.0
       scheduler: 0.26.0
 
+  react-draggable@4.4.6(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
+    dependencies:
+      clsx: 1.2.1
+      prop-types: 15.8.1
+      react: 19.1.0
+      react-dom: 19.1.0(react@19.1.0)
+
   react-hook-form@7.56.3(react@19.1.0):
     dependencies:
       react: 19.1.0
@@ -3266,6 +3329,14 @@ snapshots:
     dependencies:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
+
+  react-resizable@3.0.5(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
+    dependencies:
+      prop-types: 15.8.1
+      react: 19.1.0
+      react-draggable: 4.4.6(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+    transitivePeerDependencies:
+      - react-dom
 
   react-smooth@4.0.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:

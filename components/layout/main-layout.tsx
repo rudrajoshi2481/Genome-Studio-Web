@@ -39,7 +39,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             <ResizablePanelGroup direction="vertical" className="h-full">
               {/* Canvas Area */}
               <ResizablePanel defaultSize={75}>
-                <div className="h-full w-full overflow-auto">
+                <div className="h-full w-full overflow-auto ">
                   {children}
                 </div>
               </ResizablePanel>
@@ -47,7 +47,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               <ResizableHandle withHandle />
 
               {/* Logs/Terminal Area */}
-              <ResizablePanel defaultSize={25} minSize={10} maxSize={50}>
+              <ResizablePanel defaultSize={4} minSize={0} maxSize={80}>
                 <Terminal />
               </ResizablePanel>
             </ResizablePanelGroup>

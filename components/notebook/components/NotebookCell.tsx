@@ -1,0 +1,175 @@
+import React, { useCallback } from 'react';
+import type { Cell, CellOutput } from '../store/types';
+import { CodeMirrorEditor } from './CodeMirrorEditor';
+import { Button } from '@/components/ui/button';
+import { ChevronUp, ChevronDown, Trash2, Play } from 'lucide-react';
+import { CellToolbar } from './CellToolbar';
+import { TerminalOutput } from './TerminalOutput';
+import { useNotebookStore } from '../store/useNotebookStore';
+import { notebookConfig } from '../config/editor';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface NotebookCellProps {
+  cell: Cell;
+  isSelected: boolean;
+  onContentChange: (content: string[]) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onDelete: () => void;
+  onToggleType: () => void;
+  onSelect: () => void;
+  onAddCodeCell: (afterCellId: string) => void;
+  onAddMarkdownCell: (afterCellId: string) => void;
+  onLanguageChange?: (language: string) => void;
+}
+
+export const NotebookCell: React.FC<NotebookCellProps> = ({
+  cell,
+  isSelected,
+  onContentChange,
+  onExecute,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
+  onToggleType,
+  onSelect,
+  onAddCodeCell,
+  onAddMarkdownCell,
+}) => {
+  const { updateCellLanguage, executeCell } = useNotebookStore();
+  const handleCellClick = useCallback(() => {
+    onSelect();
+  }, [onSelect]);
+
+  const handleExecute = useCallback(() => {
+    executeCell(cell.id);
+  }, [executeCell, cell.id]);
+
+  return (
+    <div
+      className={`group relative flex flex-col gap-2 p-2 rounded-lg transition-colors ${isSelected ? 'bg-muted/100' : 'hover:bg-muted/30'}`}
+      onClick={handleCellClick}
+    >
+      <div className="flex items-center gap-1 px-2 py-1 transition-colors">
+        {/* Left side controls */}
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
+            onClick={() => onMoveUp()}
+            title="Move Up"
+          >
+            <ChevronUp className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
+            onClick={() => onMoveDown()}
+            title="Move Down"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
+            onClick={() => onDelete()}
+            title="Delete Cell"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+
+        {/* Cell type indicator and execution controls */}
+        <div className="flex items-center gap-1 min-w-[100px]">
+          {cell.cell_type === 'code' && (
+            <>
+              <div className="text-[11px] tabular-nums font-mono text-muted-foreground w-[40px]">
+                In[{cell.metadata.execution?.execution_count || ' '}]
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
+                onClick={handleExecute}
+                disabled={false}
+                title="Run Cell"
+              >
+                <Play className="h-3 w-3" />
+              </Button>
+
+            </>
+          )}
+        </div>
+      </div>
+        
+      <div className="ml-16 rounded-md overflow-hidden shadow-sm hover:shadow transition-shadow duration-200">
+        <div className="relative bg-background">
+          <CodeMirrorEditor
+            cell={cell}
+            onChange={onContentChange}
+            onExecute={cell.cell_type === 'code' ? onExecute : undefined}
+          />
+          {cell.cell_type === 'code' && (
+            <div className="absolute top-1 right-1 z-10">
+              <Select 
+                value={cell.metadata.language || notebookConfig.defaultLanguage}
+                onValueChange={(value) => updateCellLanguage(cell.id, value)}
+              >
+                <SelectTrigger className="h-5 w-[80px] text-[10px] py-0 px-1.5 bg-background/90 border-none">
+                  <SelectValue placeholder="Language" />
+                </SelectTrigger>
+                <SelectContent className="min-w-[100px]">
+                  {notebookConfig.languages.map((lang) => (
+                    <SelectItem 
+                      key={lang.id} 
+                      value={lang.id} 
+                      className="text-[10px] py-0.5"
+                    >
+                      {lang.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+        {cell.cell_type === 'code' && cell.outputs && cell.outputs.length > 0 && (
+          <div className="relative p-4 pt-6 mt-1 bg-muted/5 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-[300px] rounded-b-md">
+            <div className="absolute left-0 top-0 w-16 flex justify-center items-center h-6 text-xs font-mono text-foreground">
+              Out[{cell.metadata.execution?.execution_count || ' '}]:
+            </div>
+            {cell.outputs && cell.outputs.length > 0 && (
+              <TerminalOutput cell={cell} outputs={cell.outputs} />
+            )}
+            {cell.metadata.custom?.executionTime !== undefined && (
+              <div className="text-xs text-right text-foreground mt-2">
+                Execution time: {cell.metadata.custom.executionTime.toFixed(2)}s
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Cell Toolbar at the bottom */}
+      <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <CellToolbar
+          cellId={cell.id}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+          onDelete={onDelete}
+          onAddCodeCell={onAddCodeCell}
+          onAddMarkdownCell={onAddMarkdownCell}
+        />
+      </div>
+    </div>
+  );
+};

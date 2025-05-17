@@ -1,4 +1,4 @@
-const DEFAULT_HOST = '10.0.0.236';
+const DEFAULT_HOST = 'localhost';
 const DEFAULT_PORT = '8000';
 const DEFAULT_API_VERSION = 'v1';
 
