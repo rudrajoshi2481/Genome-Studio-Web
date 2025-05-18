@@ -49,10 +49,10 @@ export const NotebookCell: React.FC<NotebookCellProps> = ({
 
   return (
     <div
-      className={`group relative flex flex-col gap-2 p-2 rounded-lg transition-colors ${isSelected ? 'bg-muted/100' : 'hover:bg-muted/30'}`}
+      className={`group relative flex flex-col gap-2  transition-colors ${isSelected ? 'bg-muted/30 border-l-4 border-t-1 border-b-1 border-r-1  border-l-blue-400' : 'hover:bg-muted/10'}`}
       onClick={handleCellClick}
     >
-      <div className="flex items-center gap-1 px-2 py-1 transition-colors">
+      <div className="flex items-center gap-1 px-2 py-1  transition-colors">
         {/* Left side controls */}
         <div className="flex items-center gap-0.5">
           <Button
@@ -107,20 +107,20 @@ export const NotebookCell: React.FC<NotebookCellProps> = ({
         </div>
       </div>
         
-      <div className="ml-16 rounded-md overflow-hidden shadow-sm hover:shadow transition-shadow duration-200">
-        <div className="relative bg-background">
+      <div className={`ml-16 rounded-md overflow-hidden  duration-200`}>
+        <div className={`relative bg-background border-2 `}>
           <CodeMirrorEditor
             cell={cell}
             onChange={onContentChange}
             onExecute={cell.cell_type === 'code' ? handleExecute : undefined}
           />
           {cell.cell_type === 'code' && (
-            <div className="absolute top-1 right-1 z-10">
+            <div className="absolute top-0 right-0 z-10  rounded-md">
               <Select 
                 value={cell.metadata.language || notebookConfig.defaultLanguage}
                 onValueChange={(value) => updateCellLanguage(cell.id, value)}
               >
-                <SelectTrigger className="h-5 w-[80px] text-[10px] py-0 px-1.5 bg-background/90 border-none">
+                <SelectTrigger className="h-5 w-[80px]  text-[10px] py-0 px-1.5 bg-background/90 border-none">
                   <SelectValue placeholder="Language" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[100px]">
@@ -139,8 +139,8 @@ export const NotebookCell: React.FC<NotebookCellProps> = ({
           )}
         </div>
         {cell.cell_type === 'code' && cell.outputs && cell.outputs.length > 0 && (
-          <div className="relative p-4 pt-6 mt-1 bg-muted/5 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-[300px] rounded-b-md">
-            <div className="absolute left-0 top-0 w-16 flex justify-center items-center h-6 text-xs font-mono text-foreground">
+          <div className="relative p-4 pt-6 bg-muted/50 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-[300px] border-2 rounded-b-md">
+            <div className="absolute left-0 top-0 w-16 flex justify-center items-center h-6 text-xs font-mono text-foreground ">
               Out[{cell.metadata.execution?.execution_count || ' '}]:
             </div>
             {cell.outputs && cell.outputs.length > 0 && (

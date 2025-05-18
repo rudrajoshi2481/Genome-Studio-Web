@@ -20,7 +20,7 @@ export const TerminalOutput: React.FC<TerminalOutputProps> = ({ cell, outputs })
   }, [cell, outputs]);
 
   return (
-    <div className="font-mono space-y-1 text-black bg-muted/5 p-2">
+    <div className="font-mono space-y-1 text-black bg-muted/5 p-2 ">
       {outputs.map((output, index) => {
         const isError = output.output_type === 'error';
         let content = '';
@@ -37,7 +37,7 @@ export const TerminalOutput: React.FC<TerminalOutputProps> = ({ cell, outputs })
         return (
           <div 
             key={index} 
-            className={`${isError ? 'text-red-400' : 'text-black'}`}
+            className={`${isError ? 'text-red-400' : 'text-black'} `}
           >
             {content}
           </div>
