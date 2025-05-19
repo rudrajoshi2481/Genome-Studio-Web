@@ -1,19 +1,32 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 /* 
-.react-flow__controls {
-  position: absolute !important;
-  bottom: 20px !important;
-  left: 20px !important;
-  z-index: 5 !important;
+/* Add this to your global CSS file */
+.react-flow__node.node-resizing {
+  pointer-events: none;
 }
 
-.react-flow__minimap {
-  position: absolute !important;
-  bottom: 20px !important;
-  right: 20px !important;
-  z-index: 5 !important;
-} */
+.node-resizing .react-resizable-handle {
+  pointer-events: auto !important;
+}
+
+/* Make resize handles more visible */
+.react-resizable-handle {
+  background-color: rgba(0, 120, 255, 0.4);
+  border-radius: 50%;
+  width: 10px !important;
+  height: 10px !important;
+  z-index: 10;
+}
+
+.react-resizable-handle:hover {
+  background-color: rgba(0, 120, 255, 0.7);
+}
+
+/* Prevent node dragging when resizing */
+.react-flow__node {
+  cursor: default;
+}
 
 
 

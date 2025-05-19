@@ -7,8 +7,8 @@ import { Notebook } from '@/components/notebook/components/Notebook';
 export default function Home() {
   return (
     <MainLayout>
-      {/* <Canvas /> */}
-      <Notebook />
+      <Canvas />
+      {/* <Notebook /> */}
     </MainLayout>
   );
 }
