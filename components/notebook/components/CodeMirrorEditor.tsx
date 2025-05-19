@@ -77,32 +77,32 @@ const createLanguageCompletion = (language: string) => {
 const getLanguageExtension = (language: string): LanguageSupport => {
   const lang = notebookConfig.languages.find(l => l.id === language);
   const mimeType = lang?.mimeType || 'text/x-python';
-  console.log(`[SyntaxHighlighting] Configuring language mode for: ${language} (MIME: ${mimeType})`);
+
 
   let extension: LanguageSupport;
   // Map MIME types to available CodeMirror language extensions
   switch (mimeType) {
     case 'text/javascript':
-      console.log('[SyntaxHighlighting] Using JavaScript mode');
+
       extension = javascript();
       break;
     case 'text/typescript':
-      console.log('[SyntaxHighlighting] Using TypeScript mode');
+
       extension = javascript({ typescript: true });
       break;
     case 'text/x-python':
-      console.log('[SyntaxHighlighting] Using Python mode with autocompletion');
+
       extension = python();
       break;
     case 'text/x-r':
-      console.log('[SyntaxHighlighting] Using R mode with autocompletion');
+
       extension = new LanguageSupport(
         StreamLanguage.define(r),
         [autocompletion({ override: [createLanguageCompletion('r')] })]
       );
       break;
     case 'text/x-sh':
-      console.log('[SyntaxHighlighting] Using Shell/Bash mode with autocompletion');
+
       extension = new LanguageSupport(
         StreamLanguage.define(shell),
         [autocompletion({ override: [createLanguageCompletion('bash')] })]
@@ -229,12 +229,6 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
       }),
       EditorView.domEventHandlers({
         keydown: (event, view) => {
-          console.log('[Editor Keypress]', {
-            key: event.key,
-            cellId: cell.id,
-            content: view.state.doc.toString(),
-            timestamp: new Date().toISOString(),
-          });
           return false;
         }
       }),
@@ -290,8 +284,8 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     if (!editorViewRef.current || !cell.source || cell.source.length === 0) return;
     const currentContent = editorViewRef.current.state.doc.toString();
     if (currentContent !== cell.source.join('\n')) {
-      console.log(`[EditorUpdate] Updating content for cell ${cell.id}`);
-      console.log('[EditorUpdate] Language:', cell.metadata?.language || 'default');
+
+
       const transaction = editorViewRef.current.state.update({
         changes: {
           from: 0,
@@ -306,13 +300,13 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   // Update the language when it changes
   useEffect(() => {
     if (!editorViewRef.current || !languageCompartmentRef.current) return;
-    console.log(`[LanguageUpdate] Language changed for cell ${cell.id}:`, cell.metadata?.language || 'python');
+
     const extension = getLanguageExtension(cell.metadata?.language || 'python');
     const transaction = editorViewRef.current.state.update({
       effects: languageCompartmentRef.current.reconfigure(extension)
     });
     editorViewRef.current.dispatch(transaction);
-    console.log('[LanguageUpdate] Language extension applied successfully');
+
   }, [cell.metadata?.language]);
 
   return (

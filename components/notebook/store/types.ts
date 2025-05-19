@@ -2,11 +2,24 @@ export type JupyterCellType = 'code' | 'markdown' | 'raw';
 export type OutputType = 'stream' | 'display_data' | 'execute_result' | 'error';
 
 export interface CellOutput {
-  output_type: OutputType;
-  name?: string;
+  output_type: string;
   text?: string[];
-  data?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
+  ename?: string;
+  evalue?: string;
+  traceback?: string[];
+  data?: {
+    [key: string]: any;
+  };
+}
+
+export interface CellCustomMetadata {
+  collapsed?: boolean;
+  executionTime?: number;
+  isError?: boolean;
+  serverLogs?: {
+    sentTime?: number;
+    receivedTime?: number;
+  };
 }
 
 export interface CellMetadata {
@@ -14,10 +27,7 @@ export interface CellMetadata {
   execution?: {
     execution_count: number | null;
   };
-  custom?: {
-    isError?: boolean;
-    executionTime?: number;
-  };
+  custom?: CellCustomMetadata;
   language?: string;
 }
 

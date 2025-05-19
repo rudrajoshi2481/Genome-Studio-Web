@@ -2,7 +2,6 @@ import { StateCreator } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { NotebookState, JupyterCellType, CellOutput } from './types';
 import { deepCloneCell, logAction, logSourceChange, logCellState, createEmptyCell } from './utils';
-import { executeCode } from '../services/codeExecution';
 
 export interface NotebookActions {
   addCell: (cell_type: JupyterCellType) => void;
@@ -63,10 +62,8 @@ export const createActions: StateCreator<NotebookState & NotebookActions, [], []
       
       // Log any differences in metadata after cloning
       if (JSON.stringify(clonedCell.metadata) !== JSON.stringify(originalCell.metadata)) {
-        console.log('[Metadata Change] During clone:', {
-          before: originalCell.metadata,
-          after: clonedCell.metadata
-        });
+
+
       }
       
       newCells[index] = {
@@ -119,7 +116,7 @@ export const createActions: StateCreator<NotebookState & NotebookActions, [], []
       // If at the top, move to bottom
       if (index === 0) {
         const lastIndex = state.cells.length - 1;
-        console.log('[Move Top->Bottom] Moving cell:', movingCell);
+
         
         // Shift all cells up by one
         for (let i = 0; i < lastIndex; i++) {
@@ -130,8 +127,7 @@ export const createActions: StateCreator<NotebookState & NotebookActions, [], []
       } else {
         // Normal case - swap with cell above
         const targetCell = deepCloneCell(newCells[index - 1]);
-        console.log('[Move Up] Moving cell:', movingCell);
-        console.log('[Move Up] Target cell:', targetCell);
+
         
         newCells[index - 1] = movingCell;
         newCells[index] = targetCell;
@@ -150,8 +146,7 @@ export const createActions: StateCreator<NotebookState & NotebookActions, [], []
       const index = state.cells.findIndex(cell => cell.id === id);
       if (index === -1 || index >= state.cells.length - 1) return state;
 
-      console.log('[Before Move Down] Moving cell:', state.cells[index]);
-      console.log('[Before Move Down] Target cell:', state.cells[index + 1]);
+
 
       const newCells = [...state.cells];
       
@@ -159,15 +154,13 @@ export const createActions: StateCreator<NotebookState & NotebookActions, [], []
       const movingCell = deepCloneCell(newCells[index]);
       const targetCell = deepCloneCell(newCells[index + 1]);
       
-      console.log('[After Clone] Moving cell:', movingCell);
-      console.log('[After Clone] Target cell:', targetCell);
+
       
       // Simply swap the entire cells to preserve all data
       newCells[index + 1] = movingCell;
       newCells[index] = targetCell;
 
-      console.log('[After Swap] Cell at index:', newCells[index]);
-      console.log('[After Swap] Cell at index+1:', newCells[index + 1]);
+
 
       return {
         cells: newCells,
@@ -250,9 +243,15 @@ export const createActions: StateCreator<NotebookState & NotebookActions, [], []
   },
 
   executeCell: async (id: string) => {
+    logAction('executeCell', { id });
+    console.log('[NotebookStore] Executing cell:', id);
+    
     const state = get();
     const cell = state.cells.find(c => c.id === id);
-    if (!cell || cell.cell_type !== 'code') return;
+    if (!cell) {
+      console.error('[NotebookStore] Cell not found:', id);
+      return;
+    }
 
     try {
       // Increment global execution count
@@ -273,27 +272,32 @@ export const createActions: StateCreator<NotebookState & NotebookActions, [], []
         )
       }));
 
-      // Execute code and get results
-      const { outputs, executionTime } = await executeCode(cell);
-
-      // Update cell with outputs and execution time
+      console.log('[NotebookStore] Calling WebSocket service for cell:', id);
+      
+      // Import and use the WebSocket service
+      const { notebookWebSocket } = await import('../services/notebookWebSocket');
+      const outputs = await notebookWebSocket.executeCode(id, cell.source, cell.metadata.language || 'python');
+      
+      console.log('[NotebookStore] Execution completed, outputs:', outputs);
+      
+      // Update cell with outputs
       set((state) => ({
+        ...state,
         cells: state.cells.map(c =>
           c.id === id
             ? {
                 ...c,
-                outputs,
-                metadata: {
-                  ...c.metadata,
-                  custom: { ...c.metadata.custom, executionTime }
-                }
+                outputs
               }
             : c
         )
       }));
     } catch (error) {
+      console.error('[NotebookStore] Execution error:', error);
+      
       // Handle execution error
       set((state) => ({
+        ...state,
         cells: state.cells.map(c =>
           c.id === id
             ? {

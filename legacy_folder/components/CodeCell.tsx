@@ -65,10 +65,10 @@ export const CodeCell: React.FC<CodeCellProps> = ({
         {/* Cell output area */}
         {cell.outputs && cell.outputs.length > 0 && (
           <div className="border-t">
-            <div className="absolute left-0 w-16 flex flex-col items-center pt-2">
+            {/* <div className="absolute left-0 w-16 flex flex-col items-center pt-2">
               <div className="text-xs font-mono text-muted-foreground">Out[{cell.metadata.executionCount || ' '}]</div>
-            </div>
-            <pre className="ml-16 p-4 text-sm whitespace-pre-wrap bg-muted/5">{cell.outputs.join("\n")}</pre>
+            </div> */}
+            {/* <pre className="ml-16 p-4 text-sm whitespace-pre-wrap bg-muted/5">{cell.outputs.join("")}</pre> */}
           </div>
         )}
       </div>

@@ -2,8 +2,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { Cell, NotebookState, JupyterCellType } from './types';
 
 export const deepCloneCell = (cell: Cell): Cell => {
-  console.log('[DeepClone] Input cell:', JSON.stringify(cell, null, 2));
-  
   const clonedCell: Cell = {
     id: cell.id,
     cell_type: cell.cell_type,
@@ -20,21 +18,20 @@ export const deepCloneCell = (cell: Cell): Cell => {
     },
     outputs: cell.outputs?.map(output => ({ ...output })) ?? undefined
   };
-  
-  console.log('[DeepClone] Cloned result:', JSON.stringify(clonedCell, null, 2));
+
   return clonedCell;
 };
 
 export const logAction = (action: string, params: any) => {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}][NotebookStore] ${action}`, {
+  ({ 
     ...params,
     _trace: new Error().stack?.split('\n').slice(2).join('\n')
   });
 };
 
 export const logSourceChange = (prefix: string, cellId: string, oldSource: string[], newSource: string[]) => {
-  console.log(`[SourceChange][${prefix}] Cell ${cellId}:`, {
+  ({
     previousSource: oldSource.join('\n'),
     newSource: newSource.join('\n'),
     changeSize: newSource.join('\n').length - oldSource.join('\n').length,
@@ -43,7 +40,7 @@ export const logSourceChange = (prefix: string, cellId: string, oldSource: strin
 };
 
 export const logCellState = (prefix: string, cell: any) => {
-  console.log(`[CellState][${prefix}]`, {
+  ({
     id: cell.id,
     type: cell.cell_type,
     sourceLength: cell.source.join('\n').length,
@@ -70,7 +67,6 @@ export const createEmptyCell = (cell_type: JupyterCellType): Cell => {
 };
 
 export const serializeToIpynb = (state: NotebookState) => {
-  console.log('Serializing notebook state to ipynb format');
   const result = {
     cells: state.cells.map(cell => ({
       cell_type: cell.cell_type,
@@ -83,12 +79,10 @@ export const serializeToIpynb = (state: NotebookState) => {
     nbformat: 4,
     nbformat_minor: 5
   };
-  console.log('Serialization result:', result);
   return result;
 };
 
 export const deserializeFromIpynb = (ipynb: any): Partial<NotebookState> => {
-  console.log('Deserializing ipynb format to notebook state');
   const notebookData = {
     cells: ipynb.cells.map((cell: any) => ({
       id: crypto.randomUUID(),

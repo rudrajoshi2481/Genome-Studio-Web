@@ -1,17 +1,11 @@
 import React, { useEffect } from 'react';
 import { NotebookCell } from './NotebookCell';
 import { useNotebookStore } from '../store/useNotebookStore';
-import { Button } from '@/components/ui/button';
-import { PlusCircle, Code, FileText } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CellToolbar } from './CellToolbar';
 import { CellOutput, JupyterCellType } from '../store/types';
+import { notebookWebSocket } from '../services/notebookWebSocket';
 
-interface NotebookProps {
-  onExecuteCell?: (cellId: string, code: string[], language: string) => Promise<CellOutput[]>;
-}
-
-export const Notebook: React.FC<NotebookProps> = ({ onExecuteCell }) => {
+export const Notebook: React.FC = () => {
   const {
     cells,
     selectedCellId,
@@ -24,52 +18,35 @@ export const Notebook: React.FC<NotebookProps> = ({ onExecuteCell }) => {
     moveCellDown,
     selectCell,
     setExecutionCount,
-    toggleCellType,
     setCellError,
   } = useNotebookStore();
 
-  // Add an initial cell if the notebook is empty
-  // useEffect(() => {
-  //   if (cells.length === 0) {
-  //     addCell('code');
-  //   }
-  // }, [cells.length, addCell]);
+  useEffect(() => {
+    // Connect to WebSocket when component mounts
+    notebookWebSocket.connect();
+    return () => notebookWebSocket.disconnect();
+  }, []);
 
   const handleExecuteCell = async (cellId: string) => {
-    if (!onExecuteCell) return;
-    
     const cell = cells.find(c => c.id === cellId);
     if (!cell || cell.cell_type !== 'code') return;
     
-    // Check if this is a terminal command (starts with ! or $)
-    const sourceText = cell.source.join('');
-    const isTerminalCommand = sourceText.trim().startsWith('!') || sourceText.trim().startsWith('$');
-    
     try {
       const startTime = performance.now();
-      
-      // Set execution count
-      const executionCount = cell.metadata.execution?.execution_count || 1;
+      const executionCount = (cell.metadata.execution?.execution_count || 0) + 1;
       setExecutionCount(cellId, executionCount);
       
-      // Execute the cell
-      const outputs = await onExecuteCell(cellId, cell.source, 'python');
-      const executionTime = (performance.now() - startTime) / 1000; // Convert to seconds
+      const outputs = await notebookWebSocket.executeCode(cellId, cell.source, 'python');
+      const executionTime = (performance.now() - startTime) / 1000;
       
-      // Update the cell outputs
       updateCellOutputs(cellId, outputs);
+      setCellError(cellId, null);
       
-      // Update cell custom metadata
-      setCellError(cellId, null); // Clear any previous error
-      
-      // Update execution time in custom metadata
-      // This would need a new method in the store
       const updatedCell = cells.find(c => c.id === cellId);
       if (updatedCell) {
-        updateCellSource(cellId, updatedCell.source); // Ensure source is saved
+        updateCellSource(cellId, updatedCell.source);
       }
     } catch (error) {
-      // Create an error output
       const errorOutput: CellOutput = {
         output_type: 'error',
         text: [`Error: ${error instanceof Error ? error.message : String(error)}`],
@@ -80,14 +57,7 @@ export const Notebook: React.FC<NotebookProps> = ({ onExecuteCell }) => {
     }
   };
 
-  const handleAddCell = (type: JupyterCellType) => {
-    addCell(type);
-  };
-
-  // Get the selected cell - don't default to first cell which causes selection issues
   const selectedCell = selectedCellId ? cells.find(cell => cell.id === selectedCellId) : null;
-  
-  // State for hover visibility
   const [isHovering, setIsHovering] = React.useState(false);
 
   return (
@@ -95,7 +65,6 @@ export const Notebook: React.FC<NotebookProps> = ({ onExecuteCell }) => {
       <div className="flex flex-col gap-2 relative" 
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}>
-        {/* Show toolbar when: no cells exist, or when hovering, or when a cell is selected */}
         {(cells.length === 0 || isHovering) && (
           <CellToolbar 
             cellId={selectedCell?.id || ''}
@@ -117,6 +86,7 @@ export const Notebook: React.FC<NotebookProps> = ({ onExecuteCell }) => {
             cell={cell}
             isSelected={selectedCellId === cell.id}
             onContentChange={(source) => updateCellSource(cell.id, source)}
+            onExecute={() => handleExecuteCell(cell.id)}
             onMoveUp={() => moveCellUp(cell.id)}
             onMoveDown={() => moveCellDown(cell.id)}
             onDelete={() => deleteCell(cell.id)}

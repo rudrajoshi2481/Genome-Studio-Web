@@ -1,5 +1,5 @@
-const DEFAULT_HOST = 'localhost';
-const DEFAULT_PORT = '8000';
+export const DEFAULT_HOST = '10.0.0.236';
+export const DEFAULT_PORT = '8000';
 const DEFAULT_API_VERSION = 'v1';
 
 const getBaseUrl = () => {

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 
 interface NotebookCellProps {
+  onExecute: () => Promise<void>;
   cell: Cell;
   isSelected: boolean;
   onContentChange: (content: string[]) => void;
@@ -26,6 +27,10 @@ interface NotebookCellProps {
   onAddCodeCell: (afterCellId: string) => void;
   onAddMarkdownCell: (afterCellId: string) => void;
 }
+
+const formatExecutedCode = (source: string[]): string => {
+  return source.join('\n');
+};
 
 export const NotebookCell: React.FC<NotebookCellProps> = ({
   cell,
@@ -139,19 +144,7 @@ export const NotebookCell: React.FC<NotebookCellProps> = ({
           )}
         </div>
         {cell.cell_type === 'code' && cell.outputs && cell.outputs.length > 0 && (
-          <div className="relative p-4 pt-6 bg-muted/50 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-[300px] border-2 rounded-b-md">
-            <div className="absolute left-0 top-0 w-16 flex justify-center items-center h-6 text-xs font-mono text-foreground ">
-              Out[{cell.metadata.execution?.execution_count || ' '}]:
-            </div>
-            {cell.outputs && cell.outputs.length > 0 && (
-              <TerminalOutput cell={cell} outputs={cell.outputs} />
-            )}
-            {cell.metadata.custom?.executionTime !== undefined && (
-              <div className="text-xs text-right text-foreground mt-2">
-                Execution time: {cell.metadata.custom.executionTime.toFixed(2)}s
-              </div>
-            )}
-          </div>
+          <TerminalOutput cell={cell} outputs={cell.outputs} />
         )}
       </div>
       
