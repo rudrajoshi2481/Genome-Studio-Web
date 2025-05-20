@@ -1,7 +1,6 @@
-// Canvas.tsx
 "use client"
 
-import { useCallback, useLayoutEffect } from "react"
+import { useCallback, useLayoutEffect, useRef } from "react"
 import ReactFlow, {
   ReactFlowProvider,
   MiniMap,
@@ -13,11 +12,13 @@ import ReactFlow, {
   Connection,
   Edge,
   Node,
-  Position
+  Position,
+  useReactFlow
 } from "reactflow"
 import dagre from "dagre"
 import "reactflow/dist/style.css"
 import CustomBashNode from "./components/CustomBashNode"
+import React from "react"
 
 const nodeTypes = {
   bashNode: CustomBashNode,
@@ -86,7 +87,9 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   return { nodes: layoutedNodes, edges }
 }
 
-export function Canvas() {
+function Flow() {
+  const reactFlowWrapper = useRef<HTMLDivElement>(null)
+  const { project } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
@@ -103,29 +106,64 @@ export function Canvas() {
     [setEdges],
   )
 
+  const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }, [])
+
+  const onDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault()
+
+      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect()
+      const data = event.dataTransfer.getData('application/reactflow')
+      
+      if (!data || !reactFlowBounds) return
+
+      const nodeTemplate = JSON.parse(data)
+      const position = project({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      })
+
+      const newNode = {
+        id: `${Date.now()}`,
+        type: 'bashNode',
+        position,
+        data: {
+          title: nodeTemplate.title,
+          command: nodeTemplate.command,
+          status: 'Upcoming',
+          logs: [],
+        },
+      }
+
+      setNodes((nds) => nds.concat(newNode))
+    },
+    [project, setNodes],
+  )
+
   return (
-    <div style={{ width: '100%', height: '100%' }} >
-      <ReactFlowProvider>
-        <div style={{ width: '100%', height: '100%' }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            nodeTypes={nodeTypes}
-            fitView
-            defaultEdgeOptions={{
-              animated: true,
-              style: { stroke: '#999', strokeWidth: 2 },
-            }}
-          >
-            <MiniMap />
-            <Controls />
-            <Background gap={12} size={1} />
-          </ReactFlow>
-        </div>
-      </ReactFlowProvider>
+    <div className="w-full h-full" ref={reactFlowWrapper}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        nodeTypes={nodeTypes}
+        fitView
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        defaultEdgeOptions={{
+          animated: true,
+          style: { stroke: '#999', strokeWidth: 2 },
+        }}
+      >
+        <Controls />
+        <MiniMap />
+        <Background gap={12} size={1} />
+      </ReactFlow>
     </div>
   )
 }
