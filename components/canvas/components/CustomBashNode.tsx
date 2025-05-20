@@ -1,7 +1,7 @@
 // components/CustomBashNode.tsx
 "use client"
 
-import type React from "react"
+import React from "react"
 import { ResizableBox } from 'react-resizable'
 import 'react-resizable/css/styles.css'
 import { Handle, Position, type NodeProps } from "reactflow"
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Terminal, ChevronDown, ChevronUp, Play, CheckCircle, XCircle, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
@@ -37,42 +37,65 @@ export default function CustomBashNode({ data, selected, id }: NodeProps<BashNod
   const contentRef = useRef<HTMLDivElement>(null)
   const cardContentRef = useRef<HTMLDivElement>(null)
   const cardFooterRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLDivElement>(null)
+  const logsRef = useRef<HTMLDivElement>(null)
   const initialWidthRef = useRef(300)
   const nodeRef = useRef<HTMLDivElement>(null)
   // const { setDraggable } = useDraggable(id)
 
+  const calculateHeight = useCallback(() => {
+    if (!cardContentRef.current || !headerRef.current || !cardFooterRef.current) return null;
+
+    const headerHeight = headerRef.current.offsetHeight || 40;
+    const contentHeight = cardContentRef.current.offsetHeight || 0;
+    const footerHeight = cardFooterRef.current.offsetHeight || 37; // Default footer height
+    const logsHeight = showLogs && logsRef.current ? logsRef.current.offsetHeight : 0;
+
+    const totalHeight = headerHeight + contentHeight + footerHeight + logsHeight;
+
+    console.log('📐 Height calculation:', {
+      headerHeight,
+      contentHeight,
+      footerHeight,
+      logsHeight,
+      totalHeight,
+      autoSizing,
+      isCollapsed,
+      showLogs
+    });
+
+    // Always update height on initial render or when auto-sizing
+    if (!isCollapsed && (autoSizing || !dimensions.height)) {
+      const newHeight = Math.max(totalHeight, 250); // Minimum height of 250px
+      setDimensions(prev => ({
+        ...prev,
+        height: newHeight
+      }));
+      return newHeight;
+    }
+
+    return totalHeight;
+  }, [dimensions.height, autoSizing, isCollapsed, showLogs]);
+
+  // Initial height calculation
   useEffect(() => {
-    if (!autoSizing || isCollapsed || !contentRef.current) return;
-
-    if (initialWidthRef.current === 300) {
-      initialWidthRef.current = dimensions.width;
+    const newHeight = calculateHeight();
+    if (newHeight !== null && !dimensions.height) {
+      setDimensions(prev => ({
+        width: prev.width,
+        height: newHeight
+      }));
     }
+  }, [calculateHeight]);
 
-    const cardContent = cardContentRef.current;
-    const cardFooter = cardFooterRef.current;
-    const headerHeight = 40;
-
-    let contentHeight = 0;
-    let footerHeight = 0;
-
-    if (cardContent) {
-      contentHeight = cardContent.scrollHeight;
-    }
-
-    if (cardFooter) {
-      footerHeight = cardFooter.scrollHeight;
-    }
-
-    const logsContainer = contentRef.current.querySelector('.logs-container') as HTMLElement;
-    const logsHeight = showLogs && logsContainer ? Math.min(200, logsContainer.scrollHeight) : 0;
-
-    const totalHeight = headerHeight + contentHeight + footerHeight + (showLogs ? logsHeight : 0);
-
-    setDimensions(prev => ({
-      width: prev.width,
-      height: isCollapsed ? 40 : totalHeight
-    }));
-  }, [showLogs, isCollapsed, autoSizing, data]);
+  // Update height when logs are toggled or auto-sizing changes
+  useEffect(() => {
+    if (!autoSizing) return;
+    // Use RAF to ensure DOM has updated
+    requestAnimationFrame(() => {
+      calculateHeight();
+    });
+  }, [showLogs, autoSizing, calculateHeight]);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -80,9 +103,20 @@ export default function CustomBashNode({ data, selected, id }: NodeProps<BashNod
     }
   }, []);
 
+  useEffect(() => {
+    // Initial height calculation
+    calculateHeight();
+  }, []);
+
   const handleResize = (_event: React.SyntheticEvent, { size }: { size: { width: number; height: number } }) => {
     _event.stopPropagation();
     setAutoSizing(false);
+    console.log('✋ Manual resize:', { 
+      width: size.width, 
+      height: size.height,
+      isCollapsed,
+      showLogs
+    });
     setDimensions({
       width: size.width,
       height: size.height
@@ -91,8 +125,20 @@ export default function CustomBashNode({ data, selected, id }: NodeProps<BashNod
 
   const toggleLogs = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowLogs(!showLogs);
-    setAutoSizing(true);
+    setShowLogs(prev => {
+      const newShowLogs = !prev;
+      console.log('📜 Logs toggled:', { showLogs: newShowLogs });
+      
+      // Force recalculation of height when logs are toggled
+      setTimeout(() => {
+        setAutoSizing(true);
+        calculateHeight();
+        // Reset autoSizing after calculation
+        setTimeout(() => setAutoSizing(false), 100);
+      }, 0);
+      
+      return newShowLogs;
+    });
   }
 
   const handleResizeStart = (e: React.SyntheticEvent) => {
@@ -119,6 +165,25 @@ export default function CustomBashNode({ data, selected, id }: NodeProps<BashNod
     document.addEventListener('mouseup', handleMouseUp, { once: true });
   }
 
+  React.useEffect(() => {
+    if (!nodeRef.current) return;
+    
+    const resizeObserver = new ResizeObserver(() => {
+      if (autoSizing) {
+        calculateHeight();
+      }
+    });
+
+    const currentNode = contentRef.current;
+    if (currentNode) {
+      resizeObserver.observe(currentNode);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [autoSizing, calculateHeight]);
+
   return (
     <div ref={nodeRef} className="react-flow__node-content" style={{ position: 'relative' }}>
       <ResizableBox 
@@ -138,13 +203,16 @@ export default function CustomBashNode({ data, selected, id }: NodeProps<BashNod
           overflow: 'visible', 
           transition: 'height 0.2s ease',
           position: 'relative',
-          zIndex: 1
+          zIndex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%'
         }}
       >
         <Card
           ref={contentRef}
           className={cn(
-            "w-full h-full transition-all duration-200 rounded-lg p-0 shadow-sm border bg-background",
+            "w-full h-full transition-all duration-200 rounded-lg p-0 shadow-sm border bg-background flex flex-col",
             selected ? "ring-2 ring-blue-400" : "ring-0",
             isCollapsed ? "h-[40px] overflow-hidden" : "overflow-visible"
           )}
@@ -162,7 +230,9 @@ export default function CustomBashNode({ data, selected, id }: NodeProps<BashNod
             className="bg-muted px-4 py-2 border-b flex items-center justify-between cursor-pointer hover:bg-muted/70 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
-              setIsCollapsed(!isCollapsed);
+              const newIsCollapsed = !isCollapsed;
+              console.log('🔄 Collapse toggled:', { isCollapsed: newIsCollapsed });
+              setIsCollapsed(newIsCollapsed);
             }}
           >
             <div className="flex items-center">
@@ -172,7 +242,7 @@ export default function CustomBashNode({ data, selected, id }: NodeProps<BashNod
             <ChevronDown className={cn("w-4 h-4 transition-transform", isCollapsed ? "rotate-180" : "")} />
           </div>
 
-          <CardContent ref={cardContentRef} className="space-y-3 m-0 w-full">
+          <CardContent ref={cardContentRef} className="space-y-3 m-0 w-full flex-1">
             <div className="space-y-3 w-full">
               <div className="text-sm font-medium">Run command</div>
               <Input
