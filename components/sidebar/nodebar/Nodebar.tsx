@@ -7,9 +7,13 @@ function Nodebar() {
   const { nodeTemplates } = useNodeStore()
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>, node: any) => {
-    event.dataTransfer.setData('application/reactflow', JSON.stringify(node))
+    const nodeData = {
+      title: node.title,
+      command: node.command,
+      type: node.type || 'bashNode'
+    }
+    event.dataTransfer.setData('application/reactflow', JSON.stringify(nodeData))
     event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('nodeType', 'bashNode')
   }
 
   return (

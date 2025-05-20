@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useLayoutEffect, useRef } from "react"
+import React, { useCallback, useLayoutEffect, useRef } from "react"
 import ReactFlow, {
   ReactFlowProvider,
   MiniMap,
@@ -11,34 +11,44 @@ import ReactFlow, {
   addEdge,
   Connection,
   Edge,
-  Node,
   Position,
-  useReactFlow
+  useReactFlow,
 } from "reactflow"
 import dagre from "dagre"
 import "reactflow/dist/style.css"
-import CustomBashNode from "./components/CustomBashNode"
-import React from "react"
+
+// Import node components directly
+import BashNode from "./nodes/bash/BashNode"
+import AlignerNode from "./nodes/aligner/AlignerNode"
+import SamToBamNode from "./nodes/converter/SamToBamNode"
+import { BashNodeData, AlignerNodeData, FlowNode, SamToBamData } from "./types"
 
 const nodeTypes = {
-  bashNode: CustomBashNode,
-}
+  bashNode: BashNode,
+  alignerNode: AlignerNode,
+  samToBamNode: SamToBamNode
+} as const;
 
-const initialNodes = [
+const initialNodes: FlowNode[] = [
   {
     id: "1",
-    type: "bashNode",
+    type: "alignerNode",
     position: { x: 100, y: 100 },
     data: {
       title: "BWA Alignment",
       status: "Running",
       command: "bwa mem -SP5 -t 8 reference.fa R1.fastq R2.fastq > aligned.sam",
       logs: ["> BWA started...", "> Alignment complete"],
+      threads: 8,
+      reference: "reference.fa",
+      inputR1: "R1.fastq",
+      inputR2: "R2.fastq",
+      outputFile: "aligned.sam"
     },
   },
   {
     id: "2",
-    type: "bashNode",
+    type: "samToBamNode",
     position: { x: 100, y: 250 },
     data: {
       title: "SAM to BAM",
@@ -47,14 +57,13 @@ const initialNodes = [
       logs: ["> Converting SAM to BAM...", "> Sorted BAM ready"],
     },
   },
-]
+] as const
 
 const initialEdges = [
   { id: "e1-2", source: "1", target: "2" },
-  { id: "e2-3", source: "2", target: "3" },
 ]
 
-const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
+const getLayoutedElements = (nodes: FlowNode[], edges: Edge[], direction = 'LR') => {
   const dagreGraph = new dagre.graphlib.Graph()
   dagreGraph.setDefaultEdgeLabel(() => ({}))
 
@@ -87,10 +96,11 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   return { nodes: layoutedNodes, edges }
 }
 
-function Flow() {
+function FlowContent() {
+  type NodeTypes = typeof nodeTypes;
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
   const { project } = useReactFlow()
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  const [nodes, setNodes, onNodesChange] = useNodesState<BashNodeData | AlignerNodeData>(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
   useLayoutEffect(() => {
@@ -126,17 +136,33 @@ function Flow() {
         y: event.clientY - reactFlowBounds.top,
       })
 
-      const newNode = {
-        id: `${Date.now()}`,
-        type: 'bashNode',
-        position,
-        data: {
-          title: nodeTemplate.title,
-          command: nodeTemplate.command,
-          status: 'Upcoming',
-          logs: [],
-        },
+      const baseData = {
+        title: nodeTemplate.title,
+        command: nodeTemplate.command,
+        status: 'Upcoming' as const,
+        logs: [] as string[],
       }
+
+      const newNode = nodeTemplate.type === 'alignerNode'
+        ? {
+            id: `${Date.now()}`,
+            type: 'alignerNode' as const,
+            position,
+            data: {
+              ...baseData,
+              threads: 8,
+              reference: 'reference.fa',
+              inputR1: 'R1.fastq',
+              inputR2: 'R2.fastq',
+              outputFile: 'aligned.sam',
+            },
+          }
+        : {
+            id: `${Date.now()}`,
+            type: 'bashNode' as const,
+            position,
+            data: baseData,
+          }
 
       setNodes((nds) => nds.concat(newNode))
     },
@@ -148,10 +174,10 @@ function Flow() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        nodeTypes={nodeTypes}
         fitView
         onDragOver={onDragOver}
         onDrop={onDrop}
@@ -165,5 +191,13 @@ function Flow() {
         <Background gap={12} size={1} />
       </ReactFlow>
     </div>
+  )
+}
+
+export function Flow() {
+  return (
+    <ReactFlowProvider>
+      <FlowContent />
+    </ReactFlowProvider>
   )
 }
