@@ -64,14 +64,14 @@ export const createActions = (
     const currentTree = get().fileTree;
     if (!currentTree) return;
 
-    console.log('[FileWatch] Handling file event:', event);
+    // console.log('[FileWatch] Handling file event:', event);
 
     // Update tree structure based on the operation type
     switch (event.operation) {
       case 'created':
       case 'modified': {
         if (!event.node) {
-          console.error('[FileWatch] Missing node data for create/modify operation');
+          // console.error('[FileWatch] Missing node data for create/modify operation');
           return;
         }
 
@@ -79,11 +79,11 @@ export const createActions = (
         const nodePath = event.node.path;
         const parentPath = nodePath.substring(0, nodePath.lastIndexOf('/'));
 
-        console.log('[FileWatch] Adding/updating node:', {
-          nodePath,
-          parentPath,
-          nodeDetails: event.node
-        });
+        // console.log('[FileWatch] Adding/updating node:', {
+        //   nodePath,
+        //   parentPath,
+        //   nodeDetails: event.node
+        // });
 
         set((state: State) => {
           const updateTree = (node: FileNode): FileNode => {
@@ -93,14 +93,14 @@ export const createActions = (
               
               if (existingNodeIndex === -1) {
                 // Node doesn't exist, add it
-                console.log('[FileWatch] Adding new node to', node.path);
+                // console.log('[FileWatch] Adding new node to', node.path);
                 return {
                   ...node,
                   children: [...(node.children || []), event.node!]
                 };
               } else {
                 // Node exists, update it
-                console.log('[FileWatch] Updating existing node in', node.path);
+                // console.log('[FileWatch] Updating existing node in', node.path);
                 return {
                   ...node,
                   children: node.children!.map((child, index) => 
@@ -128,18 +128,18 @@ export const createActions = (
 
       case 'deleted': {
         const pathToDelete = event.path;
-        console.log('[FileWatch] Processing delete for path:', pathToDelete);
+        // console.log('[FileWatch] Processing delete for path:', pathToDelete);
 
         set((state: State) => {
           const parentPath = pathToDelete.substring(0, pathToDelete.lastIndexOf('/'));
-          console.log('[FileWatch] Will look for parent path:', parentPath);
+          // console.log('[FileWatch] Will look for parent path:', parentPath);
           
           const updateTree = (node: FileNode): FileNode => {
             // If this is the parent directory where we need to remove the node
             if (node.path === parentPath && node.children) {
-              console.log('[FileWatch] Found parent node:', node.path, 'children before:', node.children.length);
+              // console.log('[FileWatch] Found parent node:', node.path, 'children before:', node.children.length);
               const updatedChildren = node.children.filter(child => child.path !== pathToDelete);
-              console.log('[FileWatch] Children after filter:', updatedChildren.length);
+              // console.log('[FileWatch] Children after filter:', updatedChildren.length);
               
               return {
                 ...node,
@@ -160,7 +160,7 @@ export const createActions = (
           };
           
           const updatedTree = updateTree(currentTree);
-          console.log('[FileWatch] Tree updated after deletion');
+          // console.log('[FileWatch] Tree updated after deletion');
           return { ...state, fileTree: updatedTree };
         });
         break;
