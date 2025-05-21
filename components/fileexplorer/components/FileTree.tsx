@@ -13,8 +13,15 @@ export const FileTree: React.FC<FileTreeProps> = ({ node, level = 0 }) => {
   const { isNodeExpanded, toggleNode } = useFileExplorerStore();
   const isOpen = isNodeExpanded(node.path);
 
+  const containerStyle = level === 0 ? {
+    maxHeight: 'calc(100vh - 100px)',
+    overflowY: 'auto',
+    scrollbarWidth: 'thin',
+    scrollbarColor: '#9CA3AF transparent'
+  } as React.CSSProperties : {};
+
   return (
-    <div className="relative" style={{ paddingLeft: level ? '20px' : '0px' }}>
+    <div className="relative" style={{ ...containerStyle, paddingLeft: level ? '20px' : '0px' }}>
       {level > 0 && (
         <Fragment>
           <div 

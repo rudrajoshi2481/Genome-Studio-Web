@@ -22,17 +22,18 @@ function Nodebar() {
         <span className="font-medium">Node Templates</span>
       </div>
       
-      <div className="flex-1 p-4 space-y-4">
-        {nodeTemplates.map((node, index) => (
-          <NodeCard
-            key={index}
-            title={node.title}
-            command={node.command}
-            onDragStart={(e) => handleDragStart(e, node)}
-            draggable
-          />
-        ))}
-      </div>
+      <div className="flex-1 p-4 grid grid-cols-2 gap-2 space-x-2">
+  {nodeTemplates.map((node, index) => (
+    <NodeCard
+      key={index}
+      title={node.title}
+      command={node.command}
+      onDragStart={(e) => handleDragStart(e, node)}
+      draggable
+    />
+  ))}
+</div>
+
     </div>
   )
 }

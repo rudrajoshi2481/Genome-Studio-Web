@@ -14,7 +14,7 @@ export function NodeCard({ title, command, onDragStart, draggable }: NodeCardPro
     <Card
       draggable={draggable}
       onDragStart={onDragStart}
-      className="p-3 cursor-move  transition-colors w-[200px] rounded-none"
+      className="p-2 cursor-move  transition-colors w-[170px] rounded-none"
     >
       <div className="flex items-center space-x-2">
         <Terminal className="w-4 h-4" />

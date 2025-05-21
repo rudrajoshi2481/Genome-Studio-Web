@@ -29,7 +29,7 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Content Area */}
       <div className="flex flex-col flex-1 border-r bg-background">
-         <div className="h-9 border-b bg-muted/30 px-4 flex items-center justify-between">
+         <div className="h-9 border-b bg-muted/30 p-4 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">Genome Studio</span>
                       <span className="text-xs text-muted-foreground">v1.0.0</span>

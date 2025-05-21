@@ -33,7 +33,7 @@ interface ToolbarProps {
  */
 function Toolbar({ onComponentChange }: ToolbarProps) {
   const router = useRouter()
-  const [activeItem, setActiveItem] = useState<string>("File Explorer")
+  const [activeItem, setActiveItem] = useState<string>("Nodebar")
 
   const TOOLBAR_ITEMS: ToolbarItem[] = [
   // Define items outside component for better performance
@@ -86,10 +86,17 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
   }
 
   // Set File Explorer as active component on mount
+  // React.useEffect(() => {
+  //   const fileExplorer = TOOLBAR_ITEMS.find(item => item.name === "File Explorer")
+  //   if (fileExplorer && fileExplorer.type === "sidebar") {
+  //     onComponentChange(fileExplorer.component())
+  //   }
+  // }, [])
+
   React.useEffect(() => {
-    const fileExplorer = TOOLBAR_ITEMS.find(item => item.name === "File Explorer")
-    if (fileExplorer && fileExplorer.type === "sidebar") {
-      onComponentChange(fileExplorer.component())
+    const nodebar = TOOLBAR_ITEMS.find(item => item.name === "Nodebar")
+    if (nodebar && nodebar.type === "sidebar") {
+      onComponentChange(nodebar.component())
     }
   }, [])
 

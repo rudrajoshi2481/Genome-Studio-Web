@@ -28,11 +28,11 @@ const FileExplorer: React.FC = () => {
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-white">
+    <div className="w-full h-full flex flex-col bg-white ">
       <div className="h-8 flex-none px-1 mb-2 flex items-center justify-between relative">
         <ExplorerToolbar />
       </div>
-      <div className="flex-1 overflow-auto min-h-0">
+      <div className="flex-1 overflow-auto min-h-0 ">
         <WebSocketHandler />
         <FileTree node={fileTree} />
       </div>
