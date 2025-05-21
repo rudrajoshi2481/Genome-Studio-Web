@@ -33,7 +33,7 @@ interface ToolbarProps {
  */
 function Toolbar({ onComponentChange }: ToolbarProps) {
   const router = useRouter()
-  const [activeItem, setActiveItem] = useState<string>("Nodebar")
+  const [activeItem, setActiveItem] = useState<string>("File Explorer")
 
   const TOOLBAR_ITEMS: ToolbarItem[] = [
   // Define items outside component for better performance
@@ -56,12 +56,7 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       type: "sidebar",
       component: () => <Nodebar />
     },
-    {
-      name: "Manage Container",
-      icon: Box,
-      type: "page",
-      link: "/manage-container"
-    },
+   
     {
       name: "Settings",
       icon: Settings,
@@ -86,19 +81,19 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
   }
 
   // Set File Explorer as active component on mount
-  // React.useEffect(() => {
-  //   const fileExplorer = TOOLBAR_ITEMS.find(item => item.name === "File Explorer")
-  //   if (fileExplorer && fileExplorer.type === "sidebar") {
-  //     onComponentChange(fileExplorer.component())
-  //   }
-  // }, [])
-
   React.useEffect(() => {
-    const nodebar = TOOLBAR_ITEMS.find(item => item.name === "Nodebar")
-    if (nodebar && nodebar.type === "sidebar") {
-      onComponentChange(nodebar.component())
+    const fileExplorer = TOOLBAR_ITEMS.find(item => item.name === "File Explorer")
+    if (fileExplorer && fileExplorer.type === "sidebar") {
+      onComponentChange(fileExplorer.component())
     }
   }, [])
+
+  // React.useEffect(() => {
+  //   const nodebar = TOOLBAR_ITEMS.find(item => item.name === "Nodebar")
+  //   if (nodebar && nodebar.type === "sidebar") {
+  //     onComponentChange(nodebar.component())
+  //   }
+  // }, [])
 
   return (
     <nav className="flex flex-col items-center gap-2 p-2 border-r h-full bg-background">

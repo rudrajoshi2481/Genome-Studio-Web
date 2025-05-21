@@ -61,9 +61,9 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
   const promptRef = useRef<string>('');
 
   useEffect(() => {
-    console.log('[Terminal] Initializing terminal...');
+    // console.log('[Terminal] Initializing terminal...');
     if (!containerRef.current || typeof window === 'undefined') {
-      console.log('[Terminal] No container or not in browser, aborting');
+      // console.log('[Terminal] No container or not in browser, aborting');
       return;
     }
 
@@ -94,19 +94,19 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
     term.loadAddon(unicode11Addon);
     term.unicode.activeVersion = '11';
 
-    console.log('[Terminal] Opening terminal in container...');
+    // console.log('[Terminal] Opening terminal in container...');
     term.open(containerRef.current);
     fitAddon.fit();
 
     const { cols, rows } = term;
-    console.log(`[Terminal] Initial dimensions: ${cols}x${rows}`);
+    // console.log(`[Terminal] Initial dimensions: ${cols}x${rows}`);
     setDimensions({ cols, rows });
     
     termRef.current = term;
     fitAddonRef.current = fitAddon;
     
     // Write initial prompt
-    console.log('[Terminal] Writing initial prompt...');
+    // console.log('[Terminal] Writing initial prompt...');
     // writePrompt(term);
 
     const socket = new WebSocket(
@@ -115,7 +115,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
     socketRef.current = socket;
 
     socket.onopen = () => {
-      console.log('[Terminal] WebSocket connected');
+      // console.log('[Terminal] WebSocket connected');
       setIsConnected(true);
       // term.write('\r\n\x1b[32mConnected to server\x1b[0m\r\n');
       
@@ -123,7 +123,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
 
     socket.onmessage = (event: MessageEvent) => {
       const response = event.data.toString();
-      console.log('[Terminal] Received from server:', response);
+      // console.log('[Terminal] Received from server:', response);
       term.write(response);
       // if (!response.endsWith('\n')) {
       //   term.write('\r\n');
@@ -152,9 +152,9 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
     };
 
     const handleData = (data: string) => {
-      console.log('[Terminal] User input:', data, 'charCode:', data.charCodeAt(0));
+      // console.log('[Terminal] User input:', data, 'charCode:', data.charCodeAt(0));
       if (socket.readyState !== WebSocket.OPEN) {
-        console.log('[Terminal] WebSocket not connected');
+        // console.log('[Terminal] WebSocket not connected');
         // term.write('\r\n\x1b[31mNot connected. Refresh page.\x1b[0m\r\n');
         return;
       }
@@ -170,25 +170,25 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
           return;
 
         case charCode === 13: // Enter
-          console.log('[Terminal] Enter pressed, command:', currentCommandRef.current);
+          // console.log('[Terminal] Enter pressed, command:', currentCommandRef.current);
           term.write('\r'); // Add newline when user presses enter
           const command = currentCommandRef.current;
           if (command.trim()) {
             commandHistoryRef.current.push(command);
             historyIndexRef.current = commandHistoryRef.current.length;
-            console.log('[Terminal] Added to history, new length:', commandHistoryRef.current.length);
+            // console.log('[Terminal] Added to history, new length:', commandHistoryRef.current.length);
           }
-          console.log('[Terminal] Sending command to server:', command);
+          // console.log('[Terminal] Sending command to server:', command);
           socket.send(command + '\n'); // Send command with newline to server
           currentCommandRef.current = '';
           return;
 
         case charCode === 127: // Backspace
-          console.log('[Terminal] Backspace pressed, current command:', currentCommandRef.current);
+          // console.log('[Terminal] Backspace pressed, current command:', currentCommandRef.current);
           if (currentCommandRef.current.length > 0) {
             term.write('\b \b');
             currentCommandRef.current = currentCommandRef.current.slice(0, -1);
-            console.log('[Terminal] After backspace:', currentCommandRef.current);
+            // console.log('[Terminal] After backspace:', currentCommandRef.current);
           }
           return;
 
@@ -217,7 +217,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
 
 
   const fitTerminal = () => {
-    console.log('[Terminal] Fitting terminal...');
+    // console.log('[Terminal] Fitting terminal...');
     if (fitAddonRef.current) {
       fitAddonRef.current.fit();
     }

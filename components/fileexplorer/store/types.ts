@@ -1,9 +1,18 @@
-import type { FileNode } from '../types';
+export type FileNode = {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  is_directory: boolean;
+  size: number;
+  modified: string;
+  children?: FileNode[];
+};
 
 export type FileEvent = {
-  event_type: 'created' | 'modified' | 'deleted';
+  type: 'partial_update';
+  operation: 'created' | 'modified' | 'deleted';
   path: string;
-  is_directory: boolean;
+  node?: FileNode; // Optional because delete operations won't have a node
 };
 
 export type StorageState = {

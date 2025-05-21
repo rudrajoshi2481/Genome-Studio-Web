@@ -1,6 +1,7 @@
 import React, { Fragment } from 'react';
 import { ChevronDown, ChevronRight, File, Folder } from 'lucide-react';
 import { useFileExplorerStore } from '../store';
+import { useFileTabsStore } from '@/store/fileTabsStore';
 import type { FileNode } from '../types';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +12,7 @@ interface FileTreeProps {
 
 export const FileTree: React.FC<FileTreeProps> = ({ node, level = 0 }) => {
   const { isNodeExpanded, toggleNode } = useFileExplorerStore();
+  const { addTab } = useFileTabsStore();
   const isOpen = isNodeExpanded(node.path);
 
   const containerStyle = level === 0 ? {
@@ -39,7 +41,13 @@ export const FileTree: React.FC<FileTreeProps> = ({ node, level = 0 }) => {
           'flex items-center py-0.5 px-1 hover:bg-gray-100 rounded cursor-pointer group',
           'text-sm text-gray-700'
         )}
-        onClick={() => toggleNode(node.path)}
+        onClick={() => {
+          if (node.type === 'directory') {
+            toggleNode(node.path);
+          } else {
+            addTab({ name: node.name, path: node.path });
+          }
+        }}
       >
         <div className="w-4 h-4 flex items-center justify-center">
           {node.type === 'directory' ? (

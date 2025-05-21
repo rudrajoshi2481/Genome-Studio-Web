@@ -1,14 +1,18 @@
-import { config } from './config';
+import { config, DEFAULT_HOST, DEFAULT_PORT } from './config';
 
 type WebSocketCallback = (event: MessageEvent) => void;
 type WebSocketErrorCallback = (error: Error) => void;
 
-type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 interface WebSocketCallbacks {
   onMessage?: WebSocketCallback;
   onError?: WebSocketErrorCallback;
   onStatusChange?: (status: WebSocketStatus) => void;
+}
+
+interface WebSocketSubscription {
+  unsubscribe: () => void;
 }
 
 const isClient = typeof window !== 'undefined';
@@ -27,18 +31,19 @@ class WebSocketService {
   private currentPath: string = '';
 
   constructor(url: string) {
-    // Store base URL without protocol
     this.url = url.replace(/^(ws|wss|http|https):\/\//, '');
   }
 
   private getWebSocketUrl(path?: string): string {
     if (typeof window === 'undefined') return '';
-    return `ws://${config.wsUrl}/api/files/watch?path=${encodeURIComponent(path || '/app')}`;
+    const host = config.host || DEFAULT_HOST;
+    const port = config.port || DEFAULT_PORT;
+    return `ws://${host}:${port}/api/files/watch?path=${encodeURIComponent(path || '/app')}`;
   }
 
   connect(path: string = '/app') {
-    // If we're already connected or connecting to the same path, don't reconnect
     if (this.ws?.readyState === WebSocket.OPEN && this.currentPath === path) {
+      console.log('[FileWatch] Already connected to', path);
       return;
     }
     
@@ -48,18 +53,18 @@ class WebSocketService {
     try {
       this.updateStatus('connecting');
       const wsUrl = this.getWebSocketUrl(path);
+      console.log('[FileWatch] Connecting to', wsUrl);
       
       if (this.ws) {
-        // Close existing connection before reconnecting
         this.ws.close();
       }
       
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onmessage = (event) => {
+        console.log('[FileWatch] Message received from path:', this.currentPath);
         try {
           const data = JSON.parse(event.data);
-          // Process message
           this.handleMessage(event);
         } catch (err) {
           this.handleError(new Error('Failed to parse WebSocket message'));
@@ -67,25 +72,29 @@ class WebSocketService {
       };
 
       this.ws.onclose = (event) => {
-        // WebSocket closed
-        if (event.code !== 1000) { // 1000 is normal closure
+        if (event.code !== 1000) {
+          console.log('[FileWatch] Connection closed unexpectedly. Attempting to reconnect...');
           this.handleClose();
         } else {
+          console.log('[FileWatch] Connection closed normally');
           this.updateStatus('disconnected');
         }
       };
 
       this.ws.onerror = (event) => {
-        // Try to get more information about the error
         const wsUrl = this.getWebSocketUrl(this.currentPath);
-        // const error = new Error(`WebSocket connection error. URL: ${wsUrl}. Check if the server is running and the endpoint is available.`);
-        // console.error('WebSocket error:', error);
-        // this.handleError(error);
+        const error = new Error(`WebSocket connection error. URL: ${wsUrl}. Check if the server is running and the endpoint is available.`);
+        console.error('[FileWatch] Connection error:', {
+          error: error.message,
+          path: this.currentPath,
+          timestamp: new Date().toISOString()
+        });
+        this.handleError(error);
       };
 
       this.ws.onopen = () => {
-        // Connection successful
-        this.reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+        console.log('[FileWatch] Connected successfully to', this.currentPath);
+        this.reconnectAttempts = 0;
         this.updateStatus('connected');
       };
 
@@ -96,78 +105,72 @@ class WebSocketService {
     }
   }
 
-  private updateStatus(newStatus: WebSocketStatus) {
+  private updateStatus = (newStatus: WebSocketStatus) => {
     this.status = newStatus;
     this.statusCallbacks.forEach(callback => callback(newStatus));
   }
 
   private handleMessage(event: MessageEvent) {
+    // Log raw message for debugging
+    console.log('[FileWatch] Raw message received:', event.data);
+
+    try {
+      const data = JSON.parse(event.data);
+      console.log('[FileWatch] Parsed message:', {
+        type: data.type,
+        path: data.path,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn('[FileWatch] Failed to parse message for logging:', err);
+    }
+
     this.messageCallbacks.forEach(callback => callback(event));
   }
 
-  private handleClose() {
-    if (this.status === 'disconnected') return; // Don't reconnect if we intentionally disconnected
-    
+  private handleError = (error: Error) => {
+    this.errorCallbacks.forEach(callback => callback(error));
+  }
+
+  private handleClose = () => {
     this.updateStatus('disconnected');
     
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts);
       this.reconnectAttempts++;
-      // Attempting reconnect
-      
-      if (this.reconnectTimeout) {
-        clearTimeout(this.reconnectTimeout);
-      }
+      const backoffDelay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+      console.log(`[FileWatch] Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${backoffDelay}ms...`);
       
       this.reconnectTimeout = setTimeout(() => {
-        if (this.currentPath) {
-          this.connect(this.currentPath);
-        }
-      }, delay);
+        this.connect(this.currentPath);
+      }, backoffDelay);
     } else {
-      console.log('Max reconnection attempts reached');
       this.updateStatus('error');
-      this.handleError(new Error('Failed to establish WebSocket connection after multiple attempts'));
+      console.error('[FileWatch] Max reconnection attempts reached');
     }
   }
 
-  private handleError(error: Error | Event) {
-    const normalizedError = error instanceof Error ? error : new Error('WebSocket error occurred');
-    this.updateStatus('error');
-    this.errorCallbacks.forEach(callback => callback(normalizedError));
+  subscribe(callbacks: WebSocketCallbacks): WebSocketSubscription {
+    if (callbacks.onMessage) this.messageCallbacks.add(callbacks.onMessage);
+    if (callbacks.onError) this.errorCallbacks.add(callbacks.onError);
+    if (callbacks.onStatusChange) this.statusCallbacks.add(callbacks.onStatusChange);
+
+    return {
+      unsubscribe: () => {
+        if (callbacks.onMessage) this.messageCallbacks.delete(callbacks.onMessage);
+        if (callbacks.onError) this.errorCallbacks.delete(callbacks.onError);
+        if (callbacks.onStatusChange) this.statusCallbacks.delete(callbacks.onStatusChange);
+      }
+    };
   }
 
-  subscribe(callbacks: WebSocketCallbacks) {
-    const unsubscribers: (() => void)[] = [];
-
-    if (callbacks.onMessage) {
-      this.messageCallbacks.add(callbacks.onMessage);
-      unsubscribers.push(() => this.messageCallbacks.delete(callbacks.onMessage!));
-    }
-
-    if (callbacks.onError) {
-      this.errorCallbacks.add(callbacks.onError);
-      unsubscribers.push(() => this.errorCallbacks.delete(callbacks.onError!));
-    }
-
-    if (callbacks.onStatusChange) {
-      this.statusCallbacks.add(callbacks.onStatusChange);
-      unsubscribers.push(() => this.statusCallbacks.delete(callbacks.onStatusChange!));
-    }
-
-    // Immediately notify of current status
-    callbacks.onStatusChange?.(this.status);
-
-    return () => unsubscribers.forEach(unsubscribe => unsubscribe());
-  }
-
-  disconnect() {
+  disconnect(): void {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
 
     if (this.ws) {
+      console.log('[FileWatch] Disconnecting from', this.currentPath);
       this.ws.close();
       this.ws = null;
     }
@@ -175,8 +178,6 @@ class WebSocketService {
     this.messageCallbacks.clear();
     this.errorCallbacks.clear();
     this.statusCallbacks.clear();
-    this.reconnectAttempts = 0;
-    this.currentPath = '';
     this.updateStatus('disconnected');
   }
 }
