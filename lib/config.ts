@@ -1,4 +1,4 @@
-export const DEFAULT_HOST = 'localhost';
+export const DEFAULT_HOST = '150.250.121.221';
 export const DEFAULT_PORT = '8000';
 const DEFAULT_API_VERSION = 'v1';
 
