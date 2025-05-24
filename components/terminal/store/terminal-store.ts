@@ -20,21 +20,51 @@ interface TerminalState {
   updateInstance: (id: string, updates: Partial<TerminalInstance>) => void;
 }
 
+// Helper function to generate a unique terminal ID
+const generateUniqueId = (instances: TerminalInstance[]): string => {
+  // Get all existing IDs
+  const existingIds = new Set(instances.map(instance => instance.id));
+  
+  // Find the next available number
+  let counter = 1;
+  let newId = `tty-${counter.toString().padStart(2, '0')}`;
+  
+  while (existingIds.has(newId)) {
+    counter++;
+    newId = `tty-${counter.toString().padStart(2, '0')}`;
+  }
+  
+  return newId;
+};
+
 export const useTerminalStore = create<TerminalState>()(
   persist(
     (set, get) => ({
-      instances: [{
-        id: 'tty-01',
-        name: 'tty 01',
-        type: 'tty',
-        logs: []
-      }],
-      activeInstanceId: 'tty-01',
+      // Start with an empty array - we'll initialize on client side
+      instances: [],
+      activeInstanceId: '',
 
       addInstance: (instance) => {
-        set((state) => ({
-          instances: [...state.instances, { ...instance, logs: [] }]
-        }));
+        set((state) => {
+          // Generate a unique ID if one isn't provided or if it already exists
+          const existingIds = new Set(state.instances.map(i => i.id));
+          const id = existingIds.has(instance.id) ? 
+            generateUniqueId(state.instances) : 
+            instance.id;
+          
+          const newInstance = { 
+            ...instance, 
+            id,
+            name: instance.name === instance.id ? 
+              `tty ${id.split('-')[1]}` : 
+              instance.name,
+            logs: [] 
+          };
+          
+          return {
+            instances: [...state.instances, newInstance]
+          };
+        });
       },
 
       removeInstance: (id) => {

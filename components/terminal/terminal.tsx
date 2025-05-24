@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { cn } from '@/lib/utils';
 import { useThemePreferences } from '@/lib/states/theme-preferences';
 import { themes } from '@/lib/themes';
@@ -15,6 +16,22 @@ export function Terminal({ className, defaultHeight = 300 }: TerminalProps) {
   const { theme } = useThemePreferences();
   const themeColors = themes[theme];
   const { instances, activeInstanceId, addInstance, removeInstance, setActiveInstance } = useTerminalStore();
+  
+  // Initialize a default terminal instance if none exists
+  React.useEffect(() => {
+    if (instances.length === 0) {
+      const defaultInstance = {
+        id: 'tty-01',
+        name: 'tty 01',
+        type: 'tty' as const
+      };
+      addInstance(defaultInstance);
+      setActiveInstance(defaultInstance.id);
+    } else if (!activeInstanceId && instances.length > 0) {
+      // If there are instances but no active one, set the first one as active
+      setActiveInstance(instances[0].id);
+    }
+  }, [instances, activeInstanceId, addInstance, setActiveInstance]);
 
   const addTab = () => {
     const number = (instances.length + 1).toString().padStart(2, '0');

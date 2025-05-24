@@ -7,11 +7,18 @@ import { useEffect, useLayoutEffect } from 'react';
 // Create a no-op version of useLayoutEffect for SSR
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
+// Keep track of the current theme to avoid unnecessary re-renders
+let currentAppliedTheme: Theme | null = null;
+
 // Function to apply theme and its CSS variables
 function applyTheme(themeName: Theme) {
   if (typeof window === 'undefined') return;
+  
+  // Skip if the theme is already applied
+  if (currentAppliedTheme === themeName) return;
+  currentAppliedTheme = themeName;
 
-  // Remove all theme classes
+  // Use a single RAF call to minimize layout thrashing
   requestAnimationFrame(() => {
     // Apply theme class first for immediate visual feedback
     document.documentElement.classList.remove(...Object.keys(themes));
@@ -21,19 +28,15 @@ function applyTheme(themeName: Theme) {
     const themeConfig = themes[themeName];
     if (!themeConfig) return;
 
-    // Prepare all CSS variables
-    const cssVars = Object.entries(themeConfig)
-      .filter(([key, value]) => typeof value === 'string' && !key.includes('gradient'))
-      .reduce((acc, [key, value]) => {
-        acc[`--${key}`] = value;
-        return acc;
-      }, {} as Record<string, string>);
-
-    // Apply all variables in a single batch
+    // Prepare all CSS variables at once
     const style = document.documentElement.style;
-    Object.entries(cssVars).forEach(([prop, value]) => {
-      style.setProperty(prop, value);
-    });
+    
+    // Batch all DOM operations
+    Object.entries(themeConfig)
+      .filter(([key, value]) => typeof value === 'string' && !key.includes('gradient'))
+      .forEach(([key, value]) => {
+        style.setProperty(`--${key}`, value as string);
+      });
   });
 }
 

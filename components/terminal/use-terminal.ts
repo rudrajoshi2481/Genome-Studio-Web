@@ -117,7 +117,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
   const setupSocketEventHandlers = useCallback((socket: WebSocket, terminal: any) => {
     socket.onopen = () => {
       console.log('[Terminal] WebSocket connected');
-      terminal.writeln('\r\nConnected to terminal server');
+      terminal.writeln('\r\n\x1b[32mConnected to terminal server\x1b[0m');
       terminal.focus();
       setIsConnected(true);
       reconnectAttemptsRef.current = 0;
@@ -165,7 +165,6 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
       setIsConnected(false);
     };
     
-    // SINGLE onData handler - this is the key fix
     terminal.onData((data: string) => {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(data);
@@ -184,11 +183,30 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
       convertEol: true,
       cursorBlink: true,
       fontSize: 14,
-      fontFamily: "monospace",
+      fontFamily: "JetBrains Mono, Fira Code, Monaco, Consolas, monospace",
       theme: {
-        background: themeColors.background,
-        foreground: themeColors.foreground,
-        cursor: themeColors.primary,
+        background: themeColors.background || '#1a1b26',
+        foreground: themeColors.foreground || '#c0caf5',
+        cursor: themeColors.primary || '#f7768e',
+        cursorAccent: '#1a1b26',
+        selectionBackground: '#33467c',
+        selectionForeground: '#c0caf5',
+        black: '#15161e',
+        red: '#f7768e',
+        green: '#9ece6a',
+        yellow: '#e0af68',
+        blue: '#7aa2f7',
+        magenta: '#bb9af7',
+        cyan: '#7dcfff',
+        white: '#a9b1d6',
+        brightBlack: '#414868',
+        brightRed: '#f7768e',
+        brightGreen: '#9ece6a',
+        brightYellow: '#e0af68',
+        brightBlue: '#7aa2f7',
+        brightMagenta: '#bb9af7',
+        brightCyan: '#7dcfff',
+        brightWhite: '#c0caf5',
       },
       allowProposedApi: true,
       scrollback: 10000,
@@ -196,6 +214,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
       disableStdin: false,
       cursorStyle: 'block',
       scrollOnUserInput: true,
+      allowTransparency: false,
     });
 
     const fitAddon = new FitAddon();
@@ -216,11 +235,9 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    // Connect socket after a small delay
     const connectionTimeout = setTimeout(() => {
       connectSocket();
       
-      // Send initial newline after connection is established
       const initTimeout = setTimeout(() => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
           socketRef.current.send('\n');
@@ -230,11 +247,9 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
       return () => clearTimeout(initTimeout);
     }, 100);
 
-    // Add resize listener
     window.addEventListener('resize', handleResize);
 
     return () => {
-      // Cleanup
       window.removeEventListener('resize', handleResize);
       
       clearTimeout(connectionTimeout);

@@ -48,9 +48,8 @@ class WebSocketService {
     const token = useAuthStore.getState().token;
     if (token) {
       console.log('[WebSocket] Adding auth token to connection');
-      // Add token in two ways for compatibility
+      // Use a single token parameter for authentication
       params.append('token', token);
-      params.append('auth_token', token);
     } else {
       // Try to get token from cookies as fallback
       const getCookie = (name: string) => {
@@ -64,7 +63,6 @@ class WebSocketService {
       if (cookieToken) {
         console.log('[WebSocket] Using token from cookie');
         params.append('token', cookieToken);
-        params.append('auth_token', cookieToken);
       } else {
         console.log('[WebSocket] No auth token available');
       }
