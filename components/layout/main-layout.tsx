@@ -47,7 +47,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               <ResizableHandle withHandle />
 
               {/* Logs/Terminal Area */}
-              <ResizablePanel defaultSize={4} minSize={4} maxSize={80}>
+              <ResizablePanel defaultSize={60} minSize={4} maxSize={80}>
                 <Terminal />
               </ResizablePanel>
             </ResizablePanelGroup>

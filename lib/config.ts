@@ -1,4 +1,4 @@
-export const DEFAULT_HOST = '150.250.121.221';
+export const DEFAULT_HOST = 'localhost';
 export const DEFAULT_PORT = '8000';
 const DEFAULT_API_VERSION = 'v1';
 
@@ -15,7 +15,7 @@ export const config = {
   apiVersion: process.env.NEXT_PUBLIC_API_VERSION || DEFAULT_API_VERSION,
   
   // WebSocket endpoints
-  wsUrl: process.env.NEXT_PUBLIC_WS_URL || getBaseUrl(),
+  wsUrl: process.env.NEXT_PUBLIC_WS_URL || `ws://${getBaseUrl()}`,
   wsFileWatchEndpoint: '/api/files/watch',
   wsTerminalEndpoint: '/api/terminal',
   
@@ -28,9 +28,10 @@ export const config = {
   fileUploadEndpoint: '/api/files/upload',
   fileDownloadEndpoint: '/api/files/download',
   
-  // Authentication endpoints (if needed in the future)
+  // Authentication endpoints
   authEndpoint: '/api/auth',
   loginEndpoint: '/api/auth/login',
+  registerEndpoint: '/api/auth/register',
   logoutEndpoint: '/api/auth/logout',
 } as const;
 

@@ -15,19 +15,20 @@ export const createActions = (
   fetchFileTree: async (path: string, depth: number) => {
     try {
       set({ isLoading: true, error: null });
-      const response = await fetch(
-        getUrls.fileExplorer(`?path=${path}&depth=${depth}`),
+      
+      // Import apiRequest function for authenticated requests
+      const { apiRequest } = await import('@/lib/api-client');
+      
+      // Use apiRequest for authenticated API calls
+      const data = await apiRequest(
+        `${config.fileExplorerEndpoint}?path=${path}&depth=${depth}`,
         { 
           headers: { accept: 'application/json' },
+          credentials: 'include', // Include cookies for authentication
           cache: 'no-store' // Disable caching to always get fresh data
         }
       );
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch file tree');
-      }
-      
-      const data = await response.json();
       set({ fileTree: data, isLoading: false });
       
       // If this is a root level fetch, expand the app directory by default
@@ -38,6 +39,7 @@ export const createActions = (
         }));
       }
     } catch (error) {
+      console.error('[FileExplorer] Error fetching file tree:', error);
       set({ error: (error as Error).message, isLoading: false });
     }
   },
@@ -170,62 +172,70 @@ export const createActions = (
 
   initializeWebSocket: (path: string = '/app') => {
     const currentStatus = get().wsStatus;
-    if (currentStatus !== 'connected') {
-      wsService.disconnect();
-      wsService.connect(path);
+    // Always reconnect to ensure a fresh connection
+    wsService.disconnect();
+    console.log('[FileExplorer] Initializing WebSocket connection for path:', path);
+    wsService.connect(path);
 
-      const subscription = wsService.subscribe({
-        onMessage: (event: MessageEvent) => {
-          try {
-            const data = JSON.parse(event.data);
-            
-            if (data.type === 'directory_update') {
-              // Handle full directory updates
-              set({ fileTree: data.data });
-            } else if (data.type === 'partial_update') {
-              // Handle new partial update format
-              get().handleFileEvent({
-                type: 'partial_update',
-                operation: data.operation,
-                path: data.path,
-                node: data.node
-              });
-            } else if (data.type === 'file_event') {
-              // Handle old file event format
-              const eventType = data.data.event_type;
-              get().handleFileEvent({
-                type: 'partial_update',
-                operation: eventType,
+    const subscription = wsService.subscribe({
+      onMessage: (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('[FileExplorer] Received WebSocket message:', data.type);
+          
+          if (data.type === 'directory_update') {
+            // Handle full directory updates
+            set({ fileTree: data.data });
+            console.log('[FileExplorer] Updated file tree with directory update');
+          } else if (data.type === 'partial_update') {
+            // Handle new partial update format
+            console.log('[FileExplorer] Processing partial update:', data.operation, data.path);
+            get().handleFileEvent({
+              type: 'partial_update',
+              operation: data.operation,
+              path: data.path,
+              node: data.node
+            });
+          } else if (data.type === 'file_event') {
+            // Handle old file event format
+            const eventType = data.data.event_type;
+            console.log('[FileExplorer] Processing file event:', eventType, data.data.path);
+            get().handleFileEvent({
+              type: 'partial_update',
+              operation: eventType,
+              path: data.data.path,
+              node: eventType !== 'deleted' ? {
+                name: data.data.path.split('/').pop() || '',
                 path: data.data.path,
-                node: eventType !== 'deleted' ? {
-                  name: data.data.path.split('/').pop() || '',
-                  path: data.data.path,
-                  type: data.data.is_directory ? 'directory' : 'file',
-                  is_directory: data.data.is_directory,
-                  size: 0,
-                  modified: new Date().toISOString(),
-                  children: data.data.is_directory ? [] : undefined
-                } : undefined
-              });
-            }  
-          } catch (err) {
-            console.error('Failed to parse WebSocket message:', err);
+                type: data.data.is_directory ? 'directory' : 'file',
+                is_directory: data.data.is_directory,
+                size: 0,
+                modified: new Date().toISOString(),
+                children: data.data.is_directory ? [] : undefined
+              } : undefined
+            });
+          } else if (data.type === 'heartbeat') {
+            // Just a heartbeat, no action needed
+            console.log('[FileExplorer] Received heartbeat');
           }
-        },
-        onError: (error: Error) => {
-          set({ wsError: error.message, wsStatus: 'error' });
-        },
-        onStatusChange: (status: WebSocketStatus) => {
-          const currentStatus = get().wsStatus;
-          if (currentStatus !== status) {
-            set({ wsStatus: status });
-          }
+        } catch (err) {
+          console.error('Failed to parse WebSocket message:', err);
         }
-      });
+      },
+      onError: (error: Error) => {
+        console.error('[FileExplorer] WebSocket error:', error.message);
+        set({ wsError: error.message, wsStatus: 'error' });
+      },
+      onStatusChange: (status: WebSocketStatus) => {
+        console.log('[FileExplorer] WebSocket status changed:', status);
+        const currentStatus = get().wsStatus;
+        if (currentStatus !== status) {
+          set({ wsStatus: status });
+        }
+      }
+    });
 
-      return () => subscription.unsubscribe();
-    }
-    return undefined;
+    return () => subscription.unsubscribe();
   },
 
   disconnectWebSocket: () => {

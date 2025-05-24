@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 // Dynamic imports to avoid SSR issues
 interface ITerminal {
@@ -34,6 +34,7 @@ if (typeof window !== 'undefined') {
 import { useThemePreferences } from '@/lib/states/theme-preferences';
 import { themes } from '@/lib/themes';
 import { config } from '@/lib/config';
+import { createAuthenticatedWebSocket } from '@/lib/api-client';
 
 export interface TerminalDimensions {
   cols: number;
@@ -50,20 +51,132 @@ export interface UseTerminalReturn {
 export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseTerminalReturn {
   const { theme } = useThemePreferences();
   const themeColors = themes[theme];
+
   const termRef = useRef<any>(null);
+  const fitAddonRef = useRef<any>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const isReconnectingRef = useRef(false);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [isConnected, setIsConnected] = useState(false);
   const [dimensions, setDimensions] = useState<TerminalDimensions>({ cols: 80, rows: 24 });
-  const commandHistoryRef = useRef<string[]>([]);
-  const historyIndexRef = useRef<number>(-1);
-  const currentCommandRef = useRef<string>('');
-  const fitAddonRef = useRef<any>(null);
-  const promptRef = useRef<string>('');
+
+  const maxReconnectAttempts = 5;
+
+  const handleResize = useCallback(() => {
+    if (fitAddonRef.current && termRef.current) {
+      fitAddonRef.current.fit();
+      const { cols, rows } = termRef.current;
+      setDimensions({ cols, rows });
+      
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(`\x1b[8;${rows};${cols}t`);
+      }
+    }
+  }, []);
+
+  const fitTerminal = useCallback(() => {
+    if (fitAddonRef.current) {
+      fitAddonRef.current.fit();
+      if (termRef.current) {
+        const { cols, rows } = termRef.current;
+        setDimensions({ cols, rows });
+      }
+    }
+  }, []);
+
+  const connectSocket = useCallback(() => {
+    if (isReconnectingRef.current || !termRef.current) {
+      return;
+    }
+
+    try {
+      isReconnectingRef.current = true;
+      const { cols, rows } = termRef.current;
+      
+      const socketUrl = `${config.wsUrl}${config.wsTerminalEndpoint}/ws`;
+      const socketOptions = {
+        rows: rows.toString(),
+        cols: cols.toString()
+      };
+      
+      const socket = createAuthenticatedWebSocket(socketUrl, socketOptions);
+      socketRef.current = socket;
+      
+      setupSocketEventHandlers(socket, termRef.current);
+    } catch (error) {
+      console.error('[Terminal] Error creating WebSocket connection:', error);
+      if (termRef.current) {
+        termRef.current.writeln('\r\n\x1b[31mFailed to create WebSocket connection. Please try refreshing the page.\x1b[0m');
+      }
+      isReconnectingRef.current = false;
+    }
+  }, []);
+
+  const setupSocketEventHandlers = useCallback((socket: WebSocket, terminal: any) => {
+    socket.onopen = () => {
+      console.log('[Terminal] WebSocket connected');
+      terminal.writeln('\r\nConnected to terminal server');
+      terminal.focus();
+      setIsConnected(true);
+      reconnectAttemptsRef.current = 0;
+      isReconnectingRef.current = false;
+    };
+    
+    socket.onmessage = (event) => {
+      terminal.write(event.data);
+    };
+    
+    socket.onclose = (event) => {
+      console.log(`[Terminal] WebSocket closed: ${event.code}`);
+      setIsConnected(false);
+      
+      if (event.code !== 1000 && event.code !== 1008) {
+        const attempts = reconnectAttemptsRef.current;
+        if (attempts < maxReconnectAttempts) {
+          const delay = Math.min(3000 * Math.pow(1.5, attempts), 30000);
+          terminal.writeln(`\r\n\x1b[33mConnection closed. Attempting to reconnect in ${Math.round(delay/1000)}s...\x1b[0m`);
+          
+          reconnectAttemptsRef.current++;
+          
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+          }
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (termRef.current) {
+              connectSocket();
+            }
+          }, delay);
+        } else {
+          terminal.writeln('\r\n\x1b[31mFailed to reconnect after multiple attempts. Please refresh the page.\x1b[0m');
+        }
+      } else {
+        terminal.writeln('\r\n\x1b[33mConnection closed by server.\x1b[0m');
+      }
+      
+      isReconnectingRef.current = false;
+    };
+    
+    socket.onerror = (error) => {
+      console.error('[Terminal] WebSocket error:', error);
+      terminal.writeln('\r\n\x1b[31mConnection error. Please try refreshing the page.\x1b[0m');
+      setIsConnected(false);
+    };
+    
+    // SINGLE onData handler - this is the key fix
+    terminal.onData((data: string) => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(data);
+      } else {
+        terminal.write('\r\n\x1b[31mNot connected. Refresh page.\x1b[0m\r\n');
+      }
+    });
+  }, [connectSocket, maxReconnectAttempts]);
 
   useEffect(() => {
-    // console.log('[Terminal] Initializing terminal...');
     if (!containerRef.current || typeof window === 'undefined') {
-      // console.log('[Terminal] No container or not in browser, aborting');
       return;
     }
 
@@ -94,134 +207,50 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement>): UseT
     term.loadAddon(unicode11Addon);
     term.unicode.activeVersion = '11';
 
-    // console.log('[Terminal] Opening terminal in container...');
     term.open(containerRef.current);
     fitAddon.fit();
 
     const { cols, rows } = term;
-    // console.log(`[Terminal] Initial dimensions: ${cols}x${rows}`);
     setDimensions({ cols, rows });
     
     termRef.current = term;
     fitAddonRef.current = fitAddon;
-    
-    // Write initial prompt
-    // console.log('[Terminal] Writing initial prompt...');
-    // writePrompt(term);
 
-    const socket = new WebSocket(
-      `ws://${config.wsUrl}/ws?rows=${rows}&cols=${cols}`
-    );
-    socketRef.current = socket;
-
-    socket.onopen = () => {
-      // console.log('[Terminal] WebSocket connected');
-      setIsConnected(true);
-      // term.write('\r\n\x1b[32mConnected to server\x1b[0m\r\n');
+    // Connect socket after a small delay
+    const connectionTimeout = setTimeout(() => {
+      connectSocket();
       
-    };
+      // Send initial newline after connection is established
+      const initTimeout = setTimeout(() => {
+        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+          socketRef.current.send('\n');
+        }
+      }, 500);
 
-    socket.onmessage = (event: MessageEvent) => {
-      const response = event.data.toString();
-      // console.log('[Terminal] Received from server:', response);
-      term.write(response);
-      // if (!response.endsWith('\n')) {
-      //   term.write('\r\n');
-      // }
-      // writePrompt(term);
-    };
+      return () => clearTimeout(initTimeout);
+    }, 100);
 
-    socket.onclose = () => {
-      setIsConnected(false);
-      // term.write('\r\n\x1b[31mConnection closed. Refresh page to reconnect.\x1b[0m\r\n');
-    };
-
-    socket.onerror = (error: Event) => {
-      // console.error('WebSocket Error:', error);
-      // term.write('\r\n\x1b[31mConnection error. Refresh page.\x1b[0m\r\n');
-    };
-
-    const handleResize = () => {
-      fitAddon.fit();
-      const { cols, rows } = term;
-      setDimensions({ cols, rows });
-      
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(`\x1b[8;${rows};${cols}t`);
-      }
-    };
-
-    const handleData = (data: string) => {
-      // console.log('[Terminal] User input:', data, 'charCode:', data.charCodeAt(0));
-      if (socket.readyState !== WebSocket.OPEN) {
-        // console.log('[Terminal] WebSocket not connected');
-        // term.write('\r\n\x1b[31mNot connected. Refresh page.\x1b[0m\r\n');
-        return;
-      }
-
-      const charCode = data.charCodeAt(0);
-
-      // Handle special keys
-      switch (true) {
-        case charCode === 3: // Ctrl+C
-        socket.send('\x03'); // Send Ctrl+C character to server
-          // term.write('^C\r\n');
-          currentCommandRef.current = '';
-          return;
-
-        case charCode === 13: // Enter
-          // console.log('[Terminal] Enter pressed, command:', currentCommandRef.current);
-          term.write('\r'); // Add newline when user presses enter
-          const command = currentCommandRef.current;
-          if (command.trim()) {
-            commandHistoryRef.current.push(command);
-            historyIndexRef.current = commandHistoryRef.current.length;
-            // console.log('[Terminal] Added to history, new length:', commandHistoryRef.current.length);
-          }
-          // console.log('[Terminal] Sending command to server:', command);
-          socket.send(command + '\n'); // Send command with newline to server
-          currentCommandRef.current = '';
-          return;
-
-        case charCode === 127: // Backspace
-          // console.log('[Terminal] Backspace pressed, current command:', currentCommandRef.current);
-          if (currentCommandRef.current.length > 0) {
-            term.write('\b \b');
-            currentCommandRef.current = currentCommandRef.current.slice(0, -1);
-            // console.log('[Terminal] After backspace:', currentCommandRef.current);
-          }
-          return;
-
-        case charCode === 27: // Arrow keys (first part of escape sequence)
-          // We'd need to handle the full escape sequence for arrow keys
-          return;
-
-        default:
-          // Printable characters
-          if (charCode >= 32 && charCode <= 126) {
-            term.write(data);
-            currentCommandRef.current += data;
-          }
-      }
-    };
-
-    term.onData(handleData);
+    // Add resize listener
     window.addEventListener('resize', handleResize);
 
     return () => {
+      // Cleanup
       window.removeEventListener('resize', handleResize);
-      if (socketRef.current) socketRef.current.close();
-      if (termRef.current) termRef.current.dispose();
+      
+      clearTimeout(connectionTimeout);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.close(1000);
+      }
+      
+      if (termRef.current) {
+        termRef.current.dispose();
+      }
     };
-  }, [containerRef, themeColors]);
-
-
-  const fitTerminal = () => {
-    // console.log('[Terminal] Fitting terminal...');
-    if (fitAddonRef.current) {
-      fitAddonRef.current.fit();
-    }
-  };
+  }, [containerRef, themeColors, handleResize, connectSocket]);
 
   return {
     isConnected,
