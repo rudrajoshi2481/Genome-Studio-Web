@@ -57,12 +57,12 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       component: () => <Nodebar />
     },
    
-    {
-      name: "Settings",
-      icon: Settings,
-      type: "page",
-      link: "/settings"
-    }
+    // {
+    //   name: "Settings",
+    //   icon: Settings,
+    //   type: "page",
+    //   link: "/settings"
+    // }
   ]
 
   /**

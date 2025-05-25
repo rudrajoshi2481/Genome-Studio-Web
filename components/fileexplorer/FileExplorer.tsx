@@ -16,8 +16,14 @@ const FileExplorer: React.FC = () => {
   } = useFileExplorerStore();
 
   useEffect(() => {
-    fetchFileTree('/app', 3);
-  }, [fetchFileTree]);
+    // Only fetch the file tree if it's not already loaded
+    // This ensures we maintain the expanded nodes state when switching between toolbar options
+    if (!fileTree) {
+      // Only load the first level of directories initially (depth=1)
+      // Further levels will be loaded on demand when directories are expanded
+      fetchFileTree('/app', 1);
+    }
+  }, [fetchFileTree, fileTree]);
 
   if (error) {
     return <div className="text-red-500 text-sm p-2">{error}</div>;
@@ -32,7 +38,7 @@ const FileExplorer: React.FC = () => {
       <div className="h-8 flex-none px-1 mb-2 flex items-center justify-between relative">
         <ExplorerToolbar />
       </div>
-      <div className="flex-1 overflow-auto min-h-0 ">
+      <div className="flex-1 overflow-auto min-h-0 mt-8">
         <WebSocketHandler />
         <FileTree node={fileTree} />
       </div>

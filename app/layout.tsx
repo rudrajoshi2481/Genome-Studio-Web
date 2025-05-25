@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { EB_Garamond, Poppins } from "next/font/google";
 import { MainLayout } from '@/components/layout/main-layout';
 import { ThemeProvider } from '@/components/providers/theme-provider';
+import { Toaster } from "@/components/ui/sonner";
 import { themes } from '@/lib/themes';
 import "./globals.css";
 
@@ -64,6 +65,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           {children}
+          <Toaster richColors/>
         </ThemeProvider>
       </body>
     </html>

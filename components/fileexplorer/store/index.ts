@@ -12,20 +12,35 @@ export const useFileExplorerStore = create<State & Actions>()(
       error: null,
       wsStatus: 'disconnected',
       wsError: null,
+      currentPath: '/app',
+      navigationHistory: {
+        paths: ['/app'],
+        currentIndex: 0,
+        canGoBack: false,
+        canGoForward: false
+      },
+      recentPaths: ['/app'],
       ...createActions(set, get)
     }),
     {
       name: 'file-explorer-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        expandedNodes: Array.from(state.expandedNodes)
+        expandedNodes: Array.from(state.expandedNodes),
+        fileTree: state.fileTree,
+        currentPath: state.currentPath,
+        navigationHistory: state.navigationHistory,
+        recentPaths: state.recentPaths
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           // Convert the rehydrated array back to a Set
           state.expandedNodes = new Set(state.expandedNodes);
-          // Fetch initial data
-          state.fetchFileTree('/app', 2);
+          
+          // Only fetch initial data if fileTree is null
+          if (!state.fileTree) {
+            state.fetchFileTree('/app', 2);
+          }
         }
       }
     }
