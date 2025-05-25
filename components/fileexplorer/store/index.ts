@@ -26,21 +26,14 @@ export const useFileExplorerStore = create<State & Actions>()(
       name: 'file-explorer-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        expandedNodes: Array.from(state.expandedNodes),
-        fileTree: state.fileTree,
-        currentPath: state.currentPath,
-        navigationHistory: state.navigationHistory,
-        recentPaths: state.recentPaths
+        expandedNodes: Array.from(state.expandedNodes)
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           // Convert the rehydrated array back to a Set
           state.expandedNodes = new Set(state.expandedNodes);
-          
-          // Only fetch initial data if fileTree is null
-          if (!state.fileTree) {
-            state.fetchFileTree('/app', 2);
-          }
+          // Fetch initial data
+          state.fetchFileTree('/app', 2);
         }
       }
     }

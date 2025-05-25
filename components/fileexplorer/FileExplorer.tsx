@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFileExplorerStore } from './store';
 import dynamic from 'next/dynamic';
 import { FileTree, ExplorerToolbar } from './components';
@@ -12,18 +12,29 @@ const FileExplorer: React.FC = () => {
   const { 
     fileTree, 
     error, 
-    fetchFileTree 
+    fetchFileTree,
+    currentPath,
+    navigateToPath
   } = useFileExplorerStore();
+  const [initialLoad, setInitialLoad] = useState(true);
 
   useEffect(() => {
-    // Only fetch the file tree if it's not already loaded
-    // This ensures we maintain the expanded nodes state when switching between toolbar options
-    if (!fileTree) {
-      // Only load the first level of directories initially (depth=1)
-      // Further levels will be loaded on demand when directories are expanded
-      fetchFileTree('/app', 1);
+    // Only load the first level of directories initially (depth=1)
+    // Further levels will be loaded on demand when directories are expanded
+    if (initialLoad) {
+      // Use the current path from the store or default to '/app'
+      const initialPath = currentPath || '/app';
+      fetchFileTree(initialPath, 1);
+      setInitialLoad(false);
     }
-  }, [fetchFileTree, fileTree]);
+  }, [fetchFileTree, currentPath, initialLoad]);
+
+  // Update the file tree when the current path changes
+  useEffect(() => {
+    if (!initialLoad && currentPath) {
+      fetchFileTree(currentPath, 1);
+    }
+  }, [currentPath, fetchFileTree, initialLoad]);
 
   if (error) {
     return <div className="text-red-500 text-sm p-2">{error}</div>;
