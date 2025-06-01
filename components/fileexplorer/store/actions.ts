@@ -497,7 +497,7 @@ export const createActions = (
         }
       },
       onError: (error: Error) => {
-        console.error('[FileExplorer] WebSocket error:', error.message);
+        // console.error('[FileExplorer] WebSocket error:', error.message);
         set({ wsError: error.message, wsStatus: 'error' });
       },
       onStatusChange: (status: WebSocketStatus) => {

@@ -185,7 +185,7 @@ class WebSocketService {
   }
 
   private handleError = (error: Error) => {
-    console.error('[FileWatch] Error handled:', error.message);
+    // console.error('[FileWatch] Error handled:', error.message);
     this.errorCallbacks.forEach(callback => callback(error));
   }
 

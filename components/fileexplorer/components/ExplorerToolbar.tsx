@@ -97,7 +97,7 @@ export const ExplorerToolbar: React.FC<ExplorerToolbarProps> = () => {
   };
 
   return (
-    <div className="flex flex-col w-full mt-8">
+    <div className="flex flex-col w-full  sticky top-0 z-10">
       <div className="h-8 w-full bg-muted/20 px-2 flex items-center justify-between backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="flex justify-between w-full items-center">
           <div className="flex items-center">
@@ -130,10 +130,10 @@ export const ExplorerToolbar: React.FC<ExplorerToolbarProps> = () => {
       </div>
       
       {/* Navigation Bar */}
-      <div className="h-8 w-full bg-gray-50 px-2 flex items-center border-b">
+      <div className="h-8 w-full bg-gray-50 px-2 flex items-center border-b sticky top-8 z-10">
         <div className="flex items-center space-x-1 w-full">
           <button
-            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50 flex-shrink-0"
             title="Back"
             onClick={navigateBack}
             disabled={!navigationHistory.canGoBack}
@@ -141,7 +141,7 @@ export const ExplorerToolbar: React.FC<ExplorerToolbarProps> = () => {
             <ArrowLeft className="w-3.5 h-3.5" />
           </button>
           <button
-            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50 flex-shrink-0"
             title="Forward"
             onClick={navigateForward}
             disabled={!navigationHistory.canGoForward}
@@ -149,7 +149,7 @@ export const ExplorerToolbar: React.FC<ExplorerToolbarProps> = () => {
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
           <button
-            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors"
+            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
             title="Home"
             onClick={() => navigateToPath('/app')}
           >
@@ -168,16 +168,16 @@ export const ExplorerToolbar: React.FC<ExplorerToolbarProps> = () => {
             />
           ) : (
             <div 
-              className="flex-1 text-xs px-2 py-0.5 truncate cursor-pointer hover:bg-gray-200 rounded"
+              className="flex-1 text-xs px-2 py-0.5 truncate cursor-pointer hover:bg-gray-200 rounded min-w-0 max-w-full"
               onClick={() => {
                 setCustomPath(currentPath || '/app');
                 setIsPathInputVisible(true);
               }}
               title={currentPath || '/app'}
             >
-              <span className="flex items-center">
-                <FolderOpen className="w-3 h-3 mr-1 inline" />
-                {currentPath || '/app'}
+              <span className="flex items-center overflow-hidden">
+                <FolderOpen className="w-3 h-3 mr-1 inline flex-shrink-0" />
+                <span className="truncate">{currentPath || '/app'}</span>
               </span>
             </div>
           )}

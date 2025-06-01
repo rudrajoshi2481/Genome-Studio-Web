@@ -45,13 +45,13 @@ const FileExplorer: React.FC = () => {
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-white ">
-      <div className="h-8 flex-none px-1 mb-2 flex items-center justify-between relative">
+    <div className="w-full h-full flex flex-col bg-white overflow-hidden">
+      <WebSocketHandler />
+      <div className="relative w-full flex flex-col overflow-hidden">
         <ExplorerToolbar />
-      </div>
-      <div className="flex-1 overflow-auto min-h-0 mt-8">
-        <WebSocketHandler />
-        <FileTree node={fileTree} />
+        <div className="flex-1 overflow-auto min-h-0 pb-4 ">
+          <FileTree node={fileTree} />
+        </div>
       </div>
     </div>
   );
