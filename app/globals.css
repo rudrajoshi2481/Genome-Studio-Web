@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "xterm/css/xterm.css";
 /* 
 /* Add this to your global CSS file */
 .react-flow__node.node-resizing {

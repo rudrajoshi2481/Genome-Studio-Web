@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import { EB_Garamond, Poppins } from "next/font/google";
-import { MainLayout } from '@/components/layout/main-layout';
-import { ThemeProvider } from '@/components/providers/theme-provider';
-import { Toaster } from "@/components/ui/sonner";
-import { themes } from '@/lib/themes';
 import "./globals.css";
-
+import { Toaster } from "@/components/ui/sonner"
+import { AuthProvider } from "@/contexts/AuthContext"
+import { CommandDialogComponent } from "@/components/command_dialog/Command_Dialog"
 const garamond = EB_Garamond({
   subsets: ["latin"],
   variable: "--font-garamond",
@@ -21,7 +19,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "Genome Studio",
-  description: "Genome Studio",
+  description: "Genome Studio", 
 };
 
 export default function RootLayout({
@@ -32,41 +30,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  const themes = ${JSON.stringify(themes)};
-                  const theme = localStorage.getItem('theme');
-                  if (theme && themes[theme]) {
-                    // Remove all theme classes
-                    document.documentElement.classList.remove(...Object.keys(themes));
-                    document.documentElement.classList.add(theme);
-                    
-                    // Apply theme variables
-                    const themeConfig = themes[theme];
-                    const style = document.documentElement.style;
-                    Object.entries(themeConfig).forEach(([key, value]) => {
-                      if (typeof value === 'string' && !key.includes('gradient')) {
-                        style.setProperty('--' + key, value);
-                      }
-                    });
-                  }
-                } catch {}
-              })();
-            `,
-          }}
-        />
+      
       </head>
       <body
         className={`${garamond.variable} ${poppins.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
-        <ThemeProvider>
+        <AuthProvider>
+          <CommandDialogComponent />
           {children}
-          <Toaster richColors/>
-        </ThemeProvider>
+          <Toaster position="top-right" richColors />
+        </AuthProvider>
       </body>
     </html>
   );

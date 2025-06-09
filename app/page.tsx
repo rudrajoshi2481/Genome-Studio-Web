@@ -1,14 +1,9 @@
-'use client';
+import React from 'react'
 
-import { MainLayout } from '@/components/layout/main-layout';
-import { Flow } from '@/components/flow/Flow';
-import { Notebook } from '@/components/notebook/components/Notebook';
-
-export default function Home() {
+function page() {
   return (
-    <MainLayout>
-      <Flow />
-      {/* <Notebook /> */}
-    </MainLayout>
-  );
+    <div>page</div>
+  )
 }
+
+export default page
