@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Folder, MessageSquare, Box, Settings, LucideIcon, Workflow } from 'lucide-react'
+import { Folder, LucideIcon, Workflow } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import FileExplorerComponent from './FileExplorer/FileExplorer'
+import Nodebar from './Nodebar/Nodebar'
+import Settings from '../settings/Settings'
 
 /**
  * ToolbarItem represents an item in the sidebar toolbar
@@ -37,10 +39,6 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
   const [activeItem, setActiveItem] = useState<string>("File Explorer")
 
 
-  // Define placeholder components for demonstration
-//   const FileExplorer = () => <FileExplorerComponent />
-  const AIChat = () => <div>AI Chat Component</div>
-  const Nodebar = () => <div>Nodebar Component</div>
 
 
   const TOOLBAR_ITEMS: ToolbarItem[] = [
@@ -49,14 +47,8 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       icon: Folder,
       type: "sidebar",
       component: () => <FileExplorerComponent />
-    // component: () => <div>File Explorer Component</div>
+  
     },
-    // {
-    //   name: "AI Chat",
-    //   icon: MessageSquare,
-    //   type: "sidebar",
-    //   component: () => <AIChat />
-    // },
     {
       name: "Nodebar",
       icon: Workflow,
@@ -163,7 +155,7 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       </HoverCard>
       </div>
       <div>
-        <Button variant="ghost" size="icon"> <Settings /></Button>
+        <Settings />
       </div>
       </div>
     </nav>
