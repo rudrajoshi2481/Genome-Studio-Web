@@ -1,10 +1,12 @@
 import React from 'react'
 import { FlipVertical2 } from 'lucide-react'
+import CustomNode from './CustomNode/CustomNode'
 
 function Nodebar() {
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col border-r border-gray-200">
     {/* Header with refresh button */}
+    <CustomNode/>
     <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-gray-50">
       <h3 className="text-sm font-medium">Nodebar</h3>
     </div>

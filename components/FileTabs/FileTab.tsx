@@ -1,5 +1,6 @@
-import React from 'react'
-import { X } from 'lucide-react'
+"use client"
+import React, { useState, useEffect } from 'react'
+import { X, FileText, FileCode, Palette, Globe, FileJson, FileType } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface FileTabProps {
@@ -23,43 +24,50 @@ function FileTab({
   onActivate,
   onClose
 }: FileTabProps) {
-  // Get icon based on file extension
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const getFileIcon = () => {
+    const iconProps = { size: 14, className: "mr-1 flex-shrink-0" }
+    
     switch(extension?.toLowerCase()) {
       case 'js':
       case 'jsx':
-        return '📄 ';
+        return <FileCode {...iconProps} className="mr-1 flex-shrink-0 text-yellow-600" />
       case 'ts':
       case 'tsx':
-        return '📘 ';
+        return <FileCode {...iconProps} className="mr-1 flex-shrink-0 text-blue-600" />
       case 'css':
       case 'scss':
       case 'sass':
-        return '🎨 ';
+        return <Palette {...iconProps} className="mr-1 flex-shrink-0 text-pink-600" />
       case 'html':
-        return '🌐 ';
+        return <Globe {...iconProps} className="mr-1 flex-shrink-0 text-orange-600" />
       case 'json':
-        return '📋 ';
+        return <FileJson {...iconProps} className="mr-1 flex-shrink-0 text-green-600" />
       case 'md':
-        return '📝 ';
+        return <FileType {...iconProps} className="mr-1 flex-shrink-0 text-gray-600" />
       default:
-        return '📄 ';
+        return <FileText {...iconProps} className="mr-1 flex-shrink-0 text-gray-500" />
     }
-  };
+  }
 
   const handleActivate = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onActivate) {
-      onActivate(id);
+    e.stopPropagation()
+    if (onActivate && mounted) {
+      onActivate(id)
     }
-  };
+  }
 
   const handleClose = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onClose) {
-      onClose(id);
+    e.stopPropagation()
+    if (onClose && mounted) {
+      onClose(id)
     }
-  };
+  }
 
   return (
     <div 
@@ -68,20 +76,26 @@ function FileTab({
         'transition-colors duration-200',
         isActive ? 'bg-gray-100' : 'hover:bg-gray-50',
       )}
-      onClick={handleActivate}
+      onClick={mounted ? handleActivate : undefined}
       data-tab-id={id}
       title={path}
+      suppressHydrationWarning
     >
-      <span className="mr-1">{getFileIcon()}</span>
+      {mounted ? getFileIcon() : <FileText size={14} className="mr-1 flex-shrink-0 text-gray-500" />}
       <span className="truncate max-w-[100px]">{name}</span>
       {isDirty && <span className="ml-1 text-blue-400">•</span>}
-      <button 
-        className="ml-2 opacity-0 group-hover:opacity-100 rounded p-0.5"
-        onClick={handleClose}
-        aria-label="Close tab"
-      >
-        <X size={14} />
-      </button>
+      {mounted ? (
+        <button 
+          className="ml-2 opacity-0 group-hover:opacity-100 rounded p-0.5 hover:bg-gray-200 transition-all duration-150"
+          onClick={handleClose}
+          aria-label={`Close ${name} tab`}
+          type="button"
+        >
+          <X size={14} />
+        </button>
+      ) : (
+        <div className="ml-2 w-[22px] h-[22px]" />
+      )}
     </div>
   )
 }

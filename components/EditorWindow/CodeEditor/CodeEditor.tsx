@@ -13,6 +13,7 @@ import { StreamLanguage } from '@codemirror/language'
 import { yaml } from '@codemirror/legacy-modes/mode/yaml'
 import { shell } from '@codemirror/legacy-modes/mode/shell'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { autocompletion, completionKeymap } from '@codemirror/autocomplete'
 
 interface CodeEditorProps {
   content: string
@@ -36,6 +37,7 @@ function CodeEditor({ content, onChange, extension = '', readOnly = false }: Cod
       case 'tsx':
         return javascript()
       case 'py':
+      case 'python':
         return python()
       case 'md':
         return markdown()
@@ -70,7 +72,10 @@ function CodeEditor({ content, onChange, extension = '', readOnly = false }: Cod
         indentOnInput(),
         bracketMatching(),
         syntaxHighlighting(defaultHighlightStyle),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
+        
+        // Enable autocompletion
+        autocompletion(),
         
         getLanguageExtension(extension),
         EditorView.updateListener.of(update => {
