@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { useFileExplorerStore } from './utils/store'
 import { FileNode } from './utils/FileExplorerClass'
 import { FolderIcon, FileIcon, ChevronRightIcon, RefreshCwIcon, FilePlusIcon, FolderPlusIcon, ChevronsDownIcon } from 'lucide-react'
+import { useTabStore } from '@/components/FileTabs/useTabStore'
+import FileService from '@/components/services/file-service'
 
 const FileExplorer: React.FC = () => {
   const {
@@ -18,6 +20,9 @@ const FileExplorer: React.FC = () => {
     collapseAll,
     setRootPath
   } = useFileExplorerStore()
+  
+  // Get tab store methods
+  const { addTab, activateTab, getAllTabs } = useTabStore()
 
 //   const [currentDirectory, setCurrentDirectory] = useState<string>('/app')
 
@@ -39,6 +44,30 @@ const FileExplorer: React.FC = () => {
   const handleRefresh = () => {
     refreshFileTree()
   }
+  
+  // Function to open a file in a tab
+  const openFileInTab = async (node: FileNode) => {
+    // Get all existing tabs
+    const tabs = getAllTabs()
+    
+    // Check if file is already open in a tab
+    const existingTab = tabs.find(tab => tab.path === node.path)
+    
+    if (existingTab) {
+      // If tab already exists, just activate it
+      activateTab(existingTab.id)
+    } else {
+      try {
+        // Add the file to tabs with empty content initially
+        // Content will be loaded in the EditorWindow component
+        addTab(node.path, node.name, '')
+      } catch (error) {
+        console.error('Error opening file:', error)
+        // Show error in a user-friendly way
+        alert(`Failed to open file: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+  }
 
   // Render a single file node
   const renderNode = (node: FileNode, depth: number = 0) => {
@@ -52,13 +81,15 @@ const FileExplorer: React.FC = () => {
       }
     }
     
-    const handleSelect = (e: React.MouseEvent) => {
+    const handleSelect = async (e: React.MouseEvent) => {
       e.stopPropagation()
       
       // For directories, toggle expansion when clicked
       if (node.is_dir) {
-       
         toggleNode(node.path)
+      } else {
+        // If it's a file, open it in a tab
+        openFileInTab(node)
       }
       
       // Always select the node

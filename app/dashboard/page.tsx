@@ -10,6 +10,7 @@ import {
 import Terminal from '@/components/Terminal/Terminal'
 import Canvas from '@/components/canvas/Canvas'
 import Traybar from '@/components/Sidebar/Traybar/Traybar'
+import EditorWindowStore from '@/components/EditorWindow/EditorWindow'
 
 function Page() {
   return (
@@ -22,7 +23,8 @@ function Page() {
         <ResizablePanel defaultSize={85} minSize={60} maxSize={85}>
           <ResizablePanelGroup direction="vertical">
             <ResizablePanel defaultSize={70} minSize={20} maxSize={100}>
-              <Canvas />
+              {/* <Canvas /> */}
+              <EditorWindowStore />
             </ResizablePanel>
             <ResizableHandle withHandle/>
             <ResizablePanel defaultSize={30} minSize={3.5} maxSize={100}>
@@ -30,10 +32,10 @@ function Page() {
             </ResizablePanel> 
           </ResizablePanelGroup>
         </ResizablePanel>
-        <ResizableHandle withHandle/>
+        {/* <ResizableHandle withHandle/>
         <ResizablePanel defaultSize={25} minSize={5} maxSize={25}>
           <Traybar />
-        </ResizablePanel>
+        </ResizablePanel> */}
       </ResizablePanelGroup>
     </div>
   )
