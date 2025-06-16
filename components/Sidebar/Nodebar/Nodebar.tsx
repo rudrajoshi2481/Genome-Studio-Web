@@ -1,36 +1,202 @@
-import React from 'react'
-import { FlipVertical2 } from 'lucide-react'
+"use client"
+
+import React, { useEffect, useState } from 'react'
+import { FlipVertical2, RefreshCcw, Code2, Trash2, Edit, Copy } from 'lucide-react'
 import CustomNode from './CustomNode/CustomNode'
+import { useAuthStore } from '@/lib/stores/auth-store'
+import { fetchCustomNodes, deleteCustomNode, CustomNode as CustomNodeType } from '@/lib/services/custom-node-service'
+import { toast } from 'sonner'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 
 function Nodebar() {
+  const [customNodes, setCustomNodes] = useState<CustomNodeType[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  
+  // State for editing nodes
+  const [editingNode, setEditingNode] = useState<CustomNodeType | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const { token, isAuthenticated } = useAuthStore()
+
+  // Function to fetch custom nodes
+  const loadCustomNodes = async () => {
+    if (!token || !isAuthenticated) {
+      console.log('User not authenticated, skipping custom node fetch')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const nodes = await fetchCustomNodes(token)
+      console.log('Fetched custom nodes:', nodes)
+      setCustomNodes(nodes)
+    } catch (error) {
+      console.error('Failed to fetch custom nodes:', error)
+      toast.error('Failed to load custom nodes')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+  
+  // Function to handle editing a node
+  const handleEditNode = (node: CustomNodeType) => {
+    console.log('Editing node:', node)
+    setEditingNode(node)
+    setIsEditDialogOpen(true)
+  }
+  
+  // Function to delete a custom node
+  const handleDeleteNode = async (nodeId: string | number) => {
+    if (!token) {
+      toast.error('You must be logged in to delete nodes')
+      return
+    }
+    
+    console.log(`Attempting to delete node with ID: ${nodeId}`)
+    setIsDeleting(nodeId.toString())
+    
+    try {
+      const result = await deleteCustomNode(token, nodeId)
+      console.log('Delete node response:', result)
+      toast.success('Node deleted successfully')
+      // Refresh the node list
+      loadCustomNodes()
+    } catch (error: any) {
+      console.error('Failed to delete node:', error)
+      // Extract more detailed error message if available
+      let errorMessage = 'Failed to delete node'
+      if (error?.message) {
+        errorMessage = `${errorMessage}: ${error.message}`
+      }
+      toast.error(errorMessage)
+    } finally {
+      setIsDeleting(null)
+    }
+  }
+
+  // Load custom nodes on component mount and when auth state changes
+  useEffect(() => {
+    loadCustomNodes()
+  }, [token, isAuthenticated])
+
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col border-r border-gray-200">
-    {/* Header with refresh button */}
-    <CustomNode/>
-    <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-gray-50">
-      <h3 className="text-sm font-medium">Nodebar</h3>
-    </div>
-    {/* Nodebar content */}
-    <div className="flex-1 overflow-y-auto p-2">
-        <h1 className="text-sm font-medium mb-2">Basic Workflow</h1>
-      <div className="flex flex-col gap-2">
-        <button className="flex items-center gap-2 px-2 py-1 border border-gray-200 rounded hover:bg-gray-50">
-          
-          <FlipVertical2 className="w-4 h-4"/>
-          <div className='flex flex-col items-start ml-2'>
-          <span>Aligner</span>
-          <p className="text-xs text-gray-500">Aligns reads to a reference genome</p>
-          </div>
-        </button>
-        <button className="flex items-center gap-2 px-2 py-1 border border-gray-200 rounded hover:bg-gray-50">
-          <FlipVertical2 className="w-4 h-4"/>
-          <div className='flex flex-col items-start ml-2'>
-          <span>Variant Caller</span>
-          <p className="text-xs text-gray-500">Identifies variants in aligned reads</p>
-          </div>
+      {/* Header with custom node creator */}
+      <CustomNode onSaveSuccess={loadCustomNodes} />
+      
+      {/* Edit dialog - without create button */}
+      {editingNode && (
+        <CustomNode 
+          nodeToEdit={editingNode} 
+          isOpen={isEditDialogOpen} 
+          onOpenChange={(open) => {
+            setIsEditDialogOpen(open);
+            if (!open) {
+              // Reset editing state when dialog closes
+              setEditingNode(null);
+              // Refresh the node list to show updated data
+              loadCustomNodes();
+            }
+          }}
+          onSaveSuccess={loadCustomNodes}
+          hideCreateButton={true}
+        />
+      )}
+      
+      {/* Nodebar header with refresh button */}
+      <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-gray-50">
+        <h3 className="text-sm font-medium">Nodebar</h3>
+        <button 
+          className="p-1 rounded hover:bg-gray-200" 
+          onClick={loadCustomNodes}
+          disabled={isLoading}
+          title="Refresh nodes"
+        >
+          <RefreshCcw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
         </button>
       </div>
-    </div>
+      
+      {/* Nodebar content */}
+      <div className="flex-1 overflow-y-auto p-2">
+        
+        
+        {/* Custom nodes section */}
+        {isAuthenticated && (
+          <>
+            <h1 className="text-sm font-medium mb-2 mt-4">My Custom Nodes</h1>
+            <div className="flex flex-col gap-2">
+              {isLoading ? (
+                <div className="text-center py-4 text-gray-500 text-sm">Loading...</div>
+              ) : customNodes.length > 0 ? (
+                customNodes.map((node) => (
+                  <ContextMenu key={node.id || node.node_id}>
+                    <ContextMenuTrigger>
+                      <div
+                        className="flex items-center justify-between gap-2 px-2 py-1 border border-gray-200 rounded hover:bg-gray-50 group cursor-grab"
+                        draggable
+                        onDragStart={(event) => {
+                          // Set the drag data with the custom node information
+                          event.dataTransfer.setData('application/reactflow', JSON.stringify(node));
+                          event.dataTransfer.effectAllowed = 'move';
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Code2 className="w-4 h-4" />
+                          <div className="flex flex-col items-start ml-2">
+                            <span className="text-sm">{node.title}</span>
+                            <p className="text-xs text-gray-500 line-clamp-1">
+                              {node.description ? 
+                                (node.description.length > 30 ? 
+                                  `${node.description.substring(0, 30)}...` : 
+                                  node.description) : 
+                                `${node.language} function`}
+                            </p>
+                          </div>
+                        </div>
+                        {isDeleting === node.id?.toString() || isDeleting === node.node_id ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent"></div>
+                        ) : null}
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem 
+                        className="flex items-center gap-2 cursor-pointer"
+                        onClick={() => handleEditNode(node)}
+                      >
+                        <Edit className="w-4 h-4" />
+                        <span>Edit</span>
+                      </ContextMenuItem>
+                      <ContextMenuItem 
+                        className="flex items-center gap-2 cursor-pointer"
+                        onClick={() => toast.info('Copy functionality coming soon')}
+                      >
+                        <Copy className="w-4 h-4" />
+                        <span>Duplicate</span>
+                      </ContextMenuItem>
+                      <ContextMenuItem 
+                        className="flex items-center gap-2 cursor-pointer text-red-500 focus:text-red-500"
+                        onClick={() => handleDeleteNode(node.node_id || node.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete</span>
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                ))
+              ) : (
+                <div className="text-center py-4 text-gray-500 text-sm">
+                  No custom nodes found. Create one using the button above.
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

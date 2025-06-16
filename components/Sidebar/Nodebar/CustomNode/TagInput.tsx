@@ -167,6 +167,7 @@ const TagInput = ({
             placeholder={placeholder}
             className="flex-1 bg-transparent outline-none text-sm"
             disabled
+            value="" // Add default empty value to prevent uncontrolled to controlled warning
           />
         </div>
         {tags.length > 0 && (

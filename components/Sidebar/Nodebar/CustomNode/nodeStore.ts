@@ -23,14 +23,13 @@ interface NodeState {
 }
 
 // Default node code template
-const DEFAULT_NODE_CODE = `// Define your node processing logic here
-function processNode(input) {
-  // Transform the input data
-  const output = input.map(item => item * 2);
-  
-  // Return the processed output
-  return output;
-}`
+const DEFAULT_NODE_CODE = `@node()
+def functionName():
+
+
+  res = ""
+  return res
+`
 
 // Create the store with persistence
 export const useNodeStore = create<NodeState>()(
