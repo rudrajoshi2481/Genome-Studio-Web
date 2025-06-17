@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { 
   ReactFlow, 
   Background, 
@@ -10,19 +10,31 @@ import {
   Node,
   Edge,
   useReactFlow,
-  Panel,
   BaseEdge,
   EdgeProps,
-  getBezierPath
+  getBezierPath,
+  Panel,
+  NodeChange,
+  applyNodeChanges,
+  applyEdgeChanges
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import { useFileExplorerStore } from '../Sidebar/FileExplorer/utils/store'
 import DynamicCustomNode from './DynamicCustomNode'
 import { createFlowNodeFromCustomNode, calculateNewNodePosition, FlowNodeData } from '@/lib/utils/node-utils'
-import { X, Play } from 'lucide-react'
+import { X, Play, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { 
+  loadPipelineFromJson, 
+  convertPipelineNodesToFlowNodes,
+  convertPipelineEdgesToFlowEdges,
+  convertFlowNodesToPipelineNodes,
+  convertFlowEdgesToPipelineEdges,
+  savePipelineToJson,
+  createPipelineFromCurrentState
+} from '@/lib/utils/pipeline-utils'
+import { DataProcessingPipeline, PipelineNode, PipelineEdge } from '@/lib/types/pipeline-flow'
 
 
 // Custom edge component with delete button
@@ -93,8 +105,11 @@ const edgeTypes = {
   custom: CustomEdge,
 };
 
+// Pipeline file path
+const PIPELINE_FILE_PATH = 'pipeline.flow';
+
 // Initial empty state
-const initialNodes: Node[] = [];
+const initialNodes: Node<FlowNodeData>[] = [];
 const initialEdges: Edge[] = [];
 
 // Main Canvas wrapper component to provide React Flow context
@@ -109,33 +124,130 @@ function CanvasWrapper() {
 // Inner Canvas component with access to React Flow hooks
 function CanvasContent() {
   // State for nodes and edges
-  const [nodes, setNodes] = useState<Node[]>(initialNodes);
+  const [nodes, setNodes] = useState<Node<FlowNodeData>[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const { activePath, rootPath } = useFileExplorerStore();
+  
+  // State to track if the pipeline has been loaded
+  const [pipelineLoaded, setPipelineLoaded] = useState(false);
   
   // Reference to the React Flow instance
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const reactFlow = useReactFlow();
   
+  // Load pipeline data on component mount
+  useEffect(() => {
+    const loadPipeline = async () => {
+      try {
+        const pipeline = await loadPipelineFromJson(PIPELINE_FILE_PATH);
+        if (pipeline && pipeline.nodes && pipeline.edges) {
+          console.log('Loaded pipeline data:', pipeline);
+          
+          // Convert pipeline nodes to React Flow nodes using utility function
+          const flowNodes = convertPipelineNodesToFlowNodes(pipeline.nodes, onNodeDelete);
+          setNodes(flowNodes);
+          
+          // Convert pipeline edges to React Flow edges
+          const flowEdges = convertPipelineEdgesToFlowEdges(pipeline.edges);
+          setEdges(flowEdges);
+          
+          setPipelineLoaded(true);
+          toast.success('Pipeline loaded successfully');
+        }
+      } catch (error) {
+        console.error('Error loading pipeline:', error);
+        toast.error('Failed to load pipeline');
+      }
+    };
+    
+    loadPipeline();
+  }, []);  // Empty dependency array means this runs once on mount
+  
+  // Function to save the current state to the pipeline file
+  const savePipeline = useCallback(async () => {
+    if (!nodes.length) {
+      toast.info('No nodes to save');
+      return;
+    }
+    
+    try {
+      // Create a pipeline from the current state
+      const pipeline = createPipelineFromCurrentState(nodes, edges);
+      
+      // Save the pipeline to the file
+      const response = await fetch('/api/save-pipeline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pipeline,
+          filePath: PIPELINE_FILE_PATH
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to save pipeline: ${response.statusText}`);
+      }
+      
+      console.log('Pipeline saved successfully:', pipeline);
+      toast.success('Pipeline saved successfully');
+    } catch (error) {
+      console.error('Error saving pipeline:', error);
+      toast.error('Failed to save pipeline');
+    }
+  }, [nodes, edges]);
+  
   // Callbacks for node and edge changes
   const onNodesChange = useCallback(
-    (changes: any) => setNodes((nds) => applyNodeChanges(changes, nds)),
-    [],
+    (changes: NodeChange[]) => {
+      console.log('Node changes:', changes);
+      
+      // Track if any node was resized
+      const resizeChanges = changes.filter(change => 
+        change.type === 'dimensions' || 
+        change.type === 'position'
+      );
+      
+      if (resizeChanges.length > 0) {
+        console.log('Node resize or position changes:', resizeChanges);
+      }
+      
+      // Apply changes to nodes and cast the result to ensure type safety
+      setNodes((nds) => applyNodeChanges(changes, nds) as Node<FlowNodeData>[]);  
+    },
+    [setNodes]
   );
   
   const onEdgesChange = useCallback(
-    (changes: any) => setEdges((eds) => applyEdgeChanges(changes, eds)),
-    [],
+    (changes: any) => {
+      // Apply edge changes and cast the result to ensure type safety
+      setEdges((eds) => {
+        const updatedEdges = applyEdgeChanges(changes, eds) as Edge[];
+        // Log changes to console
+        console.log('Edge changes:', changes);
+        console.log('Updated edges:', updatedEdges);
+        return updatedEdges;
+      });
+    },
+    [setEdges],
   );
   
   // Handle connection between nodes
   const onConnect = useCallback((params: any) => {
-    setEdges((eds) => [...eds, { 
+    const newEdge = { 
       ...params, 
       id: `edge-${Date.now()}`, 
       animated: false,
       type: 'custom' // Use our custom edge type
-    }]);
+    };
+    
+    setEdges((eds) => {
+      const updatedEdges = [...eds, newEdge];
+      console.log('New connection created:', newEdge);
+      console.log('Updated edges:', updatedEdges);
+      return updatedEdges;
+    });
   }, []);
   
   // Handle edge deletion when user clicks on an edge
@@ -192,17 +304,20 @@ function CanvasContent() {
             // We'll access this in the DynamicCustomNode component
             onNodeDelete
           }
-        };
+        } as Node<FlowNodeData>;
         
         // Add the new node to the canvas
-        setNodes((nds) => [...nds, nodeWithDeleteFunction]);
-        
-        console.log('Added new node:', nodeWithDeleteFunction);
+        setNodes((nds) => {
+          const updatedNodes = [...nds, nodeWithDeleteFunction];
+          console.log('Added new node:', nodeWithDeleteFunction);
+          console.log('Updated nodes:', updatedNodes);
+          return updatedNodes;
+        });
       } catch (error) {
         console.error('Error adding node to canvas:', error);
       }
     },
-    [reactFlowInstance]
+    [reactFlowInstance, onNodeDelete]
   );
   
   return (
@@ -242,6 +357,15 @@ function CanvasContent() {
               <Play className="h-3 w-3 mr-1" />
               Run All
             </Button>
+            {/* <Button 
+              variant="default" 
+              size="sm"
+              className="bg-emerald-700 hover:bg-emerald-600 text-white border border-emerald-600 shadow-sm transition-colors"
+              onClick={savePipeline}
+            >
+              <Save className="h-3 w-3 mr-1" />
+              Save Flow
+            </Button> */}
             <Button 
               variant="outline" 
               size="sm"

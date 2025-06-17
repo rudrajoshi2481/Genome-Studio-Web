@@ -1,10 +1,16 @@
 "use client"
 
 import React, { useMemo, useLayoutEffect, useRef, useState, useCallback } from 'react';
-import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react';
+import { Handle, Position, useUpdateNodeInternals, NodeResizer } from '@xyflow/react';
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
+import { Play, Clock, CheckCircle2, Loader2, X, Info } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 // Define NodeIO interface here since it's not exported from CustomNode
 export interface NodeIO {
@@ -14,8 +20,16 @@ export interface NodeIO {
   description?: string;
 }
 
+// Define log entry interface
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  source: string;
+}
+
 // Define the shape of the node data
-interface NodeData {
+export interface NodeData {
   title: string;
   description: string;
   inputs: NodeIO[];
@@ -28,6 +42,17 @@ interface NodeData {
   tags: string[];
   instance_id: string;
   onNodeDelete?: (nodeId: string) => void;
+  // Execution information
+  status?: string;
+  execution_count?: number;
+  execution_timing?: {
+    start_time?: string;
+    end_time?: string;
+    duration?: number;
+    queued_time?: string;
+  };
+  // Add logs
+  logs?: LogEntry[];
 }
 
 // Define the props for our custom node
@@ -35,12 +60,32 @@ interface DynamicCustomNodeProps {
   id: string;
   data: NodeData;
   selected?: boolean;
+  xPos?: number;
+  yPos?: number;
+  width?: number;
+  height?: number;
 }
 
-const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selected }) => {
+// Format duration in milliseconds to a compact string (e.g., "2.5s" or "1.2m")
+const formatDuration = (ms: number): string => {
+  const seconds = ms / 1000;
+  
+  if (seconds < 60) {
+    return `${seconds.toFixed(1)}s`;
+  } else if (seconds < 3600) {
+    return `${(seconds / 60).toFixed(1)}m`;
+  } else {
+    return `${(seconds / 3600).toFixed(1)}h`;
+  }
+};
+
+const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selected, width, height }) => {
   const updateNodeInternals = useUpdateNodeInternals();
   const nodeRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 200, height: 100 });
+  const [dimensions, setDimensions] = useState({ 
+    width: width || 280, 
+    height: height || 100 
+  });
 
   // Calculate node dimensions for proper handle spacing
   useLayoutEffect(() => {
@@ -165,11 +210,34 @@ const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selecte
       ref={nodeRef}
       className={`rounded-lg shadow-md ${selected ? 'ring-2 ring-zinc-700' : ''} bg-white overflow-visible dark:bg-zinc-950 dark:border dark:border-zinc-800`}
       style={{ 
-        width: 280, 
-        minHeight: minHeight,
+        width: dimensions.width, 
+        height: Math.max(dimensions.height, minHeight),
         position: 'relative'
       }}
     >
+      {/* Node resizer */}
+      <NodeResizer
+        minWidth={180}
+        minHeight={150} /* Increased minimum height to accommodate logs */
+        isVisible={selected}
+        handleStyle={{
+          width: 10,
+          height: 10,
+          backgroundColor: '#18181b',
+          borderWidth: 2,
+          borderColor: 'white',
+          zIndex: 1000 /* Ensure handles are above other elements */
+        }}
+        lineStyle={{
+          borderWidth: 1,
+          borderColor: '#18181b'
+        }}
+        onResize={(_, params) => {
+          // Update node dimensions
+          setDimensions({ width: params.width, height: params.height });
+          updateNodeInternals(id);
+        }}
+      />
       {/* Node header with title */}
       <div className="bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-4 py-2 flex items-center justify-between">
         <div className="font-medium text-sm text-zinc-800 dark:text-zinc-200">{data.title || 'Untitled Node'}</div>
@@ -200,6 +268,35 @@ const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selecte
         {/* Description */}
         {data.description && (
           <div className="text-xs text-zinc-600 dark:text-zinc-400 mb-3 line-clamp-2">{data.description}</div>
+        )}
+        
+        {/* Floating status badge */}
+        {data.status && (
+          <div className="absolute -top-7 right-1 flex items-center gap-1 z-10">
+           
+            {/* Duration badge */}
+            {data.execution_timing?.duration !== undefined && (
+              <div className="px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 text-xs font-medium flex items-center gap-1 shadow-sm border border-zinc-200 dark:border-zinc-700">
+                <Clock className="h-3 w-3" />
+                {formatDuration(data.execution_timing.duration)}
+              </div>
+            )}
+            {/* Status indicator */}
+            <div className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm ${data.status === 'completed' ? 'bg-green-100 text-green-800 border border-green-200' : data.status === 'running' ? 'bg-blue-100 text-blue-800 border border-blue-200 animate-pulse' : 'bg-yellow-100 text-yellow-800 border border-yellow-200'}`}>
+              {data.status === 'completed' ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : data.status === 'running' ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
+              )}
+              <span className="capitalize">{data.status}</span>
+              {data.execution_count !== undefined && (
+                <span className="ml-1 opacity-75">#{data.execution_count}</span>
+              )}
+            </div>
+            
+          </div>
         )}
         
         {/* Node metadata */}
@@ -291,6 +388,34 @@ const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selecte
           <Play className="h-3 w-3 mr-1" />
           Run
         </Button>
+        
+        {/* Logs terminal */}
+        {data.logs && data.logs.length > 0 && (
+          <div className="mt-2">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="logs" className="border-0">
+                <AccordionTrigger className="py-1 px-0 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:no-underline">
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono">$</span>
+                    <span>Logs ({data.logs.length})</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="font-mono text-xs bg-zinc-900 text-zinc-100 rounded-md p-2 overflow-hidden" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                    {data.logs.map((log, index) => (
+                      <div key={index} className="flex">
+                        <span className={`mr-2 ${log.level === 'info' ? 'text-cyan-400' : log.level === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
+                          {log.level === 'info' ? '>' : log.level === 'error' ? '!' : '?'}
+                        </span>
+                        <span>{log.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+        )}
       </div>
     </div>
   );

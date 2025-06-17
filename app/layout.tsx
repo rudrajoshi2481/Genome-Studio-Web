@@ -39,7 +39,7 @@ export default function RootLayout({
         <AuthProvider>
           <CommandDialogComponent />
           {children}
-          <Toaster position="top-right" richColors />
+          <Toaster position="top-center" richColors />
         </AuthProvider>
       </body>
     </html>

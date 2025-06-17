@@ -15,7 +15,9 @@ export interface FlowNodeData {
   is_public: boolean;
   tags: string[];
   instance_id: string;
-  onDelete?: (nodeId: string) => void;
+  onNodeDelete?: (nodeId: string) => void;
+  // Add index signature to satisfy Record<string, unknown> constraint
+  [key: string]: unknown;
 }
 
 export const createFlowNodeFromCustomNode = (customNode: CustomNode, position: { x: number, y: number }) => {

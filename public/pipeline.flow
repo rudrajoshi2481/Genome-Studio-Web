@@ -1,0 +1,446 @@
+{
+  "id": "flow_001",
+  "name": "Data Processing Pipeline",
+  "description": "A sample flow for data processing and visualization",
+  "version": "1.0.0",
+  "created": "2025-05-26T21:37:00Z",
+  "modified": "2025-05-26T21:37:00Z",
+  "author": "Data Scientist",
+  "config": {
+    "auto_layout": true,
+    "execution_mode": "sequential",
+    "default_language": "python",
+    "environment": "default",
+    "global_timeout": 300
+  },
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "code_editor",
+      "position": {
+        "x": 100,
+        "y": 100
+      },
+      "data": {
+        "title": "Data Loading",
+        "description": "Load and prepare sample dataset",
+        "language": "python",
+        "source": [
+          "import pandas as pd",
+          "import numpy as np",
+          "",
+          "# Generate sample data",
+          "np.random.seed(42)",
+          "data = pd.DataFrame({",
+          "    'sales': np.random.normal(1000, 200, 100),",
+          "    'month': np.tile(range(1, 13), 8)[:100],",
+          "    'region': np.random.choice(['North', 'South', 'East', 'West'], 100)",
+          "})",
+          "",
+          "print(f'Dataset loaded: {data.shape[0]} rows, {data.shape[1]} columns')",
+          "data.head()"
+        ],
+        "status": "loading",
+        "execution_count": 1,
+        "execution_timing": {
+          "start_time": "2025-05-26T21:37:10Z",
+          "end_time": "2025-05-26T21:37:12Z",
+          "duration": 2000,
+          "queued_time": "2025-05-26T21:37:09Z"
+        },
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "output_1",
+            "name": "data",
+            "type": "variable",
+            "description": "Loaded dataset",
+            "data_type": "pandas.DataFrame",
+            "preview": "DataFrame with 100 rows and 3 columns",
+            "size": 2400
+          }
+        ],
+        "logs": [
+          {
+            "timestamp": "2025-05-26T21:37:11Z",
+            "level": "info",
+            "message": "Data loading completed successfully",
+            "source": "node_1"
+          }
+        ],
+        "errors": [],
+        "warnings": [],
+        "stdout": [
+          "Dataset loaded: 100 rows, 3 columns"
+        ],
+        "stderr": [],
+        "metadata": {
+          "tags": ["data-loading", "preprocessing"],
+          "author": "Data Scientist",
+          "created": "2025-05-26T21:37:00Z",
+          "modified": "2025-05-26T21:37:00Z",
+          "notes": "Initial data loading step",
+          "collapsed": false,
+          "pinned": false,
+          "version": 1,
+          "dependencies": null,
+          "environment": "python3.9"
+        },
+        "ui": {
+          "color": "#3b82f6",
+          "icon": "database",
+          "width": 300,
+          "height": 200,
+          "theme": "auto",
+          "font_size": 14,
+          "show_line_numbers": true
+        },
+        "dependencies": [],
+        "config": {
+          "timeout": 30,
+          "memory_limit": 512,
+          "cpu_limit": 50,
+          "auto_run": false,
+          "cache_results": true
+        }
+      },
+      "draggable": true,
+      "selectable": true,
+      "deletable": true,
+      "hidden": false,
+      "selected": false
+    },
+    {
+      "id": "node_2",
+      "type": "code_editor",
+      "position": {
+        "x": 450,
+        "y": 100
+      },
+      "data": {
+        "title": "Data Analysis",
+        "description": "Perform statistical analysis on the dataset",
+        "language": "python",
+        "source": [
+          "# Statistical summary",
+          "summary_stats = data.describe()",
+          "print('Summary Statistics:')",
+          "print(summary_stats)",
+          "",
+          "# Group by region",
+          "region_summary = data.groupby('region')['sales'].agg(['mean', 'std', 'count'])",
+          "print('\\nRegion Summary:')",
+          "print(region_summary)",
+          "",
+          "# Store results",
+          "analysis_results = {",
+          "    'summary': summary_stats,",
+          "    'by_region': region_summary",
+          "}"
+        ],
+        "status": "completed",
+        "execution_count": 2,
+        "execution_timing": {
+          "start_time": "2025-05-26T21:37:15Z",
+          "end_time": "2025-05-26T21:37:16Z",
+          "duration": 1000,
+          "queued_time": "2025-05-26T21:37:14Z"
+        },
+        "inputs": [
+          {
+            "id": "input_1",
+            "name": "data",
+            "type": "variable",
+            "required": true,
+            "description": "Input dataset for analysis",
+            "data_type": "pandas.DataFrame",
+            "source_node_id": "node_1",
+            "default_value": null
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output_2",
+            "name": "analysis_results",
+            "type": "variable",
+            "description": "Statistical analysis results",
+            "data_type": "dict",
+            "preview": "Analysis results dictionary",
+            "size": 1024
+          }
+        ],
+        "logs": [
+          {
+            "timestamp": "2025-05-26T21:37:15Z",
+            "level": "info",
+            "message": "Analysis completed",
+            "source": "node_2"
+          }
+        ],
+        "errors": [],
+        "warnings": [],
+        "stdout": [
+          "Summary Statistics:",
+          "Analysis completed successfully"
+        ],
+        "stderr": [],
+        "metadata": {
+          "tags": ["analysis", "statistics"],
+          "author": "Data Scientist",
+          "created": "2025-05-26T21:37:00Z",
+          "modified": "2025-05-26T21:37:00Z",
+          "notes": "Statistical analysis step",
+          "collapsed": false,
+          "pinned": false,
+          "version": 1,
+          "dependencies": ["pandas", "numpy"],
+          "environment": "python3.9"
+        },
+        "ui": {
+          "color": "#10b981",
+          "icon": "chart-bar",
+          "width": 350,
+          "height": 250,
+          "theme": "auto",
+          "font_size": 14,
+          "show_line_numbers": true
+        },
+        "dependencies": [
+          {
+            "node_id": "node_1",
+            "dependency_type": "data",
+            "required": true,
+            "description": "Requires data from loading step"
+          }
+        ],
+        "config": {
+          "timeout": 30,
+          "memory_limit": 256,
+          "cpu_limit": 30,
+          "auto_run": true,
+          "cache_results": true
+        }
+      },
+      "draggable": true,
+      "selectable": true,
+      "deletable": true,
+      "hidden": false,
+      "selected": false
+    },
+    {
+      "id": "node_3",
+      "type": "visualization",
+      "position": {
+        "x": 800,
+        "y": 100
+      },
+      "data": {
+        "title": "Data Visualization",
+        "description": "Create charts and plots",
+        "language": "python",
+        "source": [
+          "import matplotlib.pyplot as plt",
+          "import seaborn as sns",
+          "",
+          "# Create subplots",
+          "fig, axes = plt.subplots(2, 2, figsize=(12, 10))",
+          "",
+          "# Sales distribution",
+          "axes[0,0].hist(data['sales'], bins=20, alpha=0.7)",
+          "axes[0,0].set_title('Sales Distribution')",
+          "axes[0,0].set_xlabel('Sales')",
+          "",
+          "# Sales by region",
+          "data.boxplot(column='sales', by='region', ax=axes[0,1])",
+          "axes[0,1].set_title('Sales by Region')",
+          "",
+          "# Sales by month",
+          "monthly_avg = data.groupby('month')['sales'].mean()",
+          "axes[1,0].plot(monthly_avg.index, monthly_avg.values, marker='o')",
+          "axes[1,0].set_title('Average Sales by Month')",
+          "axes[1,0].set_xlabel('Month')",
+          "",
+          "# Correlation heatmap",
+          "numeric_data = data.select_dtypes(include=[np.number])",
+          "sns.heatmap(numeric_data.corr(), annot=True, ax=axes[1,1])",
+          "axes[1,1].set_title('Correlation Matrix')",
+          "",
+          "plt.tight_layout()",
+          "plt.savefig('analysis_plots.png', dpi=300, bbox_inches='tight')",
+          "plt.show()"
+        ],
+        "status": "completed",
+        "execution_count": 3,
+        "execution_timing": {
+          "start_time": "2025-05-26T21:37:20Z",
+          "end_time": "2025-05-26T21:37:23Z",
+          "duration": 3000,
+          "queued_time": "2025-05-26T21:37:19Z"
+        },
+        "inputs": [
+          {
+            "id": "input_2",
+            "name": "data",
+            "type": "variable",
+            "required": true,
+            "description": "Dataset for visualization",
+            "data_type": "pandas.DataFrame",
+            "source_node_id": "node_1",
+            "default_value": null
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output_3",
+            "name": "plot",
+            "type": "plot",
+            "description": "Analysis visualization",
+            "data_type": "matplotlib.figure.Figure",
+            "file_path": "analysis_plots.png",
+            "preview": "Multi-panel analysis plot",
+            "size": 2048000
+          }
+        ],
+        "logs": [
+          {
+            "timestamp": "2025-05-26T21:37:22Z",
+            "level": "info",
+            "message": "Visualization generated successfully",
+            "source": "node_3"
+          }
+        ],
+        "errors": [],
+        "warnings": [],
+        "stdout": [
+          "Plot saved to analysis_plots.png"
+        ],
+        "stderr": [],
+        "metadata": {
+          "tags": ["visualization", "plots"],
+          "author": "Data Scientist",
+          "created": "2025-05-26T21:37:00Z",
+          "modified": "2025-05-26T21:37:00Z",
+          "notes": "Data visualization step",
+          "collapsed": false,
+          "pinned": false,
+          "version": 1,
+          "dependencies": ["matplotlib", "seaborn"],
+          "environment": "python3.9"
+        },
+        "ui": {
+          "color": "#f59e0b",
+          "icon": "chart-line",
+          "width": 400,
+          "height": 300,
+          "theme": "auto",
+          "font_size": 14,
+          "show_line_numbers": true
+        },
+        "dependencies": [
+          {
+            "node_id": "node_1",
+            "dependency_type": "data",
+            "required": true,
+            "description": "Requires data for plotting"
+          }
+        ],
+        "config": {
+          "timeout": 60,
+          "memory_limit": 1024,
+          "cpu_limit": 70,
+          "auto_run": true,
+          "cache_results": true
+        }
+      },
+      "draggable": true,
+      "selectable": true,
+      "deletable": true,
+      "hidden": false,
+      "selected": false
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "node-1",
+      "sourceHandle": "a",
+      "target": "node-2",
+      "targetHandle": "input-1"
+    },
+    {
+      "id": "edge-2",
+      "source": "node-1",
+      "sourceHandle": "b",
+      "target": "node-3",
+      "targetHandle": "input-1"
+    },
+    {
+      "id": "edge-3",
+      "source": "node-2",
+      "sourceHandle": "output-1",
+      "target": "node-4",
+      "targetHandle": "input-1"
+    },
+    {
+      "id": "edge-4",
+      "source": "node-2",
+      "sourceHandle": "output-2",
+      "target": "node-5",
+      "targetHandle": "input-1"
+    },
+    {
+      "id": "edge-5",
+      "source": "node-3",
+      "sourceHandle": "output-1",
+      "target": "node-4",
+      "targetHandle": "input-2"
+    },
+    {
+      "id": "edge-6",
+      "source": "node-3",
+      "sourceHandle": "output-2",
+      "target": "node-5",
+      "targetHandle": "input-2"
+    },
+    {
+      "id": "edge-7",
+      "source": "node-4",
+      "sourceHandle": "output-1",
+      "target": "node-5",
+      "targetHandle": "input-3"
+    }
+  ],
+  "global_variables": {
+    "project_name": "Sales Analysis",
+    "data_source": "synthetic",
+    "random_seed": 42
+  },
+  "shared_imports": [
+    "import pandas as pd",
+    "import numpy as np",
+    "import matplotlib.pyplot as plt"
+  ],
+  "execution_history": [
+    {
+      "timestamp": "2025-05-26T21:37:12Z",
+      "node_id": "node_1",
+      "status": "completed",
+      "duration": 2000,
+      "error": null
+    },
+    {
+      "timestamp": "2025-05-26T21:37:16Z",
+      "node_id": "node_2",
+      "status": "completed",
+      "duration": 1000,
+      "error": null
+    },
+    {
+      "timestamp": "2025-05-26T21:37:23Z",
+      "node_id": "node_3",
+      "status": "completed",
+      "duration": 3000,
+      "error": null
+    }
+  ]
+}
