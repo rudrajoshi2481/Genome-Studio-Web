@@ -11,6 +11,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Separator } from '@radix-ui/react-separator';
 
 // Define NodeIO interface here since it's not exported from CustomNode
 export interface NodeIO {
@@ -86,6 +87,7 @@ const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selecte
     width: width || 280, 
     height: height || 100 
   });
+  const [logsOpen, setLogsOpen] = useState(true);
 
   // Calculate node dimensions for proper handle spacing
   useLayoutEffect(() => {
@@ -190,10 +192,25 @@ const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selecte
     });
   }, [data.outputs]);
 
-  // Determine the minimum height based on number of inputs/outputs
+  // Determine the minimum height based on component content dynamically
   const minHeight = useMemo(() => {
-    // Base height: header (40px) + content padding (24px) + description (~20px) + function name (30px) + run button (45px)
-    const baseHeight = 159;
+    // Component parts with their respective heights
+    const headerHeight = 40;  // Header section
+    const contentPadding = 24; // Padding around content
+    const descriptionHeight = data.description ? Math.min(60, data.description.length / 2) : 0; // Dynamic based on description length
+    const functionNameHeight = 30; // Function name section
+    const runButtonHeight = 45; // Run button section
+    const logsButtonHeight = data.logs?.length ? 30 : 0; // Logs accordion button if logs exist
+    
+    // Calculate height for logs content when expanded
+    const logsContentHeight = logsOpen && data.logs?.length ? 
+      // Base height (accordion header) + content height (based on number of logs, max 200px)
+      30 + Math.min(200, data.logs.length * 20) : 0;
+    
+    // Calculate base height from component parts
+    const baseHeight = headerHeight + contentPadding + descriptionHeight + 
+                      functionNameHeight + runButtonHeight + logsButtonHeight + 
+                      logsContentHeight;
     
     // Calculate height for input and output ports
     const inputsHeight = (data.inputs?.length || 0) * 32; // 32px per input port
@@ -202,8 +219,11 @@ const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selecte
     // Add divider height if both inputs and outputs exist
     const dividerHeight = (data.inputs?.length && data.outputs?.length) ? 1 : 0;
     
-    return Math.max(180, baseHeight + inputsHeight + outputsHeight + dividerHeight);
-  }, [data.inputs?.length, data.outputs?.length]);
+    // Minimum reasonable height for the node
+    const minimumHeight = 180;
+    
+    return Math.max(minimumHeight, baseHeight + inputsHeight + outputsHeight + dividerHeight);
+  }, [data.inputs?.length, data.outputs?.length, data.description, data.logs?.length, logsOpen]);
 
   return (
     <div
@@ -217,20 +237,20 @@ const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selecte
     >
       {/* Node resizer */}
       <NodeResizer
-        minWidth={180}
-        minHeight={150} /* Increased minimum height to accommodate logs */
+        minWidth={209}
+        minHeight={240} /* Increased minimum height to better accommodate uncollapsed logs */
         isVisible={selected}
         handleStyle={{
           width: 10,
           height: 10,
-          backgroundColor: '#18181b',
+          backgroundColor: '#3b82f6', /* Blue-500 - more visible and matches common UI elements */
           borderWidth: 2,
           borderColor: 'white',
           zIndex: 1000 /* Ensure handles are above other elements */
         }}
         lineStyle={{
           borderWidth: 1,
-          borderColor: '#18181b'
+          borderColor: '#3b82f6' /* Matching blue for the resize lines */
         }}
         onResize={(_, params) => {
           // Update node dimensions
@@ -388,27 +408,39 @@ const DynamicCustomNode: React.FC<DynamicCustomNodeProps> = ({ id, data, selecte
           <Play className="h-3 w-3 mr-1" />
           Run
         </Button>
-        
+        <Separator />
         {/* Logs terminal */}
         {data.logs && data.logs.length > 0 && (
-          <div className="mt-2">
-            <Accordion type="single" collapsible className="w-full">
+          <div className="mt-2 ">
+            <Accordion 
+              type="single" 
+              collapsible 
+              className="w-full"
+              defaultValue="logs"
+              onValueChange={(value) => {
+                setLogsOpen(value === 'logs');
+                // Give time for the accordion animation to complete before resizing
+                setTimeout(() => updateNodeInternals(id), 300);
+              }}
+            >
               <AccordionItem value="logs" className="border-0">
                 <AccordionTrigger className="py-1 px-0 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:no-underline">
                   <div className="flex items-center gap-1">
-                    <span className="font-mono">$</span>
                     <span>Logs ({data.logs.length})</span>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="font-mono text-xs bg-zinc-900 text-zinc-100 rounded-md p-2 overflow-hidden" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                  <div className="font-mono text-xs rounded-md overflow-hidden bg-zinc-50 dark:bg-zinc-900" style={{ maxHeight: logsOpen ? '200px' : '120px', overflowY: 'auto' }}>
                     {data.logs.map((log, index) => (
-                      <div key={index} className="flex">
-                        <span className={`mr-2 ${log.level === 'info' ? 'text-cyan-400' : log.level === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
-                          {log.level === 'info' ? '>' : log.level === 'error' ? '!' : '?'}
-                        </span>
-                        <span>{log.message}</span>
-                      </div>
+                      <pre key={index} className="text-sm ">
+                        {log.message}
+                      </pre>
+                      // <div key={index} className="flex">
+                      //   <span className={`mr-2 ${log.level === 'info' ? 'text-cyan-400' : log.level === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
+                      //     {log.level === 'info' ? '>' : log.level === 'error' ? '!' : '?'}
+                      //   </span>
+                      //   <span>{log.message}</span>
+                      // </div>
                     ))}
                   </div>
                 </AccordionContent>

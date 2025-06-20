@@ -61,13 +61,75 @@
           }
         ],
         "logs": [
-          {
-            "timestamp": "2025-05-26T21:37:11Z",
-            "level": "info",
-            "message": "Data loading completed successfully",
-            "source": "node_1"
-          }
-        ],
+    {
+      "timestamp": "2025-05-26T21:37:11.234Z",
+      "level": "info",
+      "message": "Data loading completed successfully",
+      "source": "node_1",
+      "requestId": "req_abc123def456",
+      "userId": "user_789",
+      "duration": 1250,
+      "metadata": {
+        "recordsProcessed": 15420,
+        "dataSource": "postgresql",
+        "batchSize": 1000,
+        "memoryUsage": "245MB"
+      },
+      "tags": ["data-pipeline", "etl", "production"],
+      "correlationId": "corr_xyz789"
+    },
+    {
+      "timestamp": "2025-05-26T21:37:08.891Z",
+      "level": "debug",
+      "message": "Starting data validation process",
+      "source": "node_1",
+      "requestId": "req_abc123def456",
+      "function": "validateDataIntegrity",
+      "lineNumber": 142,
+      "metadata": {
+        "validationRules": ["not_null", "data_type", "range_check"],
+        "expectedRecords": 15420
+      }
+    },
+    {
+      "timestamp": "2025-05-26T21:37:05.123Z",
+      "level": "warn",
+      "message": "High memory usage detected",
+      "source": "node_2",
+      "requestId": "req_def456ghi789",
+      "alert": {
+        "severity": "medium",
+        "threshold": "80%",
+        "current": "87%",
+        "action": "scale_up_recommended"
+      },
+      "metadata": {
+        "memoryUsage": "435MB",
+        "memoryLimit": "500MB",
+        "processId": 12345
+      }
+    },
+    {
+      "timestamp": "2025-05-26T21:36:58.456Z",
+      "level": "error",
+      "message": "Database connection failed",
+      "source": "node_3",
+      "error": {
+        "code": "CONN_TIMEOUT",
+        "type": "DatabaseConnectionError",
+        "stack": "at Database.connect (/app/db.js:45:12)",
+        "retryAttempt": 3,
+        "maxRetries": 5
+      },
+      "metadata": {
+        "host": "db-primary.internal",
+        "port": 5432,
+        "database": "production",
+        "timeout": 30000
+      },
+      "tags": ["database", "connection", "critical"]
+    }
+  ],
         "errors": [],
         "warnings": [],
         "stdout": [

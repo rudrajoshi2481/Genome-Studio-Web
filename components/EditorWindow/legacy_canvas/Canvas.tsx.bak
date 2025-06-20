@@ -1,0 +1,780 @@
+"use client"
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuthToken } from '@/lib/stores/auth-store';
+import { 
+  ReactFlow, 
+  Background, 
+  Controls, 
+  ReactFlowProvider,
+  ReactFlowInstance,
+  Node,
+  Edge,
+  useReactFlow,
+  BaseEdge,
+  EdgeProps,
+  getBezierPath,
+  Panel,
+  NodeChange,
+  applyNodeChanges,
+  applyEdgeChanges
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import { useFileExplorerStore } from '../Sidebar/FileExplorer/utils/store'
+import DynamicCustomNode from './DynamicCustomNode'
+import { createFlowNodeFromCustomNode, calculateNewNodePosition, FlowNodeData } from '@/lib/utils/node-utils'
+import { X, Play, Save, Plus, Edit, FileJson, Trash2, Settings, Download } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  Menubar,
+  MenubarContent,
+  MenubarItem,
+  MenubarMenu,
+  MenubarSeparator,
+  MenubarTrigger,
+} from "@/components/ui/menubar"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { 
+  loadPipelineFromJson, 
+  convertPipelineNodesToFlowNodes,
+  convertPipelineEdgesToFlowEdges,
+  convertFlowNodesToPipelineNodes,
+  convertFlowEdgesToPipelineEdges,
+  savePipelineToJson,
+  createPipelineFromCurrentState
+} from '@/lib/utils/pipeline-utils'
+import { DataProcessingPipeline, PipelineNode, PipelineEdge } from '@/lib/types/pipeline-flow'
+
+interface CanvasProps {
+  fileContent: string;
+  activePath: string;
+}
+
+const CanvasContent = ({ fileContent, activePath }: CanvasProps) => {
+  // Get authentication token
+  const authToken = useAuthToken();
+  
+  // Custom edge component with delete button
+  const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, markerEnd }: EdgeProps) => {
+    const [showDeleteButton, setShowDeleteButton] = useState(false);
+    const { setEdges } = useReactFlow();
+    
+    // Get the path for the edge
+    const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
+  // Handle edge deletion
+  const onEdgeDelete = useCallback(
+    (event: React.MouseEvent, edgeId: string) => {
+      event.stopPropagation();
+      setEdges((edges) => edges.filter((edge) => edge.id !== edgeId));
+      toast.success('Connection deleted');
+    },
+    [setEdges]
+  );
+
+  return (
+    <>
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
+      <path
+        className="react-flow__edge-interaction"
+        d={edgePath}
+        strokeWidth={15}
+        fill="none"
+        stroke="transparent"
+        strokeOpacity={0}
+        onMouseEnter={() => setShowDeleteButton(true)}
+        onMouseLeave={() => setShowDeleteButton(false)}
+      />
+      {showDeleteButton && (
+        <foreignObject
+          width={20}
+          height={20}
+          x={labelX - 10}
+          y={labelY - 10}
+          className="edgebutton-foreignobject"
+          requiredExtensions="http://www.w3.org/1999/xhtml"
+        >
+          <div
+            className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-800 text-white cursor-pointer hover:bg-zinc-700 border border-zinc-700 shadow-sm transition-colors"
+            onClick={(event) => onEdgeDelete(event, id)}
+          >
+            <X size={12} />
+          </div>
+        </foreignObject>
+      )}
+    </>
+  );
+};
+
+// Define node and edge types for React Flow
+const nodeTypes = {
+  dynamicCustomNode: DynamicCustomNode,
+};
+
+const edgeTypes = {
+  custom: CustomEdge,
+};
+
+// Canvas props interface
+interface CanvasProps {
+  fileContent?: string;
+}
+
+// Initial empty state
+const initialNodes: Node<FlowNodeData>[] = [];
+const initialEdges: Edge[] = [];
+
+// Main Canvas wrapper component to provide React Flow context
+const CanvasWrapper: React.FC<CanvasProps> = ({ fileContent }) => {
+  return (
+    <ReactFlowProvider>
+      <CanvasContent fileContent={fileContent} />
+    </ReactFlowProvider>
+  );
+};
+
+// Inner Canvas component with access to React Flow hooks
+const CanvasContent: React.FC<CanvasProps> = ({ fileContent }) => {
+  // State for nodes and edges
+  const [nodes, setNodes] = useState<Node<FlowNodeData>[]>(initialNodes);
+  const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  
+  // Get file explorer state
+  const { activePath, rootPath } = useFileExplorerStore();
+  
+  // State to track if the pipeline has been loaded
+  const [pipelineLoaded, setPipelineLoaded] = useState(false);
+  
+  // State for pipeline metadata
+  const [pipelineMetadata, setPipelineMetadata] = useState({
+    id: "flow_001",
+    name: "Data Processing Pipeline",
+    description: "A flow for data processing and visualization"
+  });
+  
+  // Dialog state
+  const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
+  const [tempMetadata, setTempMetadata] = useState({
+    id: "",
+    name: "",
+    description: ""
+  });
+  
+  // Reference to the React Flow instance
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const reactFlow = useReactFlow();
+  
+  // Handle node deletion
+  const onNodeDelete = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    // Remove any connected edges
+    setEdges((eds) => eds.filter((edge) => 
+      edge.source !== nodeId && edge.target !== nodeId
+    ));
+    toast.success('Node removed');
+  }, [setNodes, setEdges]);
+
+  // Load pipeline from file content when available
+  useEffect(() => {
+    const loadPipeline = () => {
+      try {
+        if (!fileContent) {
+          console.log('No file content provided');
+          return;
+        }
+        
+        // Handle empty file content
+        if (fileContent.trim() === '') {
+          console.log('Empty file content, using default empty pipeline');
+          // Set default empty pipeline
+          setNodes([]);
+          setEdges([]);
+          setPipelineLoaded(true);
+          return;
+        }
+        
+        // Parse the pipeline from the file content
+        let pipeline;
+        try {
+          // Try to parse as JSON
+          pipeline = JSON.parse(fileContent);
+        } catch (parseError) {
+          console.error('Error parsing pipeline JSON:', parseError);
+          toast.error('Invalid JSON format in pipeline file');
+          return;
+        }
+        
+        if (pipeline && pipeline.nodes) {
+          console.log('Loaded pipeline:', pipeline);
+          
+          // Extract metadata if available
+          if (pipeline.id || pipeline.name || pipeline.description) {
+            setPipelineMetadata({
+              id: pipeline.id || "flow_001",
+              name: pipeline.name || "Data Processing Pipeline",
+              description: pipeline.description || "A flow for data processing and visualization"
+            });
+          }
+          
+          // Convert pipeline nodes to flow nodes
+          const flowNodes = convertPipelineNodesToFlowNodes(pipeline.nodes, onNodeDelete);
+          setNodes(flowNodes);
+          
+          // Convert pipeline edges to flow edges
+          if (pipeline.edges) {
+            setEdges(pipeline.edges);
+          }
+          
+          setPipelineLoaded(true);
+          toast.success('Pipeline loaded successfully');
+        } else {
+          console.error('Invalid pipeline format');
+          toast.error('Invalid pipeline format');
+        }
+      } catch (error) {
+        console.error('Error loading pipeline:', error);
+        toast.error('Failed to parse pipeline data');
+      }
+    };
+    
+    loadPipeline();
+  }, [fileContent, onNodeDelete]);  // Dependency on fileContent means this runs when the content changes
+  
+  // Function to save pipeline to backend
+  const savePipelineToBackend = async (pipeline: any, filePath: string) => {
+    try {
+      // First check if the file exists and create it if needed
+      const fileCheckResponse = await fetch(`http://localhost:8000/api/v1/file-explorer/exists?path=${encodeURIComponent(filePath)}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+      const fileExists = await fileCheckResponse.json();
+      
+      if (!fileExists.exists) {
+        // Create the file
+        const createResponse = await fetch('http://localhost:8000/api/v1/file-explorer/write', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            path: filePath,
+            content: JSON.stringify(pipeline, null, 2)
+          })
+        });
+        
+        if (!createResponse.ok) {
+          throw new Error('Failed to create pipeline file');
+        }
+      } else {
+        // Update the existing file
+        const updateResponse = await fetch('http://localhost:8000/api/v1/file-explorer/write', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            path: filePath,
+            content: JSON.stringify(pipeline, null, 2)
+          })
+        });
+        
+        if (!updateResponse.ok) {
+          throw new Error('Failed to update pipeline file');
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error saving pipeline to backend:', error);
+      throw error;
+    }
+  };
+  
+  // Function to save the current pipeline state
+  const savePipeline = useCallback(async () => {
+    if (!nodes.length) {
+      toast.info('No nodes to save');
+      return;
+    }
+    
+    try {
+      // Create a pipeline object from the current state
+      const pipeline = {
+        // Include metadata
+        id: pipelineMetadata.id,
+        name: pipelineMetadata.name,
+        description: pipelineMetadata.description,
+        // Include nodes and edges
+        nodes: nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: node.data,
+          draggable: node.draggable,
+          selectable: node.selectable,
+          deletable: node.deletable,
+          hidden: node.hidden,
+          selected: node.selected
+        })),
+        edges: edges
+      };
+      
+      // Create a blob for client-side download
+      const blob = new Blob([JSON.stringify(pipeline, null, 2)], { type: 'application/json' });
+      
+      // Save to backend if we have an active path
+      if (activePath) {
+        await savePipelineToBackend(pipeline, activePath);
+        toast.success('Pipeline saved to server');
+      } else {
+        // If no active path, just do client-side download
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'pipeline.flow';
+        
+        // Trigger the download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the URL object
+        URL.revokeObjectURL(url);
+        
+        toast.success('Pipeline downloaded (not saved to server)');
+      }
+    } catch (error) {
+      console.error('Error saving pipeline:', error);
+      toast.error(`Failed to save pipeline: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [nodes, edges, pipelineMetadata, activePath]);
+  
+  // Function to open metadata dialog
+  const openMetadataDialog = useCallback(() => {
+    setTempMetadata({
+      id: pipelineMetadata.id,
+      name: pipelineMetadata.name,
+      description: pipelineMetadata.description
+    });
+    setMetadataDialogOpen(true);
+  }, [pipelineMetadata]);
+  
+  // WebSocket connection for real-time updates
+  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const maxReconnectAttempts = 5;
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Connect to WebSocket when active file path changes or token changes
+  useEffect(() => {
+    if (!activePath || !authToken) return;
+    
+    // Function to connect to WebSocket
+    const connectWebSocket = () => {
+      // Close existing connection if any
+      if (wsConnection) {
+        wsConnection.close();
+      }
+      
+      // Encode the file path for the URL
+      const encodedPath = encodeURIComponent(activePath);
+      // Include token in WebSocket URL
+      const wsUrl = `ws://localhost:8000/api/v1/pipeline/ws/${encodedPath}?token=${encodeURIComponent(authToken || '')}`;
+      
+      console.log(`Connecting to WebSocket: ${wsUrl}`);
+      const ws = new WebSocket(wsUrl);
+      
+      let pingInterval: NodeJS.Timeout;
+      
+      ws.onopen = () => {
+        console.log('WebSocket connection established');
+        setIsConnected(true);
+        setReconnectAttempts(0); // Reset reconnect attempts on successful connection
+        toast.success('Connected to pipeline updates');
+        
+        // Send a ping to keep the connection alive
+        pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 30000); // 30 seconds
+      };
+      
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('WebSocket message received:', data);
+          
+          // Handle different message types
+          if (data.type === 'metadata_update') {
+            setPipelineMetadata(data.metadata);
+            toast.info('Pipeline metadata updated from server');
+          } else if (data.type === 'file_update') {
+            // Handle full file updates
+            setPipelineMetadata(data.metadata);
+            toast.info('Pipeline file updated from server');
+          } else if (data.type === 'pong') {
+            console.log('Received pong from server');
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+        }
+      };
+      
+      ws.onclose = (event) => {
+        console.log(`WebSocket connection closed: ${event.code} ${event.reason}`);
+        setIsConnected(false);
+        clearInterval(pingInterval);
+        
+        // Attempt to reconnect if not closed intentionally
+        if (reconnectAttempts < maxReconnectAttempts) {
+          const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff up to 30s
+          console.log(`Attempting to reconnect in ${timeout/1000}s (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            setReconnectAttempts(prev => prev + 1);
+            connectWebSocket();
+          }, timeout);
+        } else {
+          toast.error(`Failed to connect after ${maxReconnectAttempts} attempts. Please refresh the page.`);
+        }
+      };
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        // Don't show toast here as onclose will be called next and handle reconnection
+      };
+      
+      setWsConnection(ws);
+    };
+    
+    // Initial connection
+    connectWebSocket();
+    
+    // Cleanup on unmount
+    return () => {
+      if (wsConnection) {
+        wsConnection.close(1000, "Component unmounting");
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, [activePath, reconnectAttempts]);
+  
+  // Function to update metadata on the backend
+  const updateMetadataOnBackend = async (metadata: any, filePath: string) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/pipeline/update-metadata', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          file_path: filePath,
+          metadata: metadata
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update metadata');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating metadata:', error);
+      throw error;
+    }
+  };
+  
+  // Function to save metadata changes
+  const saveMetadataChanges = useCallback(async () => {
+    try {
+      if (!activePath) {
+        toast.error('No active file path');
+        return;
+      }
+      
+      // Update locally first for immediate feedback
+      setPipelineMetadata(tempMetadata);
+      
+      // Then update on the backend
+      await updateMetadataOnBackend(tempMetadata, activePath);
+      setMetadataDialogOpen(false);
+      toast.success('Pipeline metadata updated');
+    } catch (error) {
+      toast.error(`Failed to update metadata: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [tempMetadata, activePath]);
+  
+  // Callbacks for node and edge changes
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      console.log('Node changes:', changes);
+      
+      // Track if any node was resized
+      const resizeChanges = changes.filter(change => 
+        change.type === 'dimensions' || 
+        change.type === 'position'
+      );
+      
+      if (resizeChanges.length > 0) {
+        console.log('Node resize or position changes:', resizeChanges);
+      }
+      
+      // Apply changes to nodes and cast the result to ensure type safety
+      setNodes((nds) => applyNodeChanges(changes, nds) as Node<FlowNodeData>[]);  
+    },
+    [setNodes]
+  );
+  
+  const onEdgesChange = useCallback(
+    (changes: any) => {
+      // Apply edge changes and cast the result to ensure type safety
+      setEdges((eds) => {
+        const updatedEdges = applyEdgeChanges(changes, eds) as Edge[];
+        // Log changes to console
+        console.log('Edge changes:', changes);
+        console.log('Updated edges:', updatedEdges);
+        return updatedEdges;
+      });
+    },
+    [setEdges],
+  );
+  
+  // Handle connection between nodes
+  const onConnect = useCallback((params: any) => {
+    const newEdge = { 
+      ...params, 
+      id: `edge-${Date.now()}`, 
+      animated: false,
+      type: 'custom' // Use our custom edge type
+    };
+    
+    setEdges((eds) => {
+      const updatedEdges = [...eds, newEdge];
+      console.log('New connection created:', newEdge);
+      console.log('Updated edges:', updatedEdges);
+      return updatedEdges;
+    });
+  }, []);
+  
+  // Handle edge deletion when user clicks on an edge
+  const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+  }, []);
+  
+  
+  
+  // Handle drag over event for custom nodes
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+  
+  // Handle drop event for custom nodes
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      
+      // Get the custom node data from the drag event
+      const nodeData = event.dataTransfer.getData('application/reactflow');
+      
+      if (!nodeData || !reactFlowInstance) {
+        return;
+      }
+      
+      try {
+        // Parse the node data
+        const customNode = JSON.parse(nodeData);
+        
+        // Get the position where the node was dropped
+        const position = reactFlowInstance.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        
+        // Create a new React Flow node from the custom node
+        const newNode = createFlowNodeFromCustomNode(customNode, position);
+        
+        // Create a new node with the onNodeDelete function
+        const nodeWithDeleteFunction = {
+          ...newNode,
+          data: {
+            ...newNode.data,
+            // We'll access this in the DynamicCustomNode component
+            onNodeDelete
+          }
+        } as Node<FlowNodeData>;
+        
+        // Add the new node to the canvas
+        setNodes((nds) => {
+          const updatedNodes = [...nds, nodeWithDeleteFunction];
+          console.log('Added new node:', nodeWithDeleteFunction);
+          console.log('Updated nodes:', updatedNodes);
+          return updatedNodes;
+        });
+      } catch (error) {
+        console.error('Error adding node to canvas:', error);
+      }
+    },
+    [reactFlowInstance, onNodeDelete]
+  );
+  
+  return (
+    <div className="flex flex-col h-full">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onInit={setReactFlowInstance}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onEdgeClick={onEdgeClick}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: 'custom' }}
+        fitView
+      >
+        <Background />
+        <Controls />
+        <Panel position="top-right">
+          <div className="flex gap-2">
+            <Button 
+              variant="default" 
+              size="sm"
+              className="bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 shadow-sm transition-colors"
+              onClick={() => {
+                toast.success('Running all nodes...');
+                // Add logic to run all nodes here
+                nodes.forEach(node => {
+                  toast.info(`Running node: ${node.data.title || 'Untitled Node'}`);
+                  // Execute node logic here
+                });
+              }}
+            >
+              <Play className="h-3 w-3 mr-1" />
+              Run All
+            </Button>
+            
+            <Dialog open={metadataDialogOpen} onOpenChange={setMetadataDialogOpen}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Edit Pipeline Metadata</DialogTitle>
+                  <DialogDescription>
+                    Update the metadata for your pipeline flow file.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="id" className="text-right">ID</Label>
+                    <Input 
+                      id="id" 
+                      value={tempMetadata.id} 
+                      onChange={(e) => setTempMetadata({...tempMetadata, id: e.target.value})}
+                      className="col-span-3" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="name" className="text-right">Name</Label>
+                    <Input 
+                      id="name" 
+                      value={tempMetadata.name} 
+                      onChange={(e) => setTempMetadata({...tempMetadata, name: e.target.value})}
+                      className="col-span-3" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="description" className="text-right">Description</Label>
+                    <Textarea 
+                      id="description" 
+                      value={tempMetadata.description} 
+                      onChange={(e) => setTempMetadata({...tempMetadata, description: e.target.value})}
+                      className="col-span-3" 
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" onClick={saveMetadataChanges}>Save changes</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            
+            <Menubar className="border-zinc-200 bg-white">
+              <MenubarMenu>
+                <MenubarTrigger className="text-xs px-2 py-1 h-8">
+                  <Settings className="h-3 w-3 mr-1" />
+                  Pipeline
+                </MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem onClick={openMetadataDialog}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Metadata
+                  </MenubarItem>
+                  
+                  <MenubarItem onClick={savePipeline}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Save Flow
+                  </MenubarItem>
+                  
+                  <MenubarSeparator />
+                  
+                  <MenubarItem onClick={() => {
+                    setNodes([]);
+                    setEdges([]);
+                    toast.success('Canvas cleared');
+                  }}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear Canvas
+                  </MenubarItem>
+                </MenubarContent>
+              </MenubarMenu>
+            </Menubar>
+          </div>
+        </Panel>
+      </ReactFlow>
+    </div>
+  );
+}
+
+// Wrap the Canvas component with ReactFlowProvider
+const Canvas = ({ fileContent, activePath }: CanvasProps) => {
+  return (
+    <ReactFlowProvider>
+      <div style={{ width: '100%', height: '100%' }}>
+        <CanvasContent fileContent={fileContent} activePath={activePath} />
+      </div>
+    </ReactFlowProvider>
+  );
+};
+
+export default Canvas;

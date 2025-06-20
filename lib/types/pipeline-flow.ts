@@ -149,6 +149,11 @@ export interface PipelineEdge {
   sourceHandle: string;
   target: string;
   targetHandle: string;
+  type?: string;
+  data?: {
+    label?: string;
+    [key: string]: any;
+  };
 }
 
 export interface LogEntry {

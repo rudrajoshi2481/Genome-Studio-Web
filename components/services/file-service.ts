@@ -14,14 +14,14 @@ export const FileService = {
    * @param rootPath Root path for security validation
    * @returns File content and metadata
    */
-  async getFileContent(filePath: string, rootPath: string = '/home'): Promise<{
+  async getFileContent(filePath: string, tokenParam?: string | null, rootPath: string = '/home'): Promise<{
     content: string;
     metadata: any;
     binary: boolean;
     truncated: boolean;
   }> {
-    // Get token from the auth store
-    const token = useAuthStore.getState().token;
+    // Get token from param or auth store
+    const token = tokenParam || useAuthStore.getState().token;
     
     if (!token) {
       throw new Error('Authentication token not found');

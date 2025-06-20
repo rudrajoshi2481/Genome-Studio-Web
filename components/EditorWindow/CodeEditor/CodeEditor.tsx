@@ -20,9 +20,10 @@ interface CodeEditorProps {
   onChange: (value: string) => void
   extension?: string
   readOnly?: boolean
+  hasUnsavedChanges?: boolean
 }
 
-function CodeEditor({ content, onChange, extension = '', readOnly = false }: CodeEditorProps) {
+function CodeEditor({ content, onChange, extension = '', readOnly = false, hasUnsavedChanges = false }: CodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
@@ -114,7 +115,12 @@ function CodeEditor({ content, onChange, extension = '', readOnly = false }: Cod
   }, [content])
 
   return (
-    <div className="h-full w-full overflow-auto" ref={editorRef} />
+    <div className="relative h-full w-full">
+      {hasUnsavedChanges && (
+        <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-amber-400 z-10" title="Unsaved changes" />
+      )}
+      <div className="h-full w-full overflow-auto" ref={editorRef} />
+    </div>
   )
 }
 

@@ -1,95 +1,138 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useAuthToken } from '@/lib/stores/auth-store'
 import FileTabsStore from '../FileTabs/FileTabs'
 import { useTabStore, TabFile } from '@/components/FileTabs/useTabStore'
-import FileService from '@/components/services/file-service'
 import CodeEditor from './CodeEditor/CodeEditor'
 import DialogProvider from '../FileTabs/DialogProvider'
-import Canvas from '@/components/canvas/Canvas'
+
+import { debounce } from 'lodash'
+
+// Extracted components and hooks
+import { useWebSocket } from './hooks/useWebSocket'
+import { useFileContent } from './hooks/useFileContent'
+import LoadingComponent from './components/LoadingComponent'
+import ErrorComponent from './components/ErrorComponent'
+import EmptyState from './components/EmptyState'
+// import Canvas from './canvas/Canvas'
 
 
 function EditorWindowContent() {
   const [activeContent, setActiveContent] = useState<string>('')
-  const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [error, setError] = useState<string | null>(null)
+  const [lastSavedContent, setLastSavedContent] = useState<string>('')
   
-  // Get store methods
-  const { getAllTabs, addTab, getActiveTab, removeTab, updateTabContent, setTabDirty } = useTabStore()
+  // Get store methods with memoization
+  const tabStore = useTabStore()
+  const { getAllTabs, addTab, getActiveTab, removeTab, updateTabContent, setTabDirty } = tabStore
   
   // Get active tab from the store
   const activeTab = getActiveTab()
+  
+  // Get authentication token
+  const authToken = useAuthToken()
+  
+  // Memoized values
+  const hasUnsavedChanges = useMemo(() => {
+    return activeContent !== lastSavedContent && activeContent.trim() !== ''
+  }, [activeContent, lastSavedContent])
+  
+  // Debounced content change handler to reduce excessive updates
+  const debouncedContentUpdate = useCallback(
+    debounce((content: string, tabId: string) => {
+      updateTabContent(tabId, content)
+      setTabDirty(tabId, content !== lastSavedContent)
+    }, 300),
+    [updateTabContent, setTabDirty, lastSavedContent]
+  )
 
+  // File content handling
+  const handleContentUpdate = useCallback((content: string) => {
+    setActiveContent(content)
+    setLastSavedContent(content)
+    
+    // Update tab content in store
+    if (activeTab) {
+      updateTabContent(activeTab.id, content)
+      setTabDirty(activeTab.id, false)
+    }
+  }, [activeTab, updateTabContent, setTabDirty])
 
+  // Use file content hook
+  const { isLoading, error, fetchFileContent, setError } = useFileContent({
+    authToken,
+    onContentUpdate: handleContentUpdate
+  })
+
+  // Use WebSocket hook
+  const { isConnected } = useWebSocket({
+    path: activeTab?.path,
+    authToken,
+    hasUnsavedChanges,
+    onFileChange: fetchFileContent
+  })
+  
   // Update content when active tab changes
   useEffect(() => {
     if (activeTab) {
-      // If the tab has content already, use it
-      if (activeTab.content) {
+      if (activeTab.content && activeTab.content !== activeContent) {
         setActiveContent(activeTab.content)
-      } else {
-        // Otherwise fetch content from the backend
+        setLastSavedContent(activeTab.content)
+      } else if (!activeTab.content) {
         fetchFileContent(activeTab.path)
       }
     }
-  }, [activeTab])
+  }, [activeTab?.id, activeTab?.path]) // Only depend on id and path to avoid excessive re-renders
   
-  // Function to fetch file content from backend
-  const fetchFileContent = async (filePath: string) => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      console.log(`Fetching content for: ${filePath}`)
-      const response = await FileService.getFileContent(filePath)
-      console.log('Response received:', response)
-      
-      if (response.binary) {
-        setActiveContent('[Binary file content not displayed]')
-      } else if (response.truncated) {
-        setActiveContent(`[File too large to display: ${response.metadata?.size || 'unknown'} bytes]`)
-      } else {
-        // Make sure we have content as a string
-        const content = typeof response.content === 'string' 
-          ? response.content 
-          : JSON.stringify(response.content, null, 2)
-        
-        console.log('Setting content:', content.substring(0, 100) + '...')
-        setActiveContent(content)
-        
-        // Update the tab content in the store
-        if (activeTab) {
-          updateTabContent(activeTab.id, content)
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching file content:', err)
-      setError(`Failed to load file: ${err instanceof Error ? err.message : String(err)}`)
-      setActiveContent('')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleTabChange = (tabId: string, tab: TabFile) => {
+  // Memoized handlers
+  const handleTabChange = useCallback((tabId: string, tab: TabFile) => {
     setActiveContent(tab.content || '')
-  }
+    setLastSavedContent(tab.content || '')
+  }, [])
 
-  const handleTabClose = (tabId: string, tab: TabFile) => {
+  const handleTabClose = useCallback((tabId: string, tab: TabFile) => {
     removeTab(tabId)
-  }
+  }, [removeTab])
   
-  // Handle content changes made by the user
+  // Optimized content change handler
   const handleContentChange = useCallback((newContent: string) => {
     if (!activeTab) return
     
-    // Update content in state
+    // Only update if content actually changed
+    if (newContent === activeContent) return
+    
     setActiveContent(newContent)
+    debouncedContentUpdate(newContent, activeTab.id)
+  }, [activeTab?.id, activeContent, debouncedContentUpdate])
+  
+  // Retry handler
+  const handleRetry = useCallback(() => {
+    if (activeTab) {
+      fetchFileContent(activeTab.path, true)
+    }
+  }, [activeTab?.path, fetchFileContent])
+  
+  // Memoized editor component
+  const EditorComponent = useMemo(() => {
+    if (!activeTab) return null
     
-    // Update content in store
-    updateTabContent(activeTab.id, newContent)
+    if (activeTab.extension === 'flow') {
+      return (
+        <div className='h-full overflow-auto'>
+          {/* <Canvas />/ */}
+        </div>
+      )
+    }
     
-    // Mark tab as dirty since user made changes
-    setTabDirty(activeTab.id, true)
-  }, [activeTab, updateTabContent, setTabDirty])
+    return (
+      <div className='h-full overflow-auto'>
+        <CodeEditor 
+          content={activeContent}
+          onChange={handleContentChange}
+          extension={activeTab.extension || ''}
+          hasUnsavedChanges={hasUnsavedChanges}
+        />
+      </div>
+    )
+  }, [activeTab?.extension, activeContent, handleContentChange, hasUnsavedChanges])
 
   return (
     <div className='flex flex-col h-full'>
@@ -101,45 +144,15 @@ function EditorWindowContent() {
       {activeTab ? (
         <div className='flex-1 overflow-auto'>
           {isLoading ? (
-            <div className='flex items-center justify-center h-full'>
-              <div className='text-center'>
-                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-4'></div>
-                <p>Loading file content...</p>
-              </div>
-            </div>
+            <LoadingComponent isConnected={isConnected} />
           ) : error ? (
-            <div className='flex items-center justify-center h-full'>
-              <div className='text-center text-red-500'>
-                <p>{error}</p>
-                <button 
-                  onClick={() => activeTab && fetchFileContent(activeTab.path)}
-                  className='mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          ) : activeTab.extension === 'flow' ? (
-            <div className='h-full overflow-auto'>
-              <Canvas />
-            </div>
+            <ErrorComponent error={error} onRetry={handleRetry} />
           ) : (
-            <div className='h-full overflow-auto'>
-              <CodeEditor 
-                content={activeContent}
-                onChange={handleContentChange}
-                extension={activeTab.extension || ''}
-              />
-            </div>
+            EditorComponent
           )}
         </div>
       ) : (
-        <div className='flex-1 flex items-center justify-center'>
-          <div className='text-center'>
-            <h3 className='text-xl font-semibold mb-2'>No file selected</h3>
-            <p>Open a file from the tabs above or from the file explorer</p>
-          </div>
-        </div>
+        <EmptyState />
       )}
     </div>
   )
