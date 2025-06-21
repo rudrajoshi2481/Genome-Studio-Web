@@ -27,8 +27,10 @@ interface TabState {
   // Actions
   addTab: (filePath: string, fileName?: string, content?: string) => string | null;
   removeTab: (tabId: string) => boolean;
+  closeTab: (tabId: string) => boolean;
   activateTab: (tabId: string) => boolean;
   updateTabContent: (tabId: string, content: string) => boolean;
+  updateTab: (tabId: string, updatedTab: Partial<TabFile>) => boolean;
   setTabDirty: (tabId: string, isDirty: boolean) => boolean;
   saveTab: (tabId: string) => boolean;
   closeAllTabs: () => boolean;
@@ -208,6 +210,11 @@ export const useTabStore = create<TabState>()(
         });
         
         return true;
+      },
+      
+      closeTab: (tabId) => {
+        // Alias for removeTab for better semantic clarity
+        return get().removeTab(tabId)
       },
       
       activateTab: (tabId) => {
@@ -426,6 +433,24 @@ export const useTabStore = create<TabState>()(
         set(state => ({
           options: { ...state.options, ...options }
         }));
+      },
+      
+      // Update tab with new properties
+      updateTab: (tabId, updatedTab) => {
+        const { tabs, tabOrder } = get();
+        const tab = tabs.get(tabId);
+        
+        if (!tab) return false;
+        
+        // Create updated tab by merging existing tab with updates
+        const newTab = { ...tab, ...updatedTab };
+        
+        // Update the tab in the map
+        const newTabs = new Map(tabs);
+        newTabs.set(tabId, newTab);
+        
+        set({ tabs: newTabs });
+        return true;
       }
     }),
     {

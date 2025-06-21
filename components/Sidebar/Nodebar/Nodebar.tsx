@@ -17,11 +17,17 @@ function Nodebar() {
   const [customNodes, setCustomNodes] = useState<CustomNodeType[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [isClient, setIsClient] = useState(false)
   
   // State for editing nodes
   const [editingNode, setEditingNode] = useState<CustomNodeType | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const { token, isAuthenticated } = useAuthStore()
+
+  // Ensure component only renders on client after hydration
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // Function to fetch custom nodes
   const loadCustomNodes = async () => {
@@ -81,8 +87,27 @@ function Nodebar() {
 
   // Load custom nodes on component mount and when auth state changes
   useEffect(() => {
-    loadCustomNodes()
-  }, [token, isAuthenticated])
+    if (isClient) {
+      loadCustomNodes()
+    }
+  }, [token, isAuthenticated, isClient])
+
+  // Prevent hydration mismatch by not rendering until client-side
+  if (!isClient) {
+    return (
+      <div className="h-[calc(100vh-56px)] flex flex-col border-r border-gray-200">
+        <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-gray-50">
+          <h3 className="text-sm font-medium">Nodebar</h3>
+          <button className="p-1 rounded hover:bg-gray-200" disabled>
+            <RefreshCcw className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          <div className="text-center py-4 text-gray-500 text-sm">Loading...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col border-r border-gray-200">
@@ -123,8 +148,6 @@ function Nodebar() {
       
       {/* Nodebar content */}
       <div className="flex-1 overflow-y-auto p-2">
-        
-        
         {/* Custom nodes section */}
         {isAuthenticated && (
           <>
@@ -195,6 +218,12 @@ function Nodebar() {
               )}
             </div>
           </>
+        )}
+        
+        {!isAuthenticated && (
+          <div className="text-center py-4 text-gray-500 text-sm">
+            Please log in to view your custom nodes.
+          </div>
         )}
       </div>
     </div>

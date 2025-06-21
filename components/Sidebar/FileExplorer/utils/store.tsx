@@ -75,6 +75,13 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
         
         toggleNode: (path: string) => {
           console.log('Store: toggling node', path)
+          
+          // Skip Vim temporary files
+          if (path.endsWith('/4913') || path === '/4913' || path.includes('.sw')) {
+            console.log(`Preventing toggle of Vim temporary file: ${path}`);
+            return false;
+          }
+          
           const { fileExplorer } = get()
           const expanded = fileExplorer.toggleExpanded(path)
           console.log('Node expanded state after toggle:', expanded)
@@ -92,6 +99,12 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
         },
         
         selectNode: (path: string, multiSelect: boolean = false) => {
+          // Skip Vim temporary files
+          if (path.endsWith('/4913') || path === '/4913' || path.includes('.sw')) {
+            console.log(`Preventing selection of Vim temporary file: ${path}`);
+            return;
+          }
+          
           const { fileExplorer } = get();
           fileExplorer.selectFile(path, multiSelect);
           
@@ -298,6 +311,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
               },
               body: JSON.stringify({
                 path: `${actualParentPath}/${fileName}`,
+                root_path: rootPath,
                 content: ''
               })
             });
@@ -339,7 +353,8 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
                 'Authorization': `Bearer ${token}`
               },
               body: JSON.stringify({
-                path: `${actualParentPath}/${folderName}`
+                path: `${actualParentPath}/${folderName}`,
+                root_path: rootPath
               })
             });
             

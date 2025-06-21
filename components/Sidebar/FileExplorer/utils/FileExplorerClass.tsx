@@ -80,6 +80,12 @@ export class FileExplorer {
 
   // Build tree recursively and populate hash map
   private _buildTreeFromNode(node: FileNode, parentPath: string | null): void {
+    // Skip Vim temporary files like '4913'
+    if (node.name === '4913' || node.path.endsWith('/4913')) {
+      console.log(`Skipping Vim temporary file in file explorer: ${node.path}`);
+      return;
+    }
+    
     const processedNode: FileNode = {
       ...node,
       parent: parentPath,
@@ -97,12 +103,27 @@ export class FileExplorer {
     }
   }
 
+  // Is this a Vim temporary file that should be ignored?
+  private isVimTempFile(path: string): boolean {
+    // Ignore Vim temporary files like '4913' and swap files
+    return path.endsWith('/4913') || 
+           path === '4913' || 
+           path.includes('.swp') || 
+           path.includes('.swx') || 
+           path.endsWith('~');
+  }
+
   // Handle real-time file changes
   handleFileChanges(event: FileChangeEvent): void {
     // Create a Set to track processed changes in this batch
     const processedChanges = new Set<string>();
-    
+    // Process each change
     for (const change of event.changes) {
+      // Skip Vim temporary files
+      if (this.isVimTempFile(change.path)) {
+        console.log(`FileExplorer: Skipping Vim temporary file: ${change.path}`);
+        continue;
+      }
       // Create a unique key for this change
       const changeKey = `${change.type}-${change.path}`;
       
@@ -176,15 +197,12 @@ export class FileExplorer {
         // Replace the existing child with the new node
         parentNode.children[existingChildIndex] = newNode;
       } else {
-        // Add the new node
+        // Add to parent's children
         parentNode.children.push(newNode);
       }
       
-      // Sort children
-      parentNode.children.sort((a, b) => {
-        if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      });
+      // Always sort children consistently after any change
+      this._sortNodeChildren(parentNode);
     }
   }
 
@@ -192,6 +210,20 @@ export class FileExplorer {
     const node = this.state.nodes.get(path);
     if (node) {
       node.modified = new Date().toISOString();
+    }
+  }
+
+  // Helper method to consistently sort node children (directories first, then alphabetical)
+  private _sortNodeChildren(node: FileNode): void {
+    if (node.children) {
+      node.children.sort((a, b) => {
+        // If one is a directory and the other isn't, directories come first
+        if (a.is_dir !== b.is_dir) {
+          return a.is_dir ? -1 : 1;
+        }
+        // Otherwise sort alphabetically by name
+        return a.name.localeCompare(b.name);
+      });
     }
   }
 
@@ -317,9 +349,22 @@ export class FileExplorer {
     displayNode.expanded = isExpanded; // Update the expanded property
     
     if (node.children && isExpanded) {
-      displayNode.children = node.children
-        .map(child => this._buildDisplayTree(this.state.nodes.get(child.path)!))
-        .filter(Boolean);
+      // First map children to their display nodes
+      const childNodes = node.children
+        .map(child => {
+          const childNode = this.state.nodes.get(child.path);
+          return childNode ? this._buildDisplayTree(childNode) : null;
+        })
+        .filter(Boolean) as FileNode[];
+      
+      // Create a temporary node with the child nodes for sorting
+      const tempNode: FileNode = { ...node, children: childNodes };
+      
+      // Use our consistent sorting helper
+      this._sortNodeChildren(tempNode);
+      
+      // Assign the sorted children
+      displayNode.children = tempNode.children;
     }
 
     return displayNode;

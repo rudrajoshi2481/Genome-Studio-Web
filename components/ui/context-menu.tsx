@@ -6,6 +6,17 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+// Create a client-side only wrapper with proper hydration handling
+const useIsClient = () => {
+  const [isClient, setIsClient] = React.useState(false);
+  
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
+  
+  return isClient;
+};
+
 function ContextMenu({
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
@@ -31,6 +42,12 @@ function ContextMenuGroup({
 function ContextMenuPortal({
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Portal>) {
+  const isClient = useIsClient();
+  
+  if (!isClient) {
+    return null;
+  }
+  
   return (
     <ContextMenuPrimitive.Portal data-slot="context-menu-portal" {...props} />
   )
@@ -97,6 +114,12 @@ function ContextMenuContent({
   className,
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Content>) {
+  const isClient = useIsClient();
+  
+  if (!isClient) {
+    return null;
+  }
+  
   return (
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Content
