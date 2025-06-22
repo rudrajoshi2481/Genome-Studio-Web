@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/resizable"
 import Terminal from '@/components/Terminal/Terminal'
 
-// import Traybar from '@/components/Sidebar/Traybar/Traybar'
+import Traybar from '@/components/Sidebar/Traybar/Traybar'
 import EditorWindowStore from '@/components/EditorWindow/EditorWindow'
 
 function Page() {
@@ -32,10 +32,10 @@ function Page() {
             </ResizablePanel> 
           </ResizablePanelGroup>
         </ResizablePanel>
-        {/* <ResizableHandle withHandle/>
+        <ResizableHandle withHandle/>
         <ResizablePanel defaultSize={25} minSize={5} maxSize={25}>
           <Traybar />
-        </ResizablePanel> */}
+        </ResizablePanel>
       </ResizablePanelGroup>
     </div>
   )

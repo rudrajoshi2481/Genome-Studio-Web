@@ -8,8 +8,9 @@ import DialogProvider from '../FileTabs/DialogProvider'
 
 import { debounce } from 'lodash'
 
-import Canvas from './Canvas/Canvas'
+
 import path from 'path'
+import { Canvas } from './Canvas'
 
 
 function EditorWindowContent() {
@@ -210,7 +211,13 @@ function EditorWindowContent() {
     if (activeTab.extension === 'flow') {
       return (
         <div className='h-full overflow-auto'>
-          <Canvas fileContent={activeContent} activePath={activeTab.path} />
+          <Canvas 
+            fileContent={activeContent} 
+            activePath={activeTab.path} 
+            onContentChange={handleContentChange}
+            hasUnsavedChanges={hasUnsavedChanges}
+            onSave={saveFileContent}
+          />
         </div>
       )
     }

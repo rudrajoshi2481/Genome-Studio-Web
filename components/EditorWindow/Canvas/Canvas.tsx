@@ -1,4 +1,7 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+"use client"
+
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import * as authService from '@/lib/services/auth-service';
 import ReactFlow, {
   ReactFlowProvider,
   Node,
@@ -9,408 +12,357 @@ import ReactFlow, {
   addEdge,
   Controls,
   Background,
-  useReactFlow,
   NodeTypes,
   EdgeTypes,
-  NodeProps,
   Handle,
   Position,
+  Panel,
+  MiniMap,
+  BackgroundVariant,
 } from 'reactflow';
+import { RefreshCw, Save, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import 'reactflow/dist/style.css';
 import { Code2, BarChart3 } from 'lucide-react';
 import DynamicCustomNode from './DynamicCustomNode';
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import {
+  parsePipelineFile,
+  createDefaultFlow,
+  convertToFlowNodes,
+  convertToFlowEdges,
+  convertToPipelineNodes,
+  convertToPipelineEdges,
+  ensureFlowExtension,
+  validateFlowData,
+  cleanJsonContent,
+  normalizeIds
+} from './utils/fileParser';
+import { PipelineFile } from './types/pipeline';
 
+// Define props for the Canvas component
 interface CanvasProps {
   fileContent: string;
   activePath: string;
+  onContentChange: (content: string) => void;
+  hasUnsavedChanges?: boolean;
+  onSave?: () => void;
 }
 
-interface FlowData {
-  id: string;
-  name: string;
-  description: string;
-  version: string;
-  created: string;
-  modified: string;
-  author: string;
-  config: any;
-  nodes: any[];
-  edges: any[];
-  global_variables?: Record<string, any>;
-  shared_imports?: string[];
-  execution_history?: any[];
-}
-
-// Custom node component for code editor nodes
-const CodeEditorNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
-  return (
-    <div className="p-3 border rounded-md shadow-sm bg-white min-w-[250px]">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Code2 className="w-4 h-4" />
-          <div className="font-medium text-sm">{data.title || 'Code Node'}</div>
-        </div>
-        <div className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-          {data.language || 'python'}
-        </div>
-      </div>
-      
-      <div className="text-xs text-gray-500 mb-2 line-clamp-2">
-        {data.description || 'No description'}
-      </div>
-      
-      <div className="bg-gray-50 p-2 rounded text-xs font-mono max-h-[100px] overflow-y-auto">
-        {Array.isArray(data.source) ? data.source.slice(0, 3).join('\n') + (data.source.length > 3 ? '\n...' : '') : data.source || '# No code'}
-      </div>
-      
-      {/* Input handles */}
-      {data.inputs && data.inputs.map((input: any, index: number) => (
-        <Handle
-          key={`input-${input.id || index}`}
-          type="target"
-          position={Position.Left}
-          id={`input-${index + 1}`}
-          style={{ top: 10 + (index * 10), background: '#555' }}
-          isConnectable={isConnectable}
-        />
-      ))}
-      
-      {/* Output handles */}
-      {data.outputs && data.outputs.map((output: any, index: number) => (
-        <Handle
-          key={`output-${output.id || index}`}
-          type="source"
-          position={Position.Right}
-          id={`output-${index + 1}`}
-          style={{ top: 10 + (index * 10), background: '#555' }}
-          isConnectable={isConnectable}
-        />
-      ))}
-      
-      {/* Default handles if no inputs/outputs specified */}
-      {(!data.inputs || data.inputs.length === 0) && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="input-default"
-          style={{ background: '#555' }}
-          isConnectable={isConnectable}
-        />
-      )}
-      
-      {(!data.outputs || data.outputs.length === 0) && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="output-default"
-          style={{ background: '#555' }}
-          isConnectable={isConnectable}
-        />
-      )}
-    </div>
-  );
-};
-
-// Custom node component for visualization nodes
-const VisualizationNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
-  return (
-    <div className="p-3 border rounded-md shadow-sm bg-white min-w-[250px]">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4" />
-          <div className="font-medium text-sm">{data.title || 'Visualization'}</div>
-        </div>
-        <div className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
-          visualization
-        </div>
-      </div>
-      
-      <div className="text-xs text-gray-500 mb-2 line-clamp-2">
-        {data.description || 'No description'}
-      </div>
-      
-      <div className="bg-gray-50 p-2 rounded text-xs font-mono h-[100px] flex items-center justify-center">
-        [Visualization Preview]
-      </div>
-      
-      {/* Input handles */}
-      {data.inputs && data.inputs.map((input: any, index: number) => (
-        <Handle
-          key={`input-${input.id || index}`}
-          type="target"
-          position={Position.Left}
-          id={`input-${index + 1}`}
-          style={{ top: 10 + (index * 10), background: '#555' }}
-          isConnectable={isConnectable}
-        />
-      ))}
-      
-      {/* Output handles */}
-      {data.outputs && data.outputs.map((output: any, index: number) => (
-        <Handle
-          key={`output-${output.id || index}`}
-          type="source"
-          position={Position.Right}
-          id={`output-${index + 1}`}
-          style={{ top: 10 + (index * 10), background: '#555' }}
-          isConnectable={isConnectable}
-        />
-      ))}
-      
-      {/* Default handles if no inputs/outputs specified */}
-      {(!data.inputs || data.inputs.length === 0) && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="input-default"
-          style={{ background: '#555' }}
-          isConnectable={isConnectable}
-        />
-      )}
-      
-      {(!data.outputs || data.outputs.length === 0) && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="output-default"
-          style={{ background: '#555' }}
-          isConnectable={isConnectable}
-        />
-      )}
-    </div>
-  );
-};
-
-// Custom edge component
-const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {} }: any) => {
-  const edgePath = `M${sourceX},${sourceY} C${sourceX + 50},${sourceY} ${targetX - 50},${targetY} ${targetX},${targetY}`;
-
-  return (
-    <path
-      id={id}
-      style={style}
-      className="react-flow__edge-path"
-      d={edgePath}
-      markerEnd="url(#arrowhead)"
-      strokeWidth={2}
-      stroke="#555"
-    />
-  );
-};
-
-// Define node types mapping
+// Memoize node types outside the component to prevent React Flow warnings
 const nodeTypes: NodeTypes = {
-  code_editor: CodeEditorNode,
-  visualization: VisualizationNode,
-  dynamicCustomNode: DynamicCustomNode,
+  dynamicNode: DynamicCustomNode,
+  code_editor: DynamicCustomNode, // Add code_editor node type
+  visualization: DynamicCustomNode, // Add visualization node type
 };
 
-// Define edge types mapping
-const edgeTypes: EdgeTypes = {
-  custom: CustomEdge,
-};
+// Memoize edge types outside the component
+const edgeTypes: EdgeTypes = {};
 
-const CanvasContent: React.FC<CanvasProps> = ({ fileContent, activePath }) => {
-  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+// Canvas content component
+const CanvasContent: React.FC<CanvasProps> = ({ fileContent, activePath, onContentChange }) => {
+  // React Flow states
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-  const [flowData, setFlowData] = useState<FlowData | null>(null);
   
+  // Flow data state
+  const [flowData, setFlowData] = useState<PipelineFile | null>(null);
+  
+  // Track unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Save loading state
+  const [isSaving, setIsSaving] = useState(false);
+
   // Parse flow file content when it changes
   useEffect(() => {
-    if (fileContent && activePath.endsWith('.flow')) {
-      try {
-        const parsedData = JSON.parse(fileContent) as FlowData;
-        setFlowData(parsedData);
-        
-        // Convert flow nodes to ReactFlow nodes
-        const flowNodes = parsedData.nodes.map((node) => ({
-          id: node.id,
-          type: 'dynamicCustomNode', // Always use the dynamic custom node for consistency
-          position: node.position,
-          data: {
-            ...node.data,
-            title: node.data.title || 'Untitled Node',
-            description: node.data.description || '',
-            language: node.data.language || 'python',
-            function_name: node.data.function_name || 'function',
-            source_code: node.data.source || '# No code',
-            inputs: node.data.inputs || [],
-            outputs: node.data.outputs || [],
-            node_id: node.data.node_id || '',
-            tags: node.data.tags || [],
-            onNodeDelete: (nodeId: string) => {
-              setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-            },
-          },
-        }));
-        
-        // Convert flow edges to ReactFlow edges
-        const flowEdges = parsedData.edges.map((edge) => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          sourceHandle: edge.sourceHandle,
-          targetHandle: edge.targetHandle,
-          type: 'custom',
-        }));
-        
-        setNodes(flowNodes);
-        setEdges(flowEdges);
-        
-        console.log('Flow file loaded:', parsedData.name);
-      } catch (error) {
-        console.error('Failed to parse flow file:', error);
-      }
-    }
-  }, [fileContent, activePath]);
-
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    []
-  );
-
-  const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, []);
-
-  const onDrop = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-
-      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-      if (!reactFlowInstance || !reactFlowBounds) {
+    if (!fileContent) return;
+    
+    try {
+      // Show loading toast
+    //   toast.loading('Loading pipeline...');
+      
+      // Clean and parse JSON content
+      const cleanContent = cleanJsonContent(fileContent);
+      const parsedData = JSON.parse(cleanContent);
+      
+      // Validate flow data structure
+      if (!validateFlowData(parsedData)) {
+        toast.error('Invalid flow data structure');
+        console.error('Invalid flow data structure');
         return;
       }
+      
+      // Normalize IDs in the flow data
+      const normalizedData = normalizeIds(parsedData);
+      
+      // Convert to React Flow nodes and edges
+      const flowNodes = convertToFlowNodes(normalizedData.nodes);
+      const flowEdges = convertToFlowEdges(normalizedData.edges);
+      
+      // Update state
+      setFlowData(normalizedData);
+      setNodes(flowNodes);
+      setEdges(flowEdges);
+      setHasUnsavedChanges(false);
+      
+      // Show success toast and dismiss loading toast
+      toast.success('Pipeline loaded successfully');
+      toast.dismiss();
+    } catch (error) {
+      // Show error toast
+      toast.error(`Failed to parse flow file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Failed to parse flow file:', error);
+      
+      // Create default flow on parse error
+      const defaultFlow = createDefaultFlow();
+      setFlowData(defaultFlow);
+      setNodes(convertToFlowNodes(defaultFlow.nodes));
+      setEdges(convertToFlowEdges(defaultFlow.edges));
+    }
+  }, [fileContent, activePath]); // Add activePath to dependencies to ensure reloading when switching files
 
-      const position = reactFlowInstance.project({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
-      });
+  // Handle edge connections
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      // Create a unique ID for the new edge
+      const newEdge = {
+        ...connection,
+        id: `edge_${connection.source}_${connection.sourceHandle}_${connection.target}_${connection.targetHandle}`,
+      };
+      
+      setEdges((eds) => addEdge(newEdge, eds));
+      setHasUnsavedChanges(true);
+    },
+    [setEdges]
+  );
 
-      // Try to get the node data from the drag event
+  // Handle node deletion
+  const onNodeDelete = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+      setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+      setHasUnsavedChanges(true);
+    },
+    [setNodes, setEdges]
+  );
+
+  // Save pipeline to server
+  const savePipeline = useCallback(async () => {
+    if (!flowData) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Show saving toast
+      toast.loading('Saving pipeline...');
+      
+      // Update flow data with current nodes and edges
+      const updatedFlowData = {
+        ...flowData,
+        nodes: convertToPipelineNodes(nodes),
+        edges: convertToPipelineEdges(edges),
+        modified: new Date().toISOString(),
+      };
+      
+      // Validate flow data before saving
+      if (!validateFlowData(updatedFlowData)) {
+        toast.error('Invalid flow data structure');
+        console.error('Invalid flow data structure');
+        setIsSaving(false);
+        return;
+      }
+      
+      // Convert to JSON string
+      const content = JSON.stringify(updatedFlowData, null, 2);
+      
+      // Save to server
+      const success = await saveFileToServer(activePath, content);
+      
+      if (success) {
+        // Update content in parent component
+        onContentChange(content);
+        setHasUnsavedChanges(false);
+        toast.success('Pipeline saved successfully');
+      } else {
+        toast.error('Failed to save pipeline');
+      }
+    } catch (error) {
+      toast.error(`Error saving pipeline: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error saving pipeline:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [flowData, nodes, edges, activePath, onContentChange, toast]);
+
+  // Save file to server
+  const saveFileToServer = async (filePath: string, content: string): Promise<boolean> => {
+    try {
+      // Ensure file path has correct extension
+      const normalizedPath = ensureFlowExtension(filePath);
+      
+      // Get root path from file path
+      const rootPath = normalizedPath.split('/').slice(0, -1).join('/');
+      
+      // Get auth token
+      const token = authService.getToken();
+      if (!token) {
+        console.error('No authentication token available');
+        toast.error('Authentication error: No token available');
+        return false;
+      }
+      
+      // Validate JSON content before saving
+      let parsedContent;
       try {
-        const nodeDataStr = event.dataTransfer.getData('application/reactflow');
-        if (nodeDataStr) {
-          const nodeData = JSON.parse(nodeDataStr);
-          console.log('Dropped node data:', nodeData);
-          
-          // Create a new node with the custom node data
-          const newNode = {
-            id: `node_${Date.now()}`,
-            type: 'dynamicCustomNode', // Always use the dynamic custom node
-            position,
-            data: {
-              title: nodeData.title || 'Custom Node',
-              description: nodeData.description || '',
-              language: nodeData.language || 'python',
-              function_name: nodeData.function_name || 'function',
-              source_code: nodeData.code || '# No code',
-              inputs: nodeData.inputs || [],
-              outputs: nodeData.outputs || [],
-              node_id: nodeData.node_id || '',
-              tags: nodeData.tags || [],
-              onNodeDelete: (nodeId: string) => {
-                setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-              },
-            },
-          };
-          
-          setNodes((nds) => nds.concat(newNode));
+        parsedContent = JSON.parse(content);
+        if (!validateFlowData(parsedContent)) {
+          console.error('Invalid flow data structure');
+          toast.error('Invalid flow data structure');
+          return false;
         }
       } catch (error) {
-        console.error('Error processing dropped node:', error);
+        console.error('Invalid JSON content:', error);
+        toast.error('Invalid JSON content');
+        return false;
       }
-    },
-    [reactFlowInstance]
-  );
-
-  const handleRunAll = useCallback(() => {
-    // Implement run all nodes logic
-    console.log('Running all nodes');
-  }, []);
-
-  const handleClearCanvas = useCallback(() => {
-    setNodes([]);
-    setEdges([]);
-  }, []);
-
-  const pipelineOps = {
-    savePipeline: useCallback(() => {
-      // Implement save pipeline logic
-      if (flowData) {
-        console.log('Saving pipeline:', flowData.name);
-        // Here you would implement the actual save logic
-      }
-    }, [flowData]),
-    updateFlowData: useCallback((updatedData: Partial<FlowData>) => {
-      setFlowData((prev) => {
-        if (!prev) return null;
-        return { ...prev, ...updatedData };
+      
+      // Format content as a valid JSON string
+      const formattedContent = JSON.stringify(parsedContent, null, 2);
+      
+      // Prepare request payload - the API expects 'path' in the body and 'root_path' as a query parameter
+      const queryParams = new URLSearchParams({
+        root_path: rootPath
+      }).toString();
+      
+      const payload = {
+        path: normalizedPath,  // API expects 'path', not 'file_path'
+        content: formattedContent
+      };
+      
+      console.log('Saving file with payload:', payload, 'and query params:', queryParams);
+      
+      // Send file content to server with correct parameter format
+      const response = await fetch(`http://localhost:8000/api/v1/file-explorer/update-file-content?${queryParams}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       });
-    }, []),
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to save file:', response.status, response.statusText, errorText);
+        toast.error(`Failed to save file: ${response.statusText}. ${errorText}`);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error saving file:', errorMessage);
+      toast.error(`Error saving file: ${errorMessage}`);
+      return false;
+    }
   };
 
-  const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
-    setEdges((eds) => eds.filter((e) => e.id !== edge.id));
-  }, []);
+  // Refresh pipeline
+  const refreshPipeline = useCallback(() => {
+    if (!fileContent) return;
+    
+    try {
+      // Show loading toast
+    //   toast.loading('Refreshing pipeline...');
+      
+      // Parse file content again
+      const parsedData = parsePipelineFile(fileContent);
+      
+      if (!parsedData) {
+        toast.error('Failed to parse flow file');
+        return;
+      }
+      
+      // Update state with refreshed data
+      setFlowData(parsedData);
+      setNodes(convertToFlowNodes(parsedData.nodes));
+      setEdges(convertToFlowEdges(parsedData.edges));
+      setHasUnsavedChanges(false);
+      
+    //   toast.success('Pipeline refreshed successfully');
+    } catch (error) {
+      toast.error(`Error refreshing pipeline: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error refreshing pipeline:', error);
+    }
+  }, [fileContent, toast]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="w-full h-full" ref={reactFlowWrapper}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onInit={setReactFlowInstance}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onEdgeClick={onEdgeClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          defaultEdgeOptions={{ type: 'custom' }}
-          fitView
-        >
-          <svg>
-            <defs>
-              <marker
-                id="arrowhead"
-                viewBox="0 0 10 10"
-                refX="9"
-                refY="5"
-                markerWidth="6"
-                markerHeight="6"
-                orient="auto"
-              >
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="#555" />
-              </marker>
-            </defs>
-          </svg>
-          <Background />
-          <Controls />
-          {flowData && (
-            <div className="absolute top-4 left-4 bg-white p-2 rounded shadow-md text-xs">
-              <div className="font-bold">{flowData.name}</div>
-              <div className="text-gray-500">{flowData.description}</div>
-            </div>
-          )}
-        </ReactFlow>
-      </div>
-    </div>
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      fitView
+    >
+      {/* Controls */}
+      <Controls />
+      <MiniMap nodeStrokeWidth={3} zoomable pannable />
+      <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+      
+      {/* Panel with buttons */}
+      <Panel position="top-right">
+        <div className="flex gap-2">
+          {/* Save button */}
+          <button
+            onClick={savePipeline}
+            disabled={isSaving || !hasUnsavedChanges}
+            className={`flex items-center gap-1 px-3 py-1 rounded text-sm font-medium ${hasUnsavedChanges ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+            title={hasUnsavedChanges ? 'Save changes' : 'No changes to save'}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                <span>Save</span>
+              </>
+            )}
+          </button>
+          
+          {/* Refresh button */}
+          <button
+            onClick={refreshPipeline}
+            className="flex items-center gap-1 px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium"
+            title="Refresh pipeline from file"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </Panel>
+    </ReactFlow>
   );
-}
+};
 
-const Canvas: React.FC<CanvasProps> = ({ fileContent, activePath }) => {
+// Main Canvas component with ReactFlowProvider
+const Canvas: React.FC<CanvasProps> = (props) => {
+  // Reset the flow when activePath changes to ensure proper loading of different files
+  const key = props.activePath || 'default';
+  
   return (
-    <ReactFlowProvider>
-      <div style={{ width: '100%', height: '100%' }}>
-        <CanvasContent fileContent={fileContent} activePath={activePath} />
-      </div>
-    </ReactFlowProvider>
+    <div className="w-full h-full">
+      <Toaster />
+      <ReactFlowProvider>
+        <CanvasContent key={key} {...props} />
+      </ReactFlowProvider>
+    </div>
   );
 };
 
