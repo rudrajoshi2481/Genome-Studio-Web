@@ -218,14 +218,14 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
             token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXZlbG9wbWVudCIsImV4cCI6MTcxNzYxMjgwMH0.example-mock-token';
           }
           
-          console.log('Using token for WebSocket:', token ? 'Token available' : 'No token');
+          // console.log('Using token for WebSocket:', token ? 'Token available' : 'No token');
           const wsUrl = `ws://150.250.96.50:8000/api/v1/file-explorer/watch?directory=${directory}&token=${token}`;
           
           try {
             const ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {
-              console.log('WebSocket connected');
+              // console.log('WebSocket connected');
               set({ wsStatus: 'connected', wsInstance: ws });
             };
             
@@ -236,11 +236,11 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
                 
                 // Handle file changes
                 if (data.type === 'file_changes') {
-                  console.log('WebSocket received file changes:', data.changes);
+                  // console.log('WebSocket received file changes:', data.changes);
                   
                   // Log the file structure before changes
                   const beforeTree = fileExplorer.getTreeStructure();
-                  console.log('File structure before changes:', JSON.stringify(beforeTree, null, 2));
+                  // console.log('File structure before changes:', JSON.stringify(beforeTree, null, 2));
                   
                   // Apply changes
                   fileExplorer.handleFileChanges(data);
@@ -249,31 +249,31 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
                   const updatedTree = fileExplorer.getTreeStructure();
                   
                   // Log the file structure after changes
-                  console.log('File structure after changes:', JSON.stringify(updatedTree, null, 2));
+                  // console.log('File structure after changes:', JSON.stringify(updatedTree, null, 2));
                   
                   // Update the store with the new tree structure
                   set({ fileTree: updatedTree });
                   
                   // Log expanded paths
-                  console.log('Current expanded paths:', fileExplorer.getAllExpandedPaths());
+                  // console.log('Current expanded paths:', fileExplorer.getAllExpandedPaths());
                 }
               } catch (error) {
-                console.error('Error processing WebSocket message:', error);
+                // console.error('Error processing WebSocket message:', error);
               }
             };
             
             ws.onerror = (error) => {
-              console.error('WebSocket error:', error);
+              // console.error('WebSocket error:', error);
               set({ wsStatus: 'error' });
             };
             
             ws.onclose = () => {
-              console.log('WebSocket disconnected');
+              // console.log('WebSocket disconnected');
               set({ wsStatus: 'disconnected', wsInstance: null });
             };
             
           } catch (error) {
-            console.error('Error connecting to WebSocket:', error);
+            // console.error('Error connecting to WebSocket:', error);
             set({ wsStatus: 'error' });
           }
         },

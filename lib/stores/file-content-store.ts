@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { useAuthToken } from './auth-store'
 import * as authService from '../services/auth-service'
+import { toast } from "sonner"
 
 interface FileContent {
   path: string
@@ -67,7 +68,9 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch file content: ${response.statusText}`)
+   
+    toast.error(`Failed to fetch file content: ${response.statusText}`)
+        // throw new Error(`Failed to fetch file content: ${response.statusText}`)
       }
 
       const data = await response.json()
@@ -106,7 +109,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       
       // Mark this file as recently saved to prevent immediate reload from backend
       // This prevents the file watcher from immediately reloading the file we just saved
-      console.log(`Marking ${path} as recently saved at ${Date.now()}`);
+      // console.log(`Marking ${path} as recently saved at ${Date.now()}`);
       set(state => ({
         recentlySavedFiles: new Map(state.recentlySavedFiles).set(path, Date.now())
       }));
@@ -202,7 +205,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
             
             // Handle different message types
             if (data.type === 'file_changes') {
-              console.log('File changes received:', data)
+              // console.log('File changes received:', data)
               
               // Use our enhanced handleFileChanges function to process all changes at once
               // This will handle swap files, backup files, and save patterns properly
@@ -210,7 +213,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
             } 
             // Handle specific file content update messages
             else if (data.type === 'file_content_updated') {
-              console.log('Specific file content updated:', data.path)
+              // console.log('Specific file content updated:', data.path)
               
               // Update the file content in the store
               if (data.path && data.content) {
@@ -219,7 +222,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
             }
             // Handle initial file content response
             else if (data.type === 'file_content') {
-              console.log('Initial file content received:', data.path)
+              // console.log('Initial file content received:', data.path)
               
               // Store the initial file content
               if (data.path && data.content) {
@@ -227,7 +230,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
               }
             }
           } catch (err) {
-            console.error('Error processing WebSocket message:', err)
+            // console.error('Error processing WebSocket message:', err)
           }
         }
         
@@ -241,12 +244,12 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
         }
         
         newSocket.onerror = (error) => {
-          console.error('WebSocket error:', error)
+          // console.error('WebSocket error:', error)
           set({ isConnecting: false })
         }
         
         newSocket.onclose = () => {
-          console.log('WebSocket closed')
+          // console.log('WebSocket closed')
           set(state => {
             const newConnections = new Set(state.activeConnections)
             newConnections.delete(directory)
@@ -272,7 +275,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
         }))
       }
     } catch (error) {
-      console.error('Error connecting to file watcher:', error)
+      // console.error('Error connecting to file watcher:', error)
       set({ isConnecting: false })
     }
   },
@@ -305,7 +308,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
     const now = Date.now()
     
     if (lastSaveTime && now - lastSaveTime < 2000) {
-      console.log(`[FILE CHANGE] Skipping update for ${path} - file was recently saved (${now - lastSaveTime}ms ago)`)
+      // console.log(`[FILE CHANGE] Skipping update for ${path} - file was recently saved (${now - lastSaveTime}ms ago)`)
       return // Skip update if file was recently saved
     }
     
@@ -313,7 +316,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
     const isPipelineFile = path.endsWith('.flow') || path.endsWith('.pipeline')
     
     if (currentFile) {
-      console.log(`Updating file content for ${path} from backend change`)
+      // console.log(`Updating file content for ${path} from backend change`)
       
       // For pipeline files, do additional checks to prevent overwriting newer content
       if (isPipelineFile && currentFile.content) {
@@ -325,19 +328,19 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
           // If current content has more nodes than incoming content, it's likely newer
           if (currentData.nodes && newData.nodes && 
               currentData.nodes.length > newData.nodes.length) {
-            console.log(`[FILE CHANGE] Rejecting update for ${path} - current version has more nodes (${currentData.nodes.length}) than incoming version (${newData.nodes.length})`)
+            // console.log(`[FILE CHANGE] Rejecting update for ${path} - current version has more nodes (${currentData.nodes.length}) than incoming version (${newData.nodes.length})`)
             return // Skip update to preserve the version with more nodes
           }
           
           // If current content has a _saveTimestamp that's newer than incoming content
           if (currentData._saveTimestamp && newData._saveTimestamp && 
               currentData._saveTimestamp > newData._saveTimestamp) {
-            console.log(`[FILE CHANGE] Rejecting update for ${path} - current version has newer timestamp`)
+                      // console.log(`[FILE CHANGE] Rejecting update for ${path} - current version has newer timestamp`)
             return // Skip update to preserve newer version
           }
         } catch (e: any) {
           // If parsing fails, fall back to normal behavior
-          console.log(`[FILE CHANGE] Error parsing JSON for comparison: ${e.message}`)
+          // console.log(`[FILE CHANGE] Error parsing JSON for comparison: ${e.message}`)
         }
       }
       
@@ -421,11 +424,11 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
     const { activeTabs } = get()
     
     if (!activeTabs || activeTabs.size === 0) {
-      console.log('No active tabs to watch')
+      // console.log('No active tabs to watch')
       return
     }
     
-    console.log(`Watching ${activeTabs.size} active tab files`)
+    // console.log(`Watching ${activeTabs.size} active tab files`)
     
     // Create a set of unique directories to watch
     const directories = new Set<string>()
@@ -466,7 +469,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
     const periodicCheck = () => {
       const socket = get().socket
       if (socket && socket.readyState === WebSocket.OPEN) {
-        console.log('Refreshing file watches for active tabs')
+        // console.log('Refreshing file watches for active tabs')
         validFilePaths.forEach(filePath => {
           // Re-send watch requests for each file
           // We need to get the socket again to ensure it's still valid
@@ -518,7 +521,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       if (response.ok) {
         const data = await response.json()
         get().handleFileChange(filePath, data.content, data.metadata || {})
-        console.log(`Fetched initial content for ${filePath}`)
+        // console.log(`Fetched initial content for ${filePath}`)
       }
     } catch (fetchError) {
       console.error(`Error fetching initial content for ${filePath}:`, fetchError)
@@ -546,7 +549,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
         path: filePath
       }))
       
-      console.log(`Started watching specific file: ${filePath}`)
+      // console.log(`Started watching specific file: ${filePath}`)
       
       // Also watch for any potential swap files that might indicate changes
       // This helps with editors like Vim that use swap files
@@ -560,14 +563,14 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
           type: 'watch_file',
           path: swapFilePath
         }))
-        console.log(`Also watching swap file: ${swapFilePath}`)
+        // console.log(`Also watching swap file: ${swapFilePath}`)
       }
       
       // Add an event listener to check if the socket closes and try to reconnect
       const checkSocketStatus = () => {
         const currentSocket = get().socket
         if (!currentSocket || currentSocket.readyState !== WebSocket.OPEN) {
-          console.log(`Socket closed, attempting to reconnect and watch ${filePath} again`)
+          // console.log(`Socket closed, attempting to reconnect and watch ${filePath} again`)
           // Try to reconnect and watch the file again
           get().watchFile(filePath).catch(err => 
             console.error(`Failed to re-watch file after socket closed: ${err}`)
@@ -581,7 +584,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       console.error(`Error watching file ${filePath}:`, error)
       // Schedule a retry after a delay
       setTimeout(() => {
-        console.log(`Retrying to watch file: ${filePath}`)
+        // console.log(`Retrying to watch file: ${filePath}`)
         get().watchFile(filePath).catch(err => 
           console.error(`Failed to retry watching file: ${err}`)
         )
@@ -615,7 +618,7 @@ function handleFileChanges(changes: any[]) {
       if (match) {
         const actualFileName = match[1]
         filePath = filePath.replace(/\.[^.]+\.sw[px]$/, `.${actualFileName}`)
-        console.log(`Detected swap file change, mapped to actual file: ${filePath}`)
+        // console.log(`Detected swap file change, mapped to actual file: ${filePath}`)
         isSwapFile = true
       }
     }
@@ -623,7 +626,7 @@ function handleFileChanges(changes: any[]) {
     // Handle backup files (file~)
     if (filePath.endsWith('~')) {
       const actualFilePath = filePath.slice(0, -1)
-      console.log(`Detected backup file: ${filePath}, mapped to: ${actualFilePath}`)
+      // console.log(`Detected backup file: ${filePath}, mapped to: ${actualFilePath}`)
       filePath = actualFilePath
       isBackupFile = true
       backupFiles.add(actualFilePath)
@@ -634,7 +637,7 @@ function handleFileChanges(changes: any[]) {
         filePath === '/4913' || 
         filePath.includes('4913') || 
         /\/\..*\.sw[px]$/.test(filePath)) { // Better regex for swap files
-      console.log(`Skipping Vim temporary file: ${filePath}`)
+      // console.log(`Skipping Vim temporary file: ${filePath}`)
       return
     }
     
@@ -667,13 +670,13 @@ function handleFileChanges(changes: any[]) {
     const hasAdd = fileChanges.some(c => c.type === 'ADDED' && !c.isSwapFile && !c.isBackupFile)
     
     if (hasDelete && hasAdd) {
-      console.log(`Detected save pattern for file: ${filePath}`)
+      // console.log(`Detected save pattern for file: ${filePath}`)
       filesToUpdate.add(filePath)
     }
     
     // If we see backup file operations, that's also a sign of a save
     if (backupFiles.has(filePath)) {
-      console.log(`Detected backup file operations for: ${filePath}`)
+      // console.log(`Detected backup file operations for: ${filePath}`)
       filesToUpdate.add(filePath)
     }
   })
@@ -691,14 +694,14 @@ function handleFileChanges(changes: any[]) {
       
       // Only fetch content for tracked files or active tabs
       if ((files && filePath in files) || (activeTabs && activeTabs.has(filePath))) {
-        console.log(`Refreshing content for file: ${filePath}`)
+        // console.log(`Refreshing content for file: ${filePath}`)
         await store.getFileContent(filePath, rootPath, true)
-        console.log(`Updated content for file: ${filePath}`)
+        // console.log(`Updated content for file: ${filePath}`)
       } else {
-        console.log(`Skipping update for untracked file: ${filePath}`)
+        // console.log(`Skipping update for untracked file: ${filePath}`)
       }
     } catch (err) {
-      console.error(`Error re-fetching file content after change for ${filePath}:`, err)
+      // console.error(`Error re-fetching file content after change for ${filePath}:`, err)
     }
   })
 }

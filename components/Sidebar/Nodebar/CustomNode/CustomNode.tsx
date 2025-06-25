@@ -30,7 +30,7 @@ import {
   CardContent, 
   CardFooter 
 } from '@/components/ui/card'
-import CodeEditor from '@/components/EditorWindow/CodeEditor/CodeEditor'
+import SimpleCodeEditor from './SimpleCodeEditor'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -601,8 +601,8 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                     <div className="p-4 h-full overflow-hidden flex flex-col">
                       <h3 className="font-medium mb-2 px-2">Node Code</h3>
                       <div className="flex-1 border rounded-md overflow-hidden">
-                        <CodeEditor 
-                          content={code} 
+                        <SimpleCodeEditor 
+                          value={code} 
                           onChange={setCode} 
                           extension={nodeLanguage.toLowerCase()} 
                         />

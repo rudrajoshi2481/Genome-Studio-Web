@@ -32,10 +32,10 @@ function Page() {
             </ResizablePanel> 
           </ResizablePanelGroup>
         </ResizablePanel>
-        {/* <ResizableHandle withHandle/>
+        <ResizableHandle withHandle/>
         <ResizablePanel defaultSize={25} minSize={5} maxSize={25}>
           <Traybar />
-        </ResizablePanel> */}
+        </ResizablePanel>
       </ResizablePanelGroup>
     </div>
   )

@@ -110,8 +110,8 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
   // Log the entire file content whenever it changes
   React.useEffect(() => {
     if (fileContent) {
-      console.log('File content updated:');
-      console.log(fileContent);
+      // console.log('File content updated:');
+      // console.log(fileContent);
     }
   }, [fileContent]);
   // State to track refreshing state
@@ -126,7 +126,7 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
   // Function to fetch data from the tab
   const fetchData = React.useCallback(async (forceRefresh = false) => {
     if (!tabId) {
-      console.log("No tab ID provided");
+      // console.log("No tab ID provided");
       return;
     }
     
@@ -136,14 +136,14 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
       const {name, path} = await fetchTabFilePath(tabId);
       
       if (!path) {
-        console.log("No path found for tab ID:", tabId);
+        // console.log("No path found for tab ID:", tabId);
         setIsRefreshing(false);
         return;
       }
       
       const content = await fetchTabFileContent(name, path, forceRefresh);
       if (!content) {
-        console.log("No content found for path:", path);
+        // console.log("No content   found for path:", path);
         setIsRefreshing(false);
         return;
       }      
@@ -199,11 +199,11 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
         }
       }
       
-      console.log("File path:", path);
-      console.log("File content:", content);
-      console.log("File content length:", content?.length || 0);
+      // console.log("File path:", path);
+      // console.log("File content:", content);
+      // console.log("File content length:", content?.length || 0);
     } catch (error) {
-      console.error("Error fetching tab data:", error);
+      // console.error("Error fetching tab data:", error);
       toast.error("Failed to refresh flow data");
     } finally {
       setIsRefreshing(false);
@@ -245,7 +245,7 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
           setFileContent(JSON.stringify(updatedFlowData, null, 2));
         }
       } catch (error) {
-        console.error("Error updating file content with new edge:", error);
+        // console.error("Error updating file content with new edge:", error);
       }
     }
   }, [fileContent, setEdges]);
@@ -265,19 +265,19 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
     // Fetch new data for the current tab
     fetchData();
     
-    console.log("Tab changed to:", tabId);
+    // console.log("Tab changed to:", tabId);
   }, [tabId, fetchData]);
  
   // Handle node deletion
   const handleNodeDelete = React.useCallback((nodeId: string) => {
-    console.log(`Deleting node: ${nodeId}`);
+    // console.log(`Deleting node: ${nodeId}`);
     
     // Helper function to check if an edge is connected to the deleted node
     // This needs to be very precise to avoid removing unrelated edges
     const isEdgeConnectedToNode = (edge: Edge) => {
       // For exact matches - this is the most reliable check and should be the primary method
       if (edge.source === nodeId || edge.target === nodeId) {
-        console.log(`Edge ${edge.id} matches exactly with node ${nodeId}`);
+        // console.log(`Edge ${edge.id} matches exactly with node ${nodeId}`);
         return true;
       }
       
@@ -287,7 +287,7 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
       const targetBase = edge.target.split('__')[0];
       
       if (sourceBase === nodeId || targetBase === nodeId) {
-        console.log(`Edge ${edge.id} matches with node ${nodeId} via handle pattern`);
+        // console.log(`Edge ${edge.id} matches with node ${nodeId} via handle pattern`);
         return true;
       }
       
@@ -303,8 +303,8 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
     const edgesToRemove = edges.filter(isEdgeConnectedToNode);
     
     // Log detailed information for debugging
-    console.log('Connected edges to remove:', edgesToRemove);
-    console.log('Edge IDs to remove:', edgesToRemove.map(e => e.id));
+    // console.log('Connected edges to remove:', edgesToRemove);
+    // console.log('Edge IDs to remove:', edgesToRemove.map(e => e.id));
     
     // Remove the node from the state
     setNodes((nds) => nds.filter((node) => node.id !== nodeId));
@@ -314,9 +314,9 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
       // Filter out only the edges connected to this node
       const remainingEdges = currentEdges.filter(edge => !isEdgeConnectedToNode(edge));
       
-      // Log before/after counts
-      console.log(`Edges before: ${currentEdges.length}, after: ${remainingEdges.length}`);
-      console.log('Removed edge count:', currentEdges.length - remainingEdges.length);
+      // Log  before/after counts
+      // console.log(`Edges before: ${currentEdges.length}, after: ${remainingEdges.length}`);
+      // console.log('Removed edge count:', currentEdges.length - remainingEdges.length);
       
       return remainingEdges;
     });
@@ -351,14 +351,14 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
           edges: convertToFlowEdges(edges)
         };
         
-        console.log(`Updating file content - Nodes: ${nodes.length}, Edges: ${edges.length}`);
-        console.log('Edge IDs in updated flow:', edges.map((e: Edge) => e.id));
+        // console.log(`Updating file content - Nodes: ${nodes.length}, Edges: ${edges.length}`);
+        // console.log('Edge IDs in updated flow:', edges.map((e: Edge) => e.id));
         
         // Update file content with the new data
         setFileContent(JSON.stringify(updatedFlowData, null, 2));
       }
     } catch (error) {
-      console.error("Error updating file content after state change:", error);
+      // console.error("Error updating file content after state change:", error);
     }
   }, [fileContent, nodes, edges, setFileContent]);
   
@@ -405,7 +405,7 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
             setFileContent(JSON.stringify(updatedFlowData, null, 2));
           }
         } catch (error) {
-          console.error("Error updating file content after node changes:", error);
+          // console.error("Error updating file content after node changes:", error);
         }
       }, 100); // Small delay to ensure nodes state is updated
     }

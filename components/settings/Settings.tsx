@@ -30,10 +30,14 @@ function Settings() {
     return nameParts[0].substring(0, 2).toUpperCase()
   }
 
+  const handleLogout = () => {
+    logout()
+  }
+
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" aria-label="Open settings">
           <SettingsIcon className="h-5 w-5" />
         </Button>
       </DialogTrigger>
@@ -45,72 +49,109 @@ function Settings() {
           </DialogDescription>
         </DialogHeader>
 
-        {isAuthenticated && user ? (
-          <div className="space-y-4">
-            {/* User Profile Card */}
+        <div className="space-y-4">
+          {isAuthenticated && user ? (
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center space-x-4">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage src={user.avatar} alt={user.username} />
-                    <AvatarFallback>{getInitials()}</AvatarFallback>
+                    <AvatarImage 
+                      src={user.avatar} 
+                      alt={`${user.username}'s avatar`} 
+                    />
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                      {getInitials()}
+                    </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <CardTitle>{user.full_name || user.username}</CardTitle>
-                    <CardDescription className="text-sm text-muted-foreground">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-lg truncate">
+                      {user.full_name || user.username}
+                    </CardTitle>
+                    <CardDescription className="flex items-center gap-2 mt-1">
                       {user.role && (
-                        <Badge variant="outline" className="mr-2">
+                        <Badge variant="secondary" className="text-xs">
                           {user.role}
                         </Badge>
                       )}
-                      User ID: {user.id}
+                      <span className="text-xs text-muted-foreground">
+                        ID: {user.id}
+                      </span>
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-center space-x-2 text-sm">
-                  <User className="h-4 w-4 opacity-70" />
-                  <span className="font-medium">Username:</span>
-                  <span>{user.username}</span>
+              
+              <CardContent className="space-y-3">
+                <div className="flex items-center space-x-3 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-foreground">Username:</span>
+                    <span className="ml-2 text-muted-foreground truncate">
+                      {user.username}
+                    </span>
+                  </div>
                 </div>
                 
                 {user.email && (
-                  <div className="flex items-center space-x-2 text-sm">
-                    <Mail className="h-4 w-4 opacity-70" />
-                    <span className="font-medium">Email:</span>
-                    <span>{user.email}</span>
+                  <div className="flex items-center space-x-3 text-sm">
+                    <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-foreground">Email:</span>
+                      <span className="ml-2 text-muted-foreground truncate">
+                        {user.email}
+                      </span>
+                    </div>
                   </div>
                 )}
                 
                 {user.role && (
-                  <div className="flex items-center space-x-2 text-sm">
-                    <Shield className="h-4 w-4 opacity-70" />
-                    <span className="font-medium">Role:</span>
-                    <span>{user.role}</span>
+                  <div className="flex items-center space-x-3 text-sm">
+                    <Shield className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-foreground">Role:</span>
+                      <span className="ml-2 text-muted-foreground">
+                        {user.role}
+                      </span>
+                    </div>
                   </div>
                 )}
               </CardContent>
+              
               <Separator />
-              <CardFooter className="pt-3">
+              
+              <CardFooter className="pt-4">
                 <Button 
                   variant="destructive" 
                   size="sm" 
-                  className="ml-auto flex items-center space-x-1"
-                  onClick={logout}
+                  className="ml-auto"
+                  onClick={handleLogout}
                 >
-                  <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
                 </Button>
               </CardFooter>
             </Card>
-          </div>
-        ) : (
-          <div className="py-6 text-center">
-            <p className="text-muted-foreground">You are not currently logged in.</p>
-            <Button className="mt-4" variant="outline">Login</Button>
-          </div>
-        )}
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <div className="space-y-4">
+                  <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                    <User className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Not logged in</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Please log in to view your account settings
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    Login
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )

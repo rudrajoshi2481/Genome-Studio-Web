@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import React, { useMemo, useLayoutEffect, useRef, useState, useCallback, MouseEvent } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals } from 'reactflow';
 
 // Define NodeIO interface
@@ -131,36 +131,45 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
   return (
     <div
       ref={nodeRef}
-      className={`rounded-lg shadow-md ${selected ? 'ring-2 ring-zinc-700' : ''} bg-white overflow-visible dark:bg-zinc-950 dark:border dark:border-zinc-800`}
+      className={` shadow-md ${selected ? 'ring-2 ring-zinc-700' : ''} bg-white overflow-visible dark:bg-zinc-950 dark:border dark:border-zinc-800`}
       style={{ 
         width: dimensions.width, 
-        height: Math.max(dimensions.height, minHeight),
+        height: Math.max(dimensions.height, minHeight) + 20,
         position: 'relative'
       }}
     >
       {/* Node resizer */}
-      <NodeResizer
-        minWidth={209}
-        minHeight={240} /* Increased minimum height to better accommodate content */
-        isVisible={selected}
-        handleStyle={{
-          width: 10,
-          height: 10,
-          backgroundColor: '#3b82f6', /* Blue-500 - more visible and matches common UI elements */
-          borderWidth: 2,
-          borderColor: 'white',
-          zIndex: 1000 /* Ensure handles are above other elements */
-        }}
-        lineStyle={{
-          borderWidth: 1,
-          borderColor: '#3b82f6' /* Matching blue for the resize lines */
-        }}
-        onResize={(_, params) => {
-          // Update node dimensions
-          setDimensions({ width: params.width, height: params.height });
-          updateNodeInternals(id);
-        }}
-      />
+{/* Node resizer */}
+{/* Node resizer */}
+<NodeResizer
+  minWidth={209}
+  minHeight={240}
+  isVisible={selected}
+  handleStyle={{
+    width: 12,
+    height: 12,
+    backgroundColor: '#000000',
+    border: '2px solid #ffffff',
+    borderRadius: '50%',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+    cursor: 'nw-resize',
+    zIndex: 1000,
+    opacity: selected ? 1 : 0,
+    transition: 'all 0.2s ease-in-out'
+  }}
+  lineStyle={{
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderStyle: 'dotted',
+    opacity: 0.8
+  }}
+  onResize={(_, params) => {
+    setDimensions({ width: params.width, height: params.height });
+    updateNodeInternals(id);
+  }}
+/>
+
+
       
       {/* Node header with title */}
       <div className="bg-gray-100 dark:bg-zinc-800 border-b border-gray-200 dark:border-zinc-700 px-4 py-2 flex items-center justify-between">
@@ -188,10 +197,16 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
       </div>
       
       {/* Node content */}
-      <div className="p-3">
+      <div className="p-3 select-text">
+      {/* shadow-[0_-2px_4px_rgba(0,0,0,0.1)] */}
         {/* Description */}
         {nodeData.description && (
-          <div className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{nodeData.description}</div>
+          <div 
+            className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2 select-text" 
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {nodeData.description}
+          </div>
         )}
         
         {/* Floating status badge */}
@@ -238,7 +253,10 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
         
         {/* Node metadata */}
         <div className="flex justify-end text-xs text-gray-500 dark:text-gray-400 mt-2 mb-2">
-          <div className="px-2 py-0.5 bg-gray-100 dark:bg-zinc-800 rounded-sm border border-gray-200 dark:border-zinc-700">
+          <div 
+            className="px-2 py-0.5 bg-gray-100 dark:bg-zinc-800 rounded-sm border border-gray-200 dark:border-zinc-700 select-text"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             {nodeData.function_name || 'function'}
           </div>
         </div>
@@ -260,7 +278,7 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
                     left: -5,
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    background: '#10B981', // Green color for inputs
+                    background: '#000000', // Black color for inputs
                     width: 10,
                     height: 10,
                     border: '2px solid white',
@@ -269,7 +287,10 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
                   }}
                 />
                 {/* Input label */}
-                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 ml-2">
+                <div 
+                  className="text-xs font-medium text-gray-700 dark:text-gray-300 ml-2 select-text"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   {input.name}
                   <span className="text-gray-400 dark:text-gray-500 ml-1">{input.type}</span>
                 </div>
@@ -284,7 +305,10 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
             {nodeData.outputs.map((output, idx) => (
               <div key={`port-${output.id || idx}`} className="relative h-8 flex items-center justify-end px-3">
                 {/* Output label */}
-                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mr-2 text-right">
+                <div 
+                  className="text-xs font-medium text-gray-700 dark:text-gray-300 mr-2 text-right select-text"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   {output.name}
                   <span className="text-gray-400 dark:text-gray-500 ml-1">{output.type}</span>
                 </div>
@@ -297,7 +321,7 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
                     right: -5,
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    background: '#A855F7', // Purple color for outputs
+                    background: '#000000', // Black color for outputs
                     width: 10,
                     height: 10,
                     border: '2px solid white',
@@ -316,7 +340,33 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
         <button 
           className="w-full bg-gray-900 hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 text-white text-sm py-1 px-3 rounded flex items-center justify-center"
           onClick={() => {
-            console.log(`Running node: ${nodeData.title || 'Untitled Node'}`);
+            // Log the node ID prominently
+            console.log('==================================');
+            console.log(`NODE ID: ${id}`);
+            console.log('==================================');
+            
+            // console.log(`Running node: ${nodeData.title || 'Untitled Node'}`);
+            
+            // // Log node_id from data if available
+            // if (nodeData.node_id) {
+            //   console.log('Internal node_id:', nodeData.node_id);
+            // }
+            
+            // // Log all node data
+            // console.log('Complete Node Data:', nodeData);
+            
+            // // Log specific properties for easier access
+            // console.log('Title:', nodeData.title);
+            // console.log('Description:', nodeData.description);
+            // console.log('Function Name:', nodeData.function_name);
+            // console.log('Language:', nodeData.language);
+            // console.log('Source Code:', nodeData.source_code);
+            // console.log('Inputs:', nodeData.inputs);
+            // console.log('Outputs:', nodeData.outputs);
+            // console.log('Status:', nodeData.status);
+            // console.log('Execution Count:', nodeData.execution_count);
+            // console.log('Execution Timing:', nodeData.execution_timing);
+            // console.log('Logs:', nodeData.logs);
           }}
         >
           <svg className="h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -353,11 +403,16 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
             
             {logsOpen && (
               <div 
-                className="font-mono text-xs rounded-md overflow-hidden bg-gray-50 dark:bg-zinc-900" 
+                className="font-mono text-xs rounded-md overflow-hidden bg-gray-50 dark:bg-zinc-900 select-text" 
                 style={{ maxHeight: '200px', overflowY: 'auto' }}
+                onMouseDown={(e) => e.stopPropagation()}
               >
                 {nodeData.logs.map((log, index) => (
-                  <pre key={index} className="text-sm p-1 border-b border-gray-100 dark:border-zinc-800">
+                  <pre 
+                    key={index} 
+                    className="text-sm p-1 border-b border-gray-100 dark:border-zinc-800 select-text"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
                     {log.message}
                   </pre>
                 ))}
