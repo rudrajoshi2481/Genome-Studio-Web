@@ -83,7 +83,7 @@ function FileTab({
     >
       {mounted ? getFileIcon() : <FileText size={14} className="mr-1 flex-shrink-0 text-gray-500" />}
       <span className="truncate max-w-[100px]">{name}</span>
-      {isDirty && <span className="ml-1 text-blue-400">•</span>}
+      {/* {isDirty && <span className="ml-1 text-blue-400">•</span>} */}
       {mounted ? (
         <button 
           className="ml-2 opacity-0 group-hover:opacity-100 rounded p-0.5 hover:bg-gray-200 transition-all duration-150"

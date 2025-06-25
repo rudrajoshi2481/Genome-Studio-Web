@@ -112,7 +112,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
           const node = fileExplorer.getNodeByPath(path);
           
           // Log the selected node
-          console.log('Selected node:', { path, isDirectory: node?.is_dir, name: node?.name });
+          // console.log('Selected node:', { path, isDirectory: node?.is_dir, name: node?.name });
           
           // If it's a directory, log it as the active folder
           if (node?.is_dir) {

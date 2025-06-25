@@ -1,302 +1,78 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import * as authService from '@/lib/services/auth-service';
+import React from 'react';
 import ReactFlow, {
   ReactFlowProvider,
+  Controls,
+  MiniMap,
+  Background,
+  BackgroundVariant,
   Node,
   Edge,
-  Connection,
   useNodesState,
   useEdgesState,
   addEdge,
-  Controls,
-  Background,
+  Connection,
   NodeTypes,
-  EdgeTypes,
-  Handle,
-  Position,
-  Panel,
-  MiniMap,
-  BackgroundVariant,
+  useReactFlow
 } from 'reactflow';
-import { RefreshCw, Save, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
-import 'reactflow/dist/style.css';
-import { Code2, BarChart3 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useTabStore } from '@/components/FileTabs/useTabStore';
+import { fetchTabFilePath, fetchTabFileContent } from './hooks/canvashooks';
+import { isValidFlowFormat, convertToFlowEdges, convertToFlowNodes, convertFlowNodesToReactFlow } from './hooks/fileParser';
+import Toolbar from './components/Toolbar';
 import DynamicCustomNode from './DynamicCustomNode';
-import { toast } from "sonner";
-import { Toaster } from "@/components/ui/sonner";
-import {
-  parsePipelineFile,
-  createDefaultFlow,
-  convertToFlowNodes,
-  convertToFlowEdges,
-  convertToPipelineNodes,
-  convertToPipelineEdges,
-  ensureFlowExtension,
-  validateFlowData,
-  cleanJsonContent,
-  normalizeIds
-} from './utils/fileParser';
-import { PipelineFile } from './types/pipeline';
+
+// Import styles for ReactFlow
+import 'reactflow/dist/style.css';
 
 // Define props for the Canvas component
 interface CanvasProps {
-  fileContent: string;
-  activePath: string;
-  onContentChange: (content: string) => void;
-  hasUnsavedChanges?: boolean;
-  onSave?: () => void;
+  tabId: string;
 }
 
-// Memoize node types outside the component to prevent React Flow warnings
+// Canvas content component
+interface CanvasContentProps extends CanvasProps {
+  onRefresh: () => void;
+  isRefreshing: boolean;
+  nodes: Node<any, string | undefined>[];
+  edges: Edge<any>[];
+  onNodesChange: (changes: any) => void;
+  onEdgesChange: (changes: any) => void;
+  onConnect: (connection: Connection) => void;
+  onDrop: (event: React.DragEvent<HTMLDivElement>, reactFlowInstance: any) => void;
+  onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
+  fileContent?: string | null;
+  filePath?: string;
+}
+
+// Define node types mapping
 const nodeTypes: NodeTypes = {
-  dynamicNode: DynamicCustomNode,
-  code_editor: DynamicCustomNode, // Add code_editor node type
-  visualization: DynamicCustomNode, // Add visualization node type
+  dynamicNode: DynamicCustomNode
 };
 
-// Memoize edge types outside the component
-const edgeTypes: EdgeTypes = {};
+const CanvasContent: React.FC<CanvasContentProps> = (props) => {
+  const { 
+    tabId, 
+    onRefresh, 
+    isRefreshing, 
+    nodes, 
+    edges, 
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    onDrop,
+    onDragOver,
+    fileContent,
+    filePath
+  } = props;
 
-// Canvas content component
-const CanvasContent: React.FC<CanvasProps> = ({ fileContent, activePath, onContentChange }) => {
-  // React Flow states
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const reactFlowInstance = useReactFlow();
   
-  // Flow data state
-  const [flowData, setFlowData] = useState<PipelineFile | null>(null);
-  
-  // Track unsaved changes
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
-  // Save loading state
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Parse flow file content when it changes
-  useEffect(() => {
-    if (!fileContent) return;
-    
-    try {
-      // Show loading toast
-    //   toast.loading('Loading pipeline...');
-      
-      // Clean and parse JSON content
-      const cleanContent = cleanJsonContent(fileContent);
-      const parsedData = JSON.parse(cleanContent);
-      
-      // Validate flow data structure
-      if (!validateFlowData(parsedData)) {
-        toast.error('Invalid flow data structure');
-        console.error('Invalid flow data structure');
-        return;
-      }
-      
-      // Normalize IDs in the flow data
-      const normalizedData = normalizeIds(parsedData);
-      
-      // Convert to React Flow nodes and edges
-      const flowNodes = convertToFlowNodes(normalizedData.nodes);
-      const flowEdges = convertToFlowEdges(normalizedData.edges);
-      
-      // Update state
-      setFlowData(normalizedData);
-      setNodes(flowNodes);
-      setEdges(flowEdges);
-      setHasUnsavedChanges(false);
-      
-      // Show success toast and dismiss loading toast
-      toast.success('Pipeline loaded successfully');
-      toast.dismiss();
-    } catch (error) {
-      // Show error toast
-      toast.error(`Failed to parse flow file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      console.error('Failed to parse flow file:', error);
-      
-      // Create default flow on parse error
-      const defaultFlow = createDefaultFlow();
-      setFlowData(defaultFlow);
-      setNodes(convertToFlowNodes(defaultFlow.nodes));
-      setEdges(convertToFlowEdges(defaultFlow.edges));
-    }
-  }, [fileContent, activePath]); // Add activePath to dependencies to ensure reloading when switching files
-
-  // Handle edge connections
-  const onConnect = useCallback(
-    (connection: Connection) => {
-      // Create a unique ID for the new edge
-      const newEdge = {
-        ...connection,
-        id: `edge_${connection.source}_${connection.sourceHandle}_${connection.target}_${connection.targetHandle}`,
-      };
-      
-      setEdges((eds) => addEdge(newEdge, eds));
-      setHasUnsavedChanges(true);
-    },
-    [setEdges]
-  );
-
-  // Handle node deletion
-  const onNodeDelete = useCallback(
-    (nodeId: string) => {
-      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-      setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
-      setHasUnsavedChanges(true);
-    },
-    [setNodes, setEdges]
-  );
-
-  // Save pipeline to server
-  const savePipeline = useCallback(async () => {
-    if (!flowData) return;
-    
-    try {
-      setIsSaving(true);
-      
-      // Show saving toast
-      toast.loading('Saving pipeline...');
-      
-      // Update flow data with current nodes and edges
-      const updatedFlowData = {
-        ...flowData,
-        nodes: convertToPipelineNodes(nodes),
-        edges: convertToPipelineEdges(edges),
-        modified: new Date().toISOString(),
-      };
-      
-      // Validate flow data before saving
-      if (!validateFlowData(updatedFlowData)) {
-        toast.error('Invalid flow data structure');
-        console.error('Invalid flow data structure');
-        setIsSaving(false);
-        return;
-      }
-      
-      // Convert to JSON string
-      const content = JSON.stringify(updatedFlowData, null, 2);
-      
-      // Save to server
-      const success = await saveFileToServer(activePath, content);
-      
-      if (success) {
-        // Update content in parent component
-        onContentChange(content);
-        setHasUnsavedChanges(false);
-        toast.success('Pipeline saved successfully');
-      } else {
-        toast.error('Failed to save pipeline');
-      }
-    } catch (error) {
-      toast.error(`Error saving pipeline: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      console.error('Error saving pipeline:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [flowData, nodes, edges, activePath, onContentChange, toast]);
-
-  // Save file to server
-  const saveFileToServer = async (filePath: string, content: string): Promise<boolean> => {
-    try {
-      // Ensure file path has correct extension
-      const normalizedPath = ensureFlowExtension(filePath);
-      
-      // Get root path from file path
-      const rootPath = normalizedPath.split('/').slice(0, -1).join('/');
-      
-      // Get auth token
-      const token = authService.getToken();
-      if (!token) {
-        console.error('No authentication token available');
-        toast.error('Authentication error: No token available');
-        return false;
-      }
-      
-      // Validate JSON content before saving
-      let parsedContent;
-      try {
-        parsedContent = JSON.parse(content);
-        if (!validateFlowData(parsedContent)) {
-          console.error('Invalid flow data structure');
-          toast.error('Invalid flow data structure');
-          return false;
-        }
-      } catch (error) {
-        console.error('Invalid JSON content:', error);
-        toast.error('Invalid JSON content');
-        return false;
-      }
-      
-      // Format content as a valid JSON string
-      const formattedContent = JSON.stringify(parsedContent, null, 2);
-      
-      // Prepare request payload - the API expects 'path' in the body and 'root_path' as a query parameter
-      const queryParams = new URLSearchParams({
-        root_path: rootPath
-      }).toString();
-      
-      const payload = {
-        path: normalizedPath,  // API expects 'path', not 'file_path'
-        content: formattedContent
-      };
-      
-      console.log('Saving file with payload:', payload, 'and query params:', queryParams);
-      
-      // Send file content to server with correct parameter format
-      const response = await fetch(`http://localhost:8000/api/v1/file-explorer/update-file-content?${queryParams}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to save file:', response.status, response.statusText, errorText);
-        toast.error(`Failed to save file: ${response.statusText}. ${errorText}`);
-        return false;
-      }
-      
-      return true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error saving file:', errorMessage);
-      toast.error(`Error saving file: ${errorMessage}`);
-      return false;
-    }
-  };
-
-  // Refresh pipeline
-  const refreshPipeline = useCallback(() => {
-    if (!fileContent) return;
-    
-    try {
-      // Show loading toast
-    //   toast.loading('Refreshing pipeline...');
-      
-      // Parse file content again
-      const parsedData = parsePipelineFile(fileContent);
-      
-      if (!parsedData) {
-        toast.error('Failed to parse flow file');
-        return;
-      }
-      
-      // Update state with refreshed data
-      setFlowData(parsedData);
-      setNodes(convertToFlowNodes(parsedData.nodes));
-      setEdges(convertToFlowEdges(parsedData.edges));
-      setHasUnsavedChanges(false);
-      
-    //   toast.success('Pipeline refreshed successfully');
-    } catch (error) {
-      toast.error(`Error refreshing pipeline: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      console.error('Error refreshing pipeline:', error);
-    }
-  }, [fileContent, toast]);
-
+  // Extract filename from path if available
+  const fileName = filePath && typeof filePath === 'string' ? 
+    filePath.split('/').pop() : undefined;
+ 
   return (
     <ReactFlow
       nodes={nodes}
@@ -305,62 +81,463 @@ const CanvasContent: React.FC<CanvasProps> = ({ fileContent, activePath, onConte
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
+      onDrop={(event) => onDrop(event, reactFlowInstance)}
+      onDragOver={onDragOver}
       fitView
     >
-      {/* Controls */}
+      <Toolbar 
+        onRefresh={onRefresh} 
+        isRefreshing={isRefreshing} 
+        fileContent={fileContent} 
+        fileName={fileName} 
+        nodes={nodes}
+        edges={edges}
+        tabId={tabId}
+      />
       <Controls />
       <MiniMap nodeStrokeWidth={3} zoomable pannable />
       <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-      
-      {/* Panel with buttons */}
-      <Panel position="top-right">
-        <div className="flex gap-2">
-          {/* Save button */}
-          <button
-            onClick={savePipeline}
-            disabled={isSaving || !hasUnsavedChanges}
-            className={`flex items-center gap-1 px-3 py-1 rounded text-sm font-medium ${hasUnsavedChanges ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-            title={hasUnsavedChanges ? 'Save changes' : 'No changes to save'}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Saving...</span>
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                <span>Save</span>
-              </>
-            )}
-          </button>
-          
-          {/* Refresh button */}
-          <button
-            onClick={refreshPipeline}
-            className="flex items-center gap-1 px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium"
-            title="Refresh pipeline from file"
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span>Refresh</span>
-          </button>
-        </div>
-      </Panel>
     </ReactFlow>
   );
 };
 
 // Main Canvas component with ReactFlowProvider
-const Canvas: React.FC<CanvasProps> = (props) => {
-  // Reset the flow when activePath changes to ensure proper loading of different files
-  const key = props.activePath || 'default';
+export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
+  // State to store file path and content
+  const [filePath, setFilePath] = React.useState<string | undefined>();
+  const [fileContent, setFileContent] = React.useState<string | null>(null);
   
+  // Log the entire file content whenever it changes
+  React.useEffect(() => {
+    if (fileContent) {
+      console.log('File content updated:');
+      console.log(fileContent);
+    }
+  }, [fileContent]);
+  // State to track refreshing state
+  const [isRefreshing, setIsRefreshing] = React.useState<boolean>(false);
+  // Ref to track if validation toast has been shown
+  const validationToastShown = React.useRef<boolean>(false);
+  
+  // State for ReactFlow nodes and edges
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Function to fetch data from the tab
+  const fetchData = React.useCallback(async (forceRefresh = false) => {
+    if (!tabId) {
+      console.log("No tab ID provided");
+      return;
+    }
+    
+    try {
+      setIsRefreshing(true);
+      
+      const {name, path} = await fetchTabFilePath(tabId);
+      
+      if (!path) {
+        console.log("No path found for tab ID:", tabId);
+        setIsRefreshing(false);
+        return;
+      }
+      
+      const content = await fetchTabFileContent(name, path, forceRefresh);
+      if (!content) {
+        console.log("No content found for path:", path);
+        setIsRefreshing(false);
+        return;
+      }      
+      const validationResult = isValidFlowFormat(content);
+      
+      // Only show toast if it hasn't been shown yet for this tabId or if forcing refresh
+      if (!validationToastShown.current || forceRefresh) {
+        if (!validationResult.isValid) {
+          toast.error(
+            forceRefresh ? "Failed to refresh flow" : "Invalid flow format", 
+            { description: validationResult.error || "The file is not in a valid flow format" }
+          );
+        } else {
+          toast.success(
+            forceRefresh ? "Flow refreshed successfully" : "Valid flow format", 
+            { description: "The file is in a valid flow format" }
+          );
+        }
+        validationToastShown.current = true;
+      }
+      
+      setFilePath(path);
+      setFileContent(content);
+      
+      // Extract nodes and edges from parsed data if valid
+      if (validationResult.isValid && validationResult.parsedData) {
+        const flowData = validationResult.parsedData;
+        if (flowData.nodes) {
+          // Convert flow nodes to ReactFlow nodes with dynamic node support
+          const reactFlowNodes = convertFlowNodesToReactFlow(flowData.nodes);
+          
+          // Add delete handler to each node
+          const nodesWithHandlers = reactFlowNodes.map(node => ({
+            ...node,
+            data: {
+              ...node.data,
+              onNodeDelete: handleNodeDelete
+            }
+          }));
+          
+          setNodes(nodesWithHandlers);
+        }
+        
+        if (flowData.edges) {
+          setEdges(flowData.edges.map(edge => ({
+            id: edge.id,
+            source: edge.source,
+            sourceHandle: edge.sourceHandle,
+            target: edge.target,
+            targetHandle: edge.targetHandle,
+            type: edge.type || 'default'
+          })));
+        }
+      }
+      
+      console.log("File path:", path);
+      console.log("File content:", content);
+      console.log("File content length:", content?.length || 0);
+    } catch (error) {
+      console.error("Error fetching tab data:", error);
+      toast.error("Failed to refresh flow data");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [tabId]); // Remove isRefreshing from dependencies
+
+  // Handle refresh button click
+  const handleRefresh = React.useCallback(() => {
+    validationToastShown.current = false; // Reset toast flag to show refresh result
+    fetchData(true); // Pass true to force refresh
+  }, [fetchData]);
+  
+  // Handle connection of nodes
+  const onConnect = React.useCallback((params: Connection) => {
+    // Create a unique ID for the new edge
+    const newEdge = {
+      ...params,
+      id: `edge_${params.source}_${params.sourceHandle || 'output'}_${params.target}_${params.targetHandle || 'input'}`,
+      type: 'default'
+    };
+    setEdges((eds) => addEdge(newEdge, eds));
+    
+    // Update the fileContent to include the new edge
+    if (fileContent) {
+      try {
+        const validationResult = isValidFlowFormat(fileContent);
+        if (validationResult.isValid && validationResult.parsedData) {
+          const updatedFlowData = {
+            ...validationResult.parsedData,
+            edges: [...(validationResult.parsedData.edges || []), {
+              id: newEdge.id,
+              source: newEdge.source,
+              sourceHandle: newEdge.sourceHandle,
+              target: newEdge.target,
+              targetHandle: newEdge.targetHandle,
+              type: newEdge.type || 'default'
+            }]
+          };
+          setFileContent(JSON.stringify(updatedFlowData, null, 2));
+        }
+      } catch (error) {
+        console.error("Error updating file content with new edge:", error);
+      }
+    }
+  }, [fileContent, setEdges]);
+  
+  // Initial data fetch when tab changes
+  React.useEffect(() => {
+    if (!tabId) return;
+    
+    // Reset state when tabId changes
+    validationToastShown.current = false;
+    setNodes([]);
+    setEdges([]);
+    setFileContent(null);
+    setFilePath(undefined);
+    setIsRefreshing(false);
+    
+    // Fetch new data for the current tab
+    fetchData();
+    
+    console.log("Tab changed to:", tabId);
+  }, [tabId, fetchData]);
+ 
+  // Handle node deletion
+  const handleNodeDelete = React.useCallback((nodeId: string) => {
+    console.log(`Deleting node: ${nodeId}`);
+    
+    // Helper function to check if an edge is connected to the deleted node
+    // This needs to be very precise to avoid removing unrelated edges
+    const isEdgeConnectedToNode = (edge: Edge) => {
+      // For exact matches - this is the most reliable check and should be the primary method
+      if (edge.source === nodeId || edge.target === nodeId) {
+        console.log(`Edge ${edge.id} matches exactly with node ${nodeId}`);
+        return true;
+      }
+      
+      // For handle-specific connections like "nodeId__handleId"
+      // These are common in ReactFlow where handles have specific IDs
+      const sourceBase = edge.source.split('__')[0];
+      const targetBase = edge.target.split('__')[0];
+      
+      if (sourceBase === nodeId || targetBase === nodeId) {
+        console.log(`Edge ${edge.id} matches with node ${nodeId} via handle pattern`);
+        return true;
+      }
+      
+      // For special cases where the node ID might be embedded in a more complex ID
+      // Be extremely cautious with this to avoid false positives
+      // Only use very specific patterns that are known to be used in the application
+      
+      // Otherwise, this edge is not connected to our node
+      return false;
+    };
+    
+    // Find edges connected to this specific node
+    const edgesToRemove = edges.filter(isEdgeConnectedToNode);
+    
+    // Log detailed information for debugging
+    console.log('Connected edges to remove:', edgesToRemove);
+    console.log('Edge IDs to remove:', edgesToRemove.map(e => e.id));
+    
+    // Remove the node from the state
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    
+    // Only remove edges that are connected to this specific node
+    setEdges((currentEdges) => {
+      // Filter out only the edges connected to this node
+      const remainingEdges = currentEdges.filter(edge => !isEdgeConnectedToNode(edge));
+      
+      // Log before/after counts
+      console.log(`Edges before: ${currentEdges.length}, after: ${remainingEdges.length}`);
+      console.log('Removed edge count:', currentEdges.length - remainingEdges.length);
+      
+      return remainingEdges;
+    });
+    
+    // We no longer update fileContent here - it will be handled by the useEffect
+    toast.success("Node deleted");
+  }, [setNodes, setEdges]);
+  
+  // Use an effect to update fileContent whenever nodes or edges change
+  // This ensures we always use the latest state for serialization
+  React.useEffect(() => {
+    // Skip initial render or when fileContent is not yet available
+    if (!fileContent || !nodes || !edges) return;
+    
+    try {
+      const validationResult = isValidFlowFormat(fileContent);
+      if (validationResult.isValid && validationResult.parsedData) {
+        // Create updated flow data with the current nodes and edges state
+        const updatedFlowData = {
+          ...validationResult.parsedData,
+          // Always use the current nodes and edges from state
+          nodes: nodes.map(node => ({
+            id: node.id,
+            type: node.type,
+            position: node.position,
+            data: {
+              ...node.data,
+              // Remove the onNodeDelete function as it shouldn't be serialized
+              onNodeDelete: undefined
+            }
+          })),
+          edges: convertToFlowEdges(edges)
+        };
+        
+        console.log(`Updating file content - Nodes: ${nodes.length}, Edges: ${edges.length}`);
+        console.log('Edge IDs in updated flow:', edges.map((e: Edge) => e.id));
+        
+        // Update file content with the new data
+        setFileContent(JSON.stringify(updatedFlowData, null, 2));
+      }
+    } catch (error) {
+      console.error("Error updating file content after state change:", error);
+    }
+  }, [fileContent, nodes, edges, setFileContent]);
+  
+  // Handle node changes and update file content
+  const handleNodesChange = React.useCallback((changes: any) => {
+    // Check if any of the changes is a node removal
+    const nodeRemovals = changes.filter(
+      (change: any) => change.type === 'remove'
+    );
+    
+    // Process normal node changes
+    onNodesChange(changes);
+    
+    // Update file content after node changes (position, deletion, etc)
+    if (fileContent && changes.length > 0) {
+      setTimeout(() => {
+        try {
+          const validationResult = isValidFlowFormat(fileContent);
+          if (validationResult.isValid && validationResult.parsedData) {
+            // Get current nodes after the change
+            const updatedFlowData = {
+              ...validationResult.parsedData,
+              nodes: nodes.map((node) => ({
+                id: node.id,
+                type: node.type || 'default',
+                position: node.position,
+                data: {
+                  ...node.data,
+                  onNodeDelete: undefined // Remove the function reference before serializing
+                },
+                draggable: node.draggable !== false,
+                selectable: node.selectable !== false,
+                deletable: node.deletable !== false
+              })),
+              edges: edges.map((edge) => ({
+                id: edge.id,
+                source: edge.source,
+                sourceHandle: edge.sourceHandle || null,
+                target: edge.target,
+                targetHandle: edge.targetHandle || null,
+                type: edge.type || 'default'
+              }))
+            };
+            setFileContent(JSON.stringify(updatedFlowData, null, 2));
+          }
+        } catch (error) {
+          console.error("Error updating file content after node changes:", error);
+        }
+      }, 100); // Small delay to ensure nodes state is updated
+    }
+  }, [fileContent, nodes, edges, onNodesChange]);
+  
+  // Handle edge changes and update file content
+  const handleEdgesChange = React.useCallback((changes: any) => {
+    onEdgesChange(changes);
+    
+    // Update file content after edge changes
+    if (fileContent && changes.length > 0) {
+      setTimeout(() => {
+        try {
+          const validationResult = isValidFlowFormat(fileContent);
+          if (validationResult.isValid && validationResult.parsedData) {
+            const updatedFlowData = {
+              ...validationResult.parsedData,
+              edges: edges.map((edge) => ({
+                id: edge.id,
+                source: edge.source,
+                sourceHandle: edge.sourceHandle || null,
+                target: edge.target,
+                targetHandle: edge.targetHandle || null,
+                type: edge.type || 'default'
+              }))
+            };
+            setFileContent(JSON.stringify(updatedFlowData, null, 2));
+          }
+        } catch (error) {
+          console.error("Error updating file content after edge changes:", error);
+        }
+      }, 100); // Small delay to ensure edges state is updated
+    }
+  }, [fileContent, edges, onEdgesChange]);
+
+  // Handle drag over event (needed for drop functionality)
+  const onDragOver = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // Handle drop event from Nodebar
+  const onDrop = React.useCallback(
+    (event: React.DragEvent<HTMLDivElement>, reactFlowInstance: any) => {
+      event.preventDefault();
+
+      // Get the ReactFlow bounds
+      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+      
+      // Try to get the custom node data
+      let nodeData;
+      try {
+        const jsonData = event.dataTransfer.getData('application/reactflow');
+        if (!jsonData) return;
+        nodeData = JSON.parse(jsonData);
+      } catch (error) {
+        console.error('Error parsing dropped node data:', error);
+        return;
+      }
+
+      // Calculate position where node was dropped
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top
+      });
+
+      console.log('Drop position:', position);
+
+      // Create a new node with unique ID
+      const newNode = {
+        id: `node_${nodeData.id || nodeData.node_id || Date.now()}`,
+        type: 'dynamicNode',
+        position,
+        data: {
+          title: nodeData.title || 'New Node',
+          description: nodeData.description || '',
+          inputs: nodeData.inputs || [],
+          outputs: nodeData.outputs || [],
+          language: nodeData.language || 'python',
+          function_name: nodeData.function_name || 'function',
+          source_code: nodeData.source_code || '',
+          onNodeDelete: handleNodeDelete // Add delete handler
+        }
+      };
+
+      // Add the new node to the flow
+      setNodes((nds) => nds.concat(newNode));
+      
+      // Update the file content to include the new node
+      if (fileContent) {
+        try {
+          const validationResult = isValidFlowFormat(fileContent);
+          if (validationResult.isValid && validationResult.parsedData) {
+            const updatedFlowData = {
+              ...validationResult.parsedData,
+              nodes: [...(validationResult.parsedData.nodes || []), {
+                id: newNode.id,
+                type: newNode.type,
+                position: newNode.position,
+                data: newNode.data,
+                draggable: true,
+                selectable: true,
+                deletable: true
+              }]
+            };
+            setFileContent(JSON.stringify(updatedFlowData, null, 2));
+          }
+        } catch (error) {
+          console.error("Error updating file content with new node:", error);
+        }
+      }
+    },
+    [fileContent, setNodes]
+  );
+
   return (
-    <div className="w-full h-full">
-      <Toaster />
+    <div className="w-full h-[95%] overflow-auto">
       <ReactFlowProvider>
-        <CanvasContent key={key} {...props} />
+        <CanvasContent 
+          tabId={tabId} 
+          onRefresh={handleRefresh} 
+          isRefreshing={isRefreshing}
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          onConnect={onConnect}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          fileContent={fileContent}
+          filePath={filePath}
+        />
       </ReactFlowProvider>
     </div>
   );

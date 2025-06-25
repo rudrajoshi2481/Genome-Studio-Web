@@ -25,6 +25,7 @@ interface FileContentState {
   activeTabs: Set<string>  // Track active tab file paths
   isLoading: boolean
   error: string | null
+  recentlySavedFiles: Map<string, number>  // Track recently saved files to prevent immediate reload
   
   // Methods
   getFileContent: (path: string, rootPath: string, forceRefresh?: boolean) => Promise<FileContent>
@@ -46,6 +47,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
   activeTabs: new Set<string>(),
   isLoading: false,
   error: null,
+  recentlySavedFiles: new Map<string, number>(),
 
   getFileContent: async (path: string, rootPath: string, forceRefresh: boolean = false) => {
     try {
@@ -101,6 +103,13 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       // Get the current file state from the store to access original content
       const currentFile = get().files[path]
       const originalContent = currentFile?.originalContent || currentFile?.content
+      
+      // Mark this file as recently saved to prevent immediate reload from backend
+      // This prevents the file watcher from immediately reloading the file we just saved
+      console.log(`Marking ${path} as recently saved at ${Date.now()}`);
+      set(state => ({
+        recentlySavedFiles: new Map(state.recentlySavedFiles).set(path, Date.now())
+      }));
       
       const token = authService.getToken()
       const response = await fetch(`http://localhost:8000/api/v1/file-explorer/update-file-content?root_path=${encodeURIComponent(rootPath)}`, {
@@ -289,9 +298,48 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
   handleFileChange: (path: string, newContent: string, metadata: any) => {
     // Check if we have this file in our store
     const currentFile = get().files[path]
+    const recentlySavedFiles = get().recentlySavedFiles
+    
+    // Check if this file was recently saved (within last 2 seconds)
+    const lastSaveTime = recentlySavedFiles.get(path)
+    const now = Date.now()
+    
+    if (lastSaveTime && now - lastSaveTime < 2000) {
+      console.log(`[FILE CHANGE] Skipping update for ${path} - file was recently saved (${now - lastSaveTime}ms ago)`)
+      return // Skip update if file was recently saved
+    }
+    
+    // Check if this is a pipeline file (.flow or .pipeline extension)
+    const isPipelineFile = path.endsWith('.flow') || path.endsWith('.pipeline')
     
     if (currentFile) {
       console.log(`Updating file content for ${path} from backend change`)
+      
+      // For pipeline files, do additional checks to prevent overwriting newer content
+      if (isPipelineFile && currentFile.content) {
+        try {
+          // Parse both current and new content to compare node counts
+          const currentData = JSON.parse(currentFile.content)
+          const newData = JSON.parse(newContent)
+          
+          // If current content has more nodes than incoming content, it's likely newer
+          if (currentData.nodes && newData.nodes && 
+              currentData.nodes.length > newData.nodes.length) {
+            console.log(`[FILE CHANGE] Rejecting update for ${path} - current version has more nodes (${currentData.nodes.length}) than incoming version (${newData.nodes.length})`)
+            return // Skip update to preserve the version with more nodes
+          }
+          
+          // If current content has a _saveTimestamp that's newer than incoming content
+          if (currentData._saveTimestamp && newData._saveTimestamp && 
+              currentData._saveTimestamp > newData._saveTimestamp) {
+            console.log(`[FILE CHANGE] Rejecting update for ${path} - current version has newer timestamp`)
+            return // Skip update to preserve newer version
+          }
+        } catch (e: any) {
+          // If parsing fails, fall back to normal behavior
+          console.log(`[FILE CHANGE] Error parsing JSON for comparison: ${e.message}`)
+        }
+      }
       
       // Check if the content has actually changed
       if (currentFile.content !== newContent) {

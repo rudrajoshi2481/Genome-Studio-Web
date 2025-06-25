@@ -13,6 +13,7 @@ export interface PipelineFile {
   global_variables?: Record<string, any>;
   shared_imports?: string[];
   execution_history?: ExecutionHistoryEntry[];
+  _saveTimestamp?: string; // Timestamp added during save to track the most recent version
 }
 
 export interface PipelineConfig {
