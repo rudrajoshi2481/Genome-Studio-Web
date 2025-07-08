@@ -12,6 +12,8 @@ export interface FileNode {
   expanded?: boolean;
   selected?: boolean;
   active?: boolean;
+  // Type property to determine if it's a file or directory
+  type?: 'file' | 'directory';
 }
 
 export interface FileChangeEvent {

@@ -1,30 +1,39 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useFileExplorerStore } from './utils/store'
 import { FileNode } from './utils/FileExplorerClass'
-import { FolderIcon, FileIcon, ChevronRightIcon, RefreshCwIcon, FilePlusIcon, FolderPlusIcon, ChevronsDownIcon } from 'lucide-react'
+import { RefreshCwIcon, FilePlusIcon, FolderPlusIcon, ChevronsDownIcon, UploadIcon, HomeIcon } from 'lucide-react'
 import { useTabStore } from '@/components/FileTabs/useTabStore'
-import FileService from '@/components/services/file-service'
+import { uploadFiles, uploadFolder, hasDragItems, getDragTargetNode, DragDropState } from './DragDropUtils'
+
+// Import components and utilities from split files
+import FileNodeComponent from './FileNode'
+import { RenameDialog, DeleteDialog } from './FileDialogs'
+import { NewFileDialog, NewFolderDialog } from './FileDialogs2'
+import { openFileInTab, getSelectedFolderPath, renameFile, deleteFile } from './FileOperations'
+import { getExpandedPaths, restoreExpandedPaths } from './FileHelpers'
+import UploadProgress from './UploadProgress'
+
+// Import breadcrumb components from shadcn UI
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+
+// Import context menu components from shadcn UI
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import * as authService from '@/lib/services/auth-service'
 
 const FileExplorer: React.FC = () => {
   // State for rename dialog
   const [isRenaming, setIsRenaming] = useState(false)
   const [nodeToRename, setNodeToRename] = useState<FileNode | null>(null)
-  const [newFileName, setNewFileName] = useState('')
   
   // State for delete confirmation dialog
   const [isDeleting, setIsDeleting] = useState(false)
@@ -32,17 +41,32 @@ const FileExplorer: React.FC = () => {
   
   // State for new file dialog
   const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState(false)
-  const [newFileInput, setNewFileInput] = useState('')
   
   // State for new folder dialog
   const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false)
-  const [newFolderInput, setNewFolderInput] = useState('')
+  
+  // State for drag and drop
+  const [dragState, setDragState] = useState<DragDropState>({
+    isDragging: false,
+    dragTarget: null
+  })
+  
+  // State for upload progress
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [currentFileName, setCurrentFileName] = useState('')
+  const [bytesUploaded, setBytesUploaded] = useState(0)
+  const [totalBytes, setTotalBytes] = useState(0)
+  const [filesCompleted, setFilesCompleted] = useState(0)
+  const [totalFiles, setTotalFiles] = useState(0)
+  
+  // Ref for file input
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const {
     fileTree,
     isLoading,
     error,
-    wsStatus,
     refreshFileTree,
     toggleNode,
     selectNode,
@@ -59,11 +83,9 @@ const FileExplorer: React.FC = () => {
   // Get tab store methods
   const { addTab, activateTab, getAllTabs } = useTabStore()
 
-//   const [currentDirectory, setCurrentDirectory] = useState<string>('/app')
-
   // Initial fetch of the file tree
   useEffect(() => {
-    // Set the default root path to /app
+    // Set the default root path to /home
     setRootPath('/home')
     
     // Then refresh the file tree with the new path
@@ -74,114 +96,38 @@ const FileExplorer: React.FC = () => {
       useFileExplorerStore.getState().disconnectWebSocket()
     }
   }, [refreshFileTree, setRootPath])
-
-  // Handle refresh button click
-  const handleRefresh = () => {
-    refreshFileTree()
-  }
   
-  // Function to open a file in a tab
-  const openFileInTab = async (node: FileNode) => {
-    // Get all existing tabs
-    const tabs = getAllTabs()
-    
-    // Check if file is already open in a tab
-    const existingTab = tabs.find(tab => tab.path === node.path)
-    
-    if (existingTab) {
-      // If tab already exists, just activate it
-      activateTab(existingTab.id)
-    } else {
-      try {
-        // Add the file to tabs with empty content initially
-        // Content will be loaded in the EditorWindow component
-        addTab(node.path, node.name, '')
-      } catch (error) {
-        console.error('Error opening file:', error)
-        // Show error in a user-friendly way
-        alert(`Failed to open file: ${error instanceof Error ? error.message : String(error)}`)
-      }
+  // Listen for custom events from FileNodeComponent
+  useEffect(() => {
+    // Event handler for new file action
+    const handleNewFileEvent = () => {
+      setIsNewFileDialogOpen(true)
     }
-  }
+    
+    // Event handler for new folder action
+    const handleNewFolderEvent = () => {
+      setIsNewFolderDialogOpen(true)
+    }
+    
+    // Add event listeners
+    window.addEventListener('fileexplorer:newfile', handleNewFileEvent)
+    window.addEventListener('fileexplorer:newfolder', handleNewFolderEvent)
+    
+    // Cleanup event listeners when component unmounts
+    return () => {
+      window.removeEventListener('fileexplorer:newfile', handleNewFileEvent)
+      window.removeEventListener('fileexplorer:newfolder', handleNewFolderEvent)
+    }
+  }, [])
 
-  // Render a single file node
-  const renderNode = (node: FileNode, depth: number = 0) => {
-    const isExpanded = isNodeExpanded(node.path)
-    const isSelected = node.selected || false
-    
-    const handleToggle = (e: React.MouseEvent) => {
-      e.stopPropagation()
-      if (node.is_dir) {
-        toggleNode(node.path)
-      }
-    }
-    
-    const handleSelect = async (e: React.MouseEvent) => {
-      e.stopPropagation()
-      
-      // For directories, toggle expansion when clicked
-      if (node.is_dir) {
-        toggleNode(node.path)
-      } else {
-        // If it's a file, open it in a tab
-        openFileInTab(node)
-      }
-      
-      // Always select the node
-      selectNode(node.path, e.ctrlKey || e.metaKey)
-    }
-    
-    // Generate a unique key by combining path with the modified timestamp
-    const nodeKey = `${node.path}-${node.modified || Date.now()}`
-    
-    return (
-      <div key={nodeKey}>
-        <ContextMenu>
-          <ContextMenuTrigger>
-            <div 
-              className={`flex items-center py-1 px-2 cursor-pointer hover:bg-gray-100 ${isSelected ? 'bg-blue-100' : ''}`}
-              style={{ paddingLeft: `${(depth * 12) + 4}px` }}
-              onClick={handleSelect}
-            >
-              {node.is_dir && (
-                <span 
-                  className="mr-1 transform transition-transform inline-block"
-                  style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
-                >
-                  <ChevronRightIcon 
-                    size={16} 
-                    className="text-gray-600"
-                  />
-                </span>
-              )}
-              
-              <span className="mr-2">
-                {node.is_dir ? <FolderIcon size={16} /> : <FileIcon size={16} />}
-              </span>
-              
-              <span className="text-sm truncate">{node.name}</span>
-            </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            <ContextMenuItem onClick={() => handleRename(node)}>Rename</ContextMenuItem>
-            <ContextMenuItem onClick={() => handleDelete(node)}>Delete</ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
-        
-        {/* Render children if expanded */}
-        {node.is_dir && isExpanded && node.children && 
-          // Remove duplicates by path before rendering
-          Array.from(new Map(node.children.map(child => [child.path, child])).values())
-            .map(child => renderNode(child, depth + 1))
-        }
-      </div>
-    )
+  // Handle file open action
+  const handleOpenFile = (node: FileNode) => {
+    openFileInTab(node)
   }
 
   // Handle rename action
   const handleRename = (node: FileNode) => {
     setNodeToRename(node)
-    setNewFileName(node.name)
     setIsRenaming(true)
   }
 
@@ -191,499 +137,608 @@ const FileExplorer: React.FC = () => {
     setIsDeleting(true)
   }
 
-  // Submit rename to backend
-  const submitRename = async () => {
-    if (!nodeToRename || !newFileName) return
-    
-    try {
-      const token = await authService.getToken()
-      const oldPath = nodeToRename.path
-      const pathParts = oldPath.split('/')
-      pathParts.pop() // Remove the last part (current filename)
-      const newPath = [...pathParts, newFileName].join('/')
-      
-      // Get the root path from the file explorer store
-      const rootPath = useFileExplorerStore.getState().rootPath
-      
-      const response = await fetch('http://localhost:8000/api/v1/file-explorer/rename-file', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          old_path: oldPath,
-          new_path: newPath,
-          root_path: rootPath
-        })
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Rename file error response:', errorData)
-        throw new Error(errorData.detail || 'Failed to rename file')
-      }
-      
-      // Close the dialog and refresh file tree
-      setIsRenaming(false)
-      refreshFileTree()
-      
-      // If this was a file that's open in tabs, update the tab paths
-      if (!nodeToRename.is_dir) {
-        const tabs = useTabStore.getState().getAllTabs()
-        const tabToUpdate = tabs.find(tab => tab.path === oldPath)
-        if (tabToUpdate) {
-          useTabStore.getState().updateTab(tabToUpdate.id, {
-            path: newPath,
-            name: newFileName
-          })
+  // Submit rename
+  const submitRename = async (newName: string) => {
+    if (nodeToRename) {
+      try {
+        // Store the current expanded paths before renaming
+        const expandedPaths = getExpandedPaths(fileTree, isNodeExpanded)
+        
+        // Call the rename function from FileOperations
+        await renameFile(nodeToRename, newName, refreshFileTree)
+        
+        // Get the updated file tree after refresh
+        const updatedFileTree = useFileExplorerStore.getState().fileTree
+        
+        // Restore the expanded paths with the updated tree
+        if (updatedFileTree) {
+          restoreExpandedPaths(updatedFileTree, expandedPaths, toggleNode)
         }
+      } catch (error) {
+        console.error('Error renaming file:', error)
+        alert(`Failed to rename file: ${error instanceof Error ? error.message : String(error)}`)
       }
-    } catch (error) {
-      console.error('Error renaming file:', error)
-      let errorMessage = 'Failed to rename file';
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null) {
-        // Handle case where error might be a JSON object
-        errorMessage = JSON.stringify(error);
-      } else {
-        errorMessage = String(error);
-      }
-      
-      alert(`Failed to rename file: ${errorMessage}`);
     }
+    setIsRenaming(false)
   }
 
-  // Submit delete to backend
+  // Submit delete
   const submitDelete = async () => {
-    if (!nodeToDelete) return
-    
-    try {
-      const token = await authService.getToken()
-      // Get the root path from the file explorer store
-      const rootPath = useFileExplorerStore.getState().rootPath
-      
-      // Delete endpoint uses query parameters, not body
-      const queryParams = new URLSearchParams({
-        path: nodeToDelete.path,
-        root_path: rootPath
-      }).toString()
-      
-      const response = await fetch(`http://localhost:8000/api/v1/file-explorer/delete-file?${queryParams}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
+    if (nodeToDelete) {
+      try {
+        // Store the current expanded paths before deleting
+        const expandedPaths = getExpandedPaths(fileTree, isNodeExpanded)
+        
+        // Call the delete function from FileOperations
+        await deleteFile(nodeToDelete, refreshFileTree)
+        
+        // Get the updated file tree after refresh
+        const updatedFileTree = useFileExplorerStore.getState().fileTree
+        
+        // Restore the expanded paths with the updated tree
+        if (updatedFileTree) {
+          restoreExpandedPaths(updatedFileTree, expandedPaths, toggleNode)
         }
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Delete file error response:', errorData)
-        throw new Error(errorData.detail || 'Failed to delete file')
+      } catch (error) {
+        console.error('Error deleting file:', error)
+        alert(`Failed to delete file: ${error instanceof Error ? error.message : String(error)}`)
       }
-      
-      // Close the dialog and refresh file tree
-      setIsDeleting(false)
-      refreshFileTree()
-      
-      // If this was a file that's open in tabs, close the tab
-      if (!nodeToDelete.is_dir) {
-        const tabs = useTabStore.getState().getAllTabs()
-        const tabToClose = tabs.find(tab => tab.path === nodeToDelete.path)
-        if (tabToClose) {
-          useTabStore.getState().closeTab(tabToClose.id)
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting file:', error)
-      let errorMessage = 'Failed to delete file';
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null) {
-        // Handle case where error might be a JSON object
-        errorMessage = JSON.stringify(error);
-      } else {
-        errorMessage = String(error);
-      }
-      
-      alert(`Failed to delete file: ${errorMessage}`);
     }
+    setIsDeleting(false)
   }
 
-  // Handle new file creation
-  const handleNewFile = () => {
-    setNewFileInput('')
+  // Handle new file button click
+  const handleNewFileClick = () => {
     setIsNewFileDialogOpen(true)
   }
-  
-  // Get the currently selected folder path for new file/folder creation
-  const getSelectedFolderPath = (): string => {
-    // If there's an active path and it's a directory, use it
-    if (activePath && fileTree) {
-      const activeNode = findNodeByPath(fileTree, activePath)
-      if (activeNode && activeNode.is_dir) {
-        return activePath
-      }
-      
-      // If active path is a file, use its parent directory
-      if (activeNode && !activeNode.is_dir) {
-        return activeNode.path.substring(0, activeNode.path.lastIndexOf('/'))
-      }
-    }
-    
-    // If there are selected paths and the first one is a directory, use it
-    if (selectedPaths.length > 0 && fileTree) {
-      const selectedNode = findNodeByPath(fileTree, selectedPaths[0])
-      if (selectedNode && selectedNode.is_dir) {
-        return selectedPaths[0]
-      }
-      
-      // If selected path is a file, use its parent directory
-      if (selectedNode && !selectedNode.is_dir) {
-        return selectedNode.path.substring(0, selectedNode.path.lastIndexOf('/'))
-      }
-    }
-    
-    // Default to root path if no folder is selected
-    return rootPath
-  }
-  
-  // Helper function to get all currently expanded paths
-  const getExpandedPaths = (): string[] => {
-    if (!fileTree) return []
-    
-    const expandedPaths: string[] = []
-    
-    // Recursive function to find all expanded nodes
-    const findExpandedNodes = (node: FileNode) => {
-      if (node.is_dir && isNodeExpanded(node.path)) {
-        expandedPaths.push(node.path)
-      }
-      
-      if (node.children) {
-        for (const child of node.children) {
-          if (child.is_dir) {
-            findExpandedNodes(child)
-          }
-        }
-      }
-    }
-    
-    findExpandedNodes(fileTree)
-    return expandedPaths
-  }
-  
-  // Helper function to restore expanded paths after a refresh
-  const restoreExpandedPaths = (paths: string[]) => {
-    // For each path that was previously expanded, expand it again
-    paths.forEach(path => {
-      if (fileTree) {
-        const node = findNodeByPath(fileTree, path)
-        if (node && node.is_dir) {
-          toggleNode(path) // Toggle the node expansion
-        }
-      }
-    })
-  }
-  
-  // Submit new file creation
-  const submitNewFile = async () => {
-    if (newFileInput.trim()) {
-      // Get the parent folder path where the file should be created
-      const parentPath = getSelectedFolderPath()
-      
-      // Store the current expanded paths before creating the file
-      const expandedPaths = getExpandedPaths()
-      
-      // Create the file
-      await createNewFile(newFileInput.trim(), parentPath)
-      setIsNewFileDialogOpen(false)
-      
-      // Force refresh the file tree
-      await refreshFileTree()
-      
-      // Restore the expanded paths
-      restoreExpandedPaths(expandedPaths)
-    }
-  }
-  
-  // Handle new folder creation
-  const handleNewFolder = () => {
-    setNewFolderInput('')
+
+  // Handle new folder button click
+  const handleNewFolderClick = () => {
     setIsNewFolderDialogOpen(true)
   }
   
-  // Submit new folder creation
-  const submitNewFolder = async () => {
-    if (newFolderInput.trim()) {
-      // Get the parent folder path where the folder should be created
-      const parentPath = getSelectedFolderPath()
+  // Track the path where the context menu was opened
+  const [contextMenuPath, setContextMenuPath] = useState<string | null>(null)
+  
+  // Handle context menu actions with the path from right-click
+  const handleContextMenuAction = (action: 'newFile' | 'newFolder') => {
+    // Set the selected path to the context menu path if available
+    if (contextMenuPath) {
+      // Temporarily select this path for the file/folder creation
+      selectNode(contextMenuPath)
+    }
+    
+    if (action === 'newFile') {
+      setIsNewFileDialogOpen(true)
+    } else if (action === 'newFolder') {
+      setIsNewFolderDialogOpen(true)
+    }
+  }
+  
+  // Handle context menu from FileNodeComponent
+  const handleNodeContextMenu = (path: string, isDirectory: boolean) => {
+    setContextMenuPath(path)
+    // If it's a directory, we'll use this path for creating new files/folders
+    // If it's a file, we'll use its parent directory
+    if (!isDirectory && path) {
+      // For files, use the parent directory
+      const parentPath = path.substring(0, path.lastIndexOf('/'))
+      if (parentPath) {
+        setContextMenuPath(parentPath)
+      }
+    }
+  }
+  
+  // Handle file upload button click
+  const handleUploadClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click()
+    }
+  }
+  
+  // Handle file input change
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files && files.length > 0) {
+      const destinationPath = getSelectedFolderPath(fileTree, activePath, selectedPaths, rootPath)
+      handleFileUpload(Array.from(files), destinationPath)
+    }
+    // Reset the input so the same file can be uploaded again if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+  
+  // Handle file upload
+  const handleFileUpload = useCallback(async (files: File[], destinationPath: string) => {
+    if (files.length === 0) return
+    
+    // Calculate total size of all files
+    const totalSize = files.reduce((total, file) => total + file.size, 0)
+    setTotalBytes(totalSize)
+    setBytesUploaded(0)
+    setFilesCompleted(0)
+    setTotalFiles(files.length)
+    
+    setIsUploading(true)
+    setCurrentFileName(files[0].name)
+    
+    try {
+      await uploadFiles(
+        files,
+        destinationPath,
+        (progress, uploadedBytes, fileIndex, totalFilesCount) => {
+          setUploadProgress(progress)
+          setBytesUploaded(uploadedBytes)
+          
+          // Update file completion tracking
+          if (fileIndex !== undefined) {
+            setFilesCompleted(fileIndex)
+          }
+          
+          // Update total files if provided
+          if (totalFilesCount !== undefined) {
+            setTotalFiles(totalFilesCount)
+          }
+        },
+        async () => {
+          // Refresh the file tree after upload
+          await refreshFileTree()
+          
+          // Restore expanded paths
+          const expandedPaths = getExpandedPaths(fileTree, isNodeExpanded)
+          const updatedFileTree = useFileExplorerStore.getState().fileTree
+          if (updatedFileTree) {
+            restoreExpandedPaths(updatedFileTree, expandedPaths, toggleNode)
+          }
+        },
+        (error) => {
+          console.error('Upload error:', error)
+          alert(`Upload failed: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      )
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
+    }
+  }, [fileTree, refreshFileTree, isNodeExpanded, toggleNode])
+  
+  // Handle folder upload
+  const handleFolderUpload = useCallback(async (items: DataTransferItemList, destinationPath: string) => {
+    if (items.length === 0) return
+    
+    setIsUploading(true)
+    setCurrentFileName('folder')
+    
+    try {
+      await uploadFolder(
+        items,
+        destinationPath,
+        (progress) => {
+          setUploadProgress(progress)
+        },
+        async () => {
+          // Refresh the file tree after upload
+          await refreshFileTree()
+          
+          // Restore expanded paths
+          const expandedPaths = getExpandedPaths(fileTree, isNodeExpanded)
+          const updatedFileTree = useFileExplorerStore.getState().fileTree
+          if (updatedFileTree) {
+            restoreExpandedPaths(updatedFileTree, expandedPaths, toggleNode)
+          }
+        },
+        (error) => {
+          console.error('Upload error:', error)
+          alert(`Upload failed: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      )
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
+    }
+  }, [fileTree, refreshFileTree, isNodeExpanded, toggleNode])
+  
+  // Get node from path
+  const getNodeFromPath = useCallback((path: string): FileNode | null => {
+    if (!fileTree) return null
+    
+    // If it's the root path
+    if (path === fileTree.path) return fileTree
+    
+    // Helper function to recursively find a node
+    const findNode = (node: FileNode, targetPath: string): FileNode | null => {
+      if (node.path === targetPath) return node
       
-      // Store the current expanded paths before creating the folder
-      const expandedPaths = getExpandedPaths()
+      if (node.children) {
+        for (const child of node.children) {
+          const found = findNode(child, targetPath)
+          if (found) return found
+        }
+      }
       
-      // Create the folder
-      await createNewFolder(newFolderInput.trim(), parentPath)
-      setIsNewFolderDialogOpen(false)
+      return null
+    }
+    
+    return findNode(fileTree, path)
+  }, [fileTree])
+  
+  // Drag event handlers
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    // Prevent default to allow drop
+    event.preventDefault()
+    
+    // Only proceed if the drag contains files
+    if (!hasDragItems(event)) return
+    
+    // Get the target node
+    const targetNode = getDragTargetNode(event, fileTree, getNodeFromPath)
+    
+    // Only allow dropping on directories
+    if (targetNode && (targetNode.is_dir || targetNode === fileTree)) {
+      // Update drag state
+      setDragState({
+        isDragging: true,
+        dragTarget: targetNode
+      })
+      
+      // Set the drop effect
+      event.dataTransfer.dropEffect = 'copy'
+    } else {
+      // Not a valid drop target
+      event.dataTransfer.dropEffect = 'none'
+    }
+  }, [fileTree, getNodeFromPath])
+  
+  const handleDragEnter = useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    if (!hasDragItems(event)) return
+  }, [])
+  
+  const handleDragLeave = useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    
+    // Check if we're leaving the file explorer entirely
+    const relatedTarget = event.relatedTarget as Node
+    const fileExplorerElement = document.querySelector('.file-explorer-container')
+    
+    if (!fileExplorerElement?.contains(relatedTarget)) {
+      setDragState({
+        isDragging: false,
+        dragTarget: null
+      })
+    }
+  }, [])
+  
+  const handleDrop = useCallback((event: React.DragEvent) => {
+    // Prevent default behavior
+    event.preventDefault()
+    
+    // Reset drag state
+    setDragState({
+      isDragging: false,
+      dragTarget: null
+    })
+    
+    console.log('[FileExplorer] Drop event detected', {
+      items: event.dataTransfer.items.length,
+      files: event.dataTransfer.files.length
+    })
+    
+    // Only proceed if the drag contains files
+    if (!hasDragItems(event)) {
+      console.log('[FileExplorer] Drop event does not contain files')
+      return
+    }
+    
+    // Get the target node
+    const targetNode = getDragTargetNode(event, fileTree, getNodeFromPath)
+    
+    console.log('[FileExplorer] Drop target node:', targetNode ? {
+      path: targetNode.path,
+      isDirectory: targetNode.is_dir || targetNode === fileTree,
+      name: targetNode.name
+    } : 'No target node found')
+    
+    // Only allow dropping on directories
+    if (targetNode && (targetNode.is_dir || targetNode === fileTree)) {
+      const destinationPath = targetNode.path
+      console.log('[FileExplorer] Uploading to destination path:', destinationPath)
+      
+      // Handle files vs. folders
+      if (event.dataTransfer.items) {
+        // Check if we have a directory
+        let hasDirectory = false
+        for (let i = 0; i < event.dataTransfer.items.length; i++) {
+          const item = event.dataTransfer.items[i]
+          if (item.webkitGetAsEntry && item.webkitGetAsEntry()?.isDirectory) {
+            hasDirectory = true
+            break
+          }
+        }
+        
+        if (hasDirectory) {
+          // Handle folder upload
+          handleFolderUpload(event.dataTransfer.items, destinationPath)
+        } else {
+          // Handle file upload
+          const files = Array.from(event.dataTransfer.files)
+          handleFileUpload(files, destinationPath)
+        }
+      } else if (event.dataTransfer.files) {
+        // Fallback for browsers that don't support DataTransferItemList
+        const files = Array.from(event.dataTransfer.files)
+        handleFileUpload(files, destinationPath)
+      }
+    }
+  }, [fileTree, getNodeFromPath, handleFileUpload, handleFolderUpload])
+
+  // Submit new file creation
+  const submitNewFile = async (fileName: string) => {
+    if (fileName.trim()) {
+      // Get the parent folder path where the file should be created
+      // This is now passed directly from the dialog component
+      const parentPath = getSelectedFolderPath(fileTree, activePath, selectedPaths, rootPath)
+      
+      // Store the current expanded paths before creating the file
+      const expandedPaths = getExpandedPaths(fileTree, isNodeExpanded)
+      
+      // Create the file
+      await createNewFile(fileName.trim(), parentPath)
       
       // Force refresh the file tree
       await refreshFileTree()
       
-      // Restore the expanded paths
-      restoreExpandedPaths(expandedPaths)
-    }
-  }
-  
-  // Helper function to find a node by its path in the file tree
-  const findNodeByPath = (node: FileNode | null, path: string): FileNode | null => {
-    if (!node) return null
-    if (node.path === path) return node
-    
-    if (node.children) {
-      for (const child of node.children) {
-        const found = findNodeByPath(child, path)
-        if (found) return found
+      // Get the updated file tree after refresh
+      const updatedFileTree = useFileExplorerStore.getState().fileTree
+      
+      // Restore the expanded paths with the updated tree
+      if (updatedFileTree) {
+        restoreExpandedPaths(updatedFileTree, expandedPaths, toggleNode)
       }
     }
-    
-    return null
   }
   
-  // Format file size to human-readable format
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  // Submit new folder creation
+  const submitNewFolder = async (folderName: string) => {
+    if (folderName.trim()) {
+      // Get the parent folder path where the folder should be created
+      // This is now passed directly from the dialog component
+      const parentPath = getSelectedFolderPath(fileTree, activePath, selectedPaths, rootPath)
+      
+      // Store the current expanded paths before creating the folder
+      const expandedPaths = getExpandedPaths(fileTree, isNodeExpanded)
+      
+      // Create the folder
+      await createNewFolder(folderName.trim(), parentPath)
+      
+      // Force refresh the file tree
+      await refreshFileTree()
+      
+      // Get the updated file tree after refresh
+      const updatedFileTree = useFileExplorerStore.getState().fileTree
+      
+      // Restore the expanded paths with the updated tree
+      if (updatedFileTree) {
+        restoreExpandedPaths(updatedFileTree, expandedPaths, toggleNode)
+      }
+    }
   }
 
+  // Cancel upload
+  const cancelUpload = () => {
+    setIsUploading(false)
+    setUploadProgress(0)
+    // Note: This doesn't actually abort the upload in progress
+    // To implement actual cancellation, you would need to use AbortController
+  }
+  
+  // Render the file explorer
   return (
-    <div className="h-[calc(100vh-56px)] flex flex-col border-r border-gray-200">
-      {/* Header with refresh button */}
-      <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-gray-50">
-        <h3 className="text-sm font-medium">File Explorer</h3>
-        <div className="flex items-center space-x-1">
-          {/* New File Button */}
-          <button 
-            onClick={handleNewFile}
-            className="p-1 hover:bg-gray-200 rounded-md"
-            title="New File"
-          >
-            <FilePlusIcon size={16} />
-          </button>
-          
-          {/* New Folder Button */}
-          <button 
-            onClick={handleNewFolder}
-            className="p-1 hover:bg-gray-200 rounded-md"
-            title="New Folder"
-          >
-            <FolderPlusIcon size={16} />
-          </button>
-          
-          {/* Collapse All Button */}
-          <button 
-            onClick={collapseAll}
-            className="p-1 hover:bg-gray-200 rounded-md"
-            title="Collapse All"
-          >
-            <ChevronsDownIcon size={16} />
-          </button>
-          
-          {/* Refresh Button */}
-          <button 
-            onClick={handleRefresh}
-            className="p-1 hover:bg-gray-200 rounded-md"
+    <div 
+      className="h-full flex flex-col file-explorer-container overflow-y-hidden"
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      style={{ height: '100%', maxHeight: '100%' }}
+    >
+      {/* Header with buttons - fixed height */}
+      <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
+        <div className="text-sm font-medium">Explorer</div>
+        <div className="flex space-x-1">
+          <button
+            onClick={() => refreshFileTree()}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
             title="Refresh"
           >
-            <RefreshCwIcon size={16} className={isLoading ? 'animate-spin' : ''} />
+            <RefreshCwIcon className="h-4 w-4" />
           </button>
+          <button
+            onClick={handleNewFileClick}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
+            title="New File"
+          >
+            <FilePlusIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleNewFolderClick}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
+            title="New Folder"
+          >
+            <FolderPlusIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={collapseAll}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
+            title="Collapse All"
+          >
+            <ChevronsDownIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleUploadClick}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
+            title="Upload Files"
+          >
+            <UploadIcon className="h-4 w-4" />
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileInputChange}
+            multiple
+            className="hidden"
+          />
         </div>
       </div>
       
-     
-      
-      {/* File tree */}
-      <div className="flex-1 overflow-auto">
-        {isLoading && (
-          <div className="p-4 text-center text-sm text-gray-500">
-            Loading files...
-          </div>
-        )}
-        
-        {error && (
-          <div className="p-4 text-center text-sm text-red-500">
-            Error: {error}
-          </div>
-        )}
-        
-        {!isLoading && !error && fileTree && (
-          <div className="py-2">
-            {fileTree.children?.map(node => renderNode(node))} 
-          </div>
-        )}
-        
-        {!isLoading && !error && !fileTree && (
-          <div className="p-4 text-center text-sm text-gray-500">
-            No files found. Click refresh to load files.
-          </div>
+      {/* Breadcrumb navigation - fixed height */}
+      <div className="px-2 py-1 border-b flex-shrink-0">
+        {fileTree && (
+          <Breadcrumb>
+            <BreadcrumbList className="flex-wrap">
+              <BreadcrumbItem>
+                <BreadcrumbLink 
+                  href="#" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setRootPath('/home');
+                    refreshFileTree();
+                  }}
+                  className="flex items-center"
+                >
+                  <HomeIcon className="h-3 w-3 mr-1" />
+                  Home
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              
+              {rootPath.split('/').slice(2).map((segment, index, array) => {
+                // Create path up to this segment
+                const pathToSegment = '/home/' + array.slice(0, index + 1).join('/');
+                
+                return (
+                  <React.Fragment key={index}>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      {index === array.length - 1 ? (
+                        <span className="font-medium">{segment}</span>
+                      ) : (
+                        <BreadcrumbLink 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setRootPath(pathToSegment);
+                            refreshFileTree();
+                          }}
+                        >
+                          {segment}
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                  </React.Fragment>
+                );
+              })}
+            </BreadcrumbList>
+          </Breadcrumb>
         )}
       </div>
-
-      {/* Rename Dialog */}
-      <Dialog open={isRenaming} onOpenChange={(open) => !open && setIsRenaming(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename {nodeToRename?.is_dir ? 'Folder' : 'File'}</DialogTitle>
-            <DialogDescription>
-              Enter a new name for the {nodeToRename?.is_dir ? 'folder' : 'file'}.
-              {!nodeToRename?.is_dir && ' The file extension will be preserved.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <input
-              type="text"
-              className="w-full p-2 border rounded mb-2 dark:bg-gray-700 dark:border-gray-600"
-              value={newFileName}
-              onChange={(e) => setNewFileName(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && submitRename()}
-            />
-          </div>
-          <DialogFooter>
-            <div className="flex justify-end space-x-2">
-              <button 
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded"
-                onClick={() => setIsRenaming(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="px-4 py-2 bg-blue-500 text-white rounded"
-                onClick={submitRename}
-              >
-                Rename
-              </button>
+      
+      {/* File tree with context menu - only this section should scroll */}
+      <div className="flex-1 flex overflow-hidden">
+        <ContextMenu onOpenChange={(open) => {
+          // Reset context menu path when menu closes
+          if (!open) setContextMenuPath(null);
+        }}>
+          <ContextMenuTrigger className="flex-1 w-full h-full" onContextMenu={() => {
+            // When right-clicking on the empty area (not on a specific file/folder),
+            // set the context menu path to the root path
+            setContextMenuPath(rootPath);
+          }}>
+            <div className={`w-full h-full overflow-y-auto overflow-x-hidden p-2 ${dragState.isDragging ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+              {isLoading ? (
+                <div className="text-sm text-gray-500 p-2">Loading...</div>
+              ) : error ? (
+                <div className="text-sm text-red-500 p-2">Error: {error}</div>
+              ) : fileTree && fileTree.children ? (
+                // Render children of root instead of root itself
+                fileTree.children.map((childNode, index) => (
+                  <FileNodeComponent
+                    key={childNode.path}
+                    node={childNode}
+                    depth={0}
+                    onToggle={toggleNode}
+                    onSelect={selectNode}
+                    isNodeExpanded={isNodeExpanded}
+                    onOpenFile={handleOpenFile}
+                    onRename={handleRename}
+                    onDelete={handleDelete}
+                    onContextMenu={handleNodeContextMenu}
+                  />
+                ))
+              ) : (
+                <div className="text-sm text-gray-500 p-2">No files found</div>
+              )}
             </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleting} onOpenChange={(open) => !open && setIsDeleting(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete {nodeToDelete?.is_dir ? 'Folder' : 'File'}</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{nodeToDelete?.name}"?
-              {nodeToDelete?.is_dir && ' This will delete all contents inside this folder.'}
-              This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <div className="flex justify-end space-x-2">
-              <button 
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded"
-                onClick={() => setIsDeleting(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="px-4 py-2 bg-red-500 text-white rounded"
-                onClick={submitDelete}
-              >
-                Delete
-              </button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onClick={() => handleContextMenuAction('newFile')}>
+              <FilePlusIcon className="h-4 w-4 mr-2" />
+              New File
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => handleContextMenuAction('newFolder')}>
+              <FolderPlusIcon className="h-4 w-4 mr-2" />
+              New Folder
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      </div>
+      
+      {/* Dialogs */}
+      {isRenaming && nodeToRename && (
+        <RenameDialog
+          isOpen={isRenaming}
+          onClose={() => setIsRenaming(false)}
+          node={nodeToRename}
+          onRename={submitRename}
+        />
+      )}
+      
+      {isDeleting && nodeToDelete && (
+        <DeleteDialog
+          isOpen={isDeleting}
+          onClose={() => setIsDeleting(false)}
+          node={nodeToDelete}
+          onDelete={submitDelete}
+        />
+      )}
       
       {/* New File Dialog */}
-      <Dialog open={isNewFileDialogOpen} onOpenChange={(open) => !open && setIsNewFileDialogOpen(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New File</DialogTitle>
-            <DialogDescription>
-              Enter a name for the new file. Include the file extension (e.g., .js, .txt, .py).
-              <br />
-              <span className="text-sm font-medium mt-2 block">Location: {getSelectedFolderPath()}</span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <input
-              type="text"
-              className="w-full p-2 border rounded mb-2 dark:bg-gray-700 dark:border-gray-600"
-              value={newFileInput}
-              onChange={(e) => setNewFileInput(e.target.value)}
-              placeholder="filename.ext"
-              autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && submitNewFile()}
-            />
-          </div>
-          <DialogFooter>
-            <div className="flex justify-end space-x-2">
-              <button 
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded"
-                onClick={() => setIsNewFileDialogOpen(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="px-4 py-2 bg-blue-500 text-white rounded"
-                onClick={submitNewFile}
-              >
-                Create
-              </button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewFileDialog
+        isOpen={isNewFileDialogOpen}
+        onClose={() => setIsNewFileDialogOpen(false)}
+        onCreate={submitNewFile}
+        parentPath={getSelectedFolderPath(fileTree, activePath, selectedPaths, rootPath)}
+      />
       
       {/* New Folder Dialog */}
-      <Dialog open={isNewFolderDialogOpen} onOpenChange={(open) => !open && setIsNewFolderDialogOpen(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Folder</DialogTitle>
-            <DialogDescription>
-              Enter a name for the new folder.
-              <br />
-              <span className="text-sm font-medium mt-2 block">Location: {getSelectedFolderPath()}</span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <input
-              type="text"
-              className="w-full p-2 border rounded mb-2 dark:bg-gray-700 dark:border-gray-600"
-              value={newFolderInput}
-              onChange={(e) => setNewFolderInput(e.target.value)}
-              placeholder="folder name"
-              autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && submitNewFolder()}
-            />
-          </div>
-          <DialogFooter>
-            <div className="flex justify-end space-x-2">
-              <button 
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded"
-                onClick={() => setIsNewFolderDialogOpen(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="px-4 py-2 bg-blue-500 text-white rounded"
-                onClick={submitNewFolder}
-              >
-                Create
-              </button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewFolderDialog
+        isOpen={isNewFolderDialogOpen}
+        onClose={() => setIsNewFolderDialogOpen(false)}
+        onCreate={submitNewFolder}
+        parentPath={getSelectedFolderPath(fileTree, activePath, selectedPaths, rootPath)}
+      />
+      
+      {/* Upload Progress */}
+      <UploadProgress
+        isUploading={isUploading}
+        progress={uploadProgress}
+        fileName={currentFileName}
+        onCancel={cancelUpload}
+        bytesUploaded={bytesUploaded}
+        totalBytes={totalBytes}
+        filesCompleted={filesCompleted}
+        totalFiles={totalFiles}
+      />
     </div>
   )
 }

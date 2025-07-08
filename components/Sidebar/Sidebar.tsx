@@ -12,7 +12,7 @@ function Sidebar() {
       <Toolbar onComponentChange={setActiveComponent} />
       
       {/* Content area to display the active component */}
-      <div className="flex-1  overflow-auto border-r">
+      <div className="flex-1  overflow-y-hidden border-r">
         <Appbar/>
         {activeComponent}
       </div>

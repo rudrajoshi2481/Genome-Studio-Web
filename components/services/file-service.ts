@@ -2,7 +2,7 @@ import { getServerConfig } from '@/config/server';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 // Base API URL
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = `${getServerConfig().api.protocol}://${getServerConfig().api.host}:${getServerConfig().api.port}/api/v1`;
 
 /**
  * Service for file operations

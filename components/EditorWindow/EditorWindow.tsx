@@ -4,9 +4,12 @@ import FileTabs from '../FileTabs/FileTabs'
 import DialogProvider from '../FileTabs/DialogProvider'
 import Canvas from './Canvas/Canvas'
 import { Badge } from '@/components/ui/badge'
+import { host, port } from '@/config/server'; 
 import CodeEditor from './CodeEditor/CodeEditor'
 import FileTab from '../FileTabs/FileTab'
 import Image from 'next/image'
+import ImageExtension from './Extensions/ImageExtension'
+
 
 /**
  * EditorWindowContent component that renders the main editor interface
@@ -38,12 +41,23 @@ const EditorWindowContent = memo(() => {
       )
     }
     
+    // For image files, use the ImageExtension component
+    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
+    if (activeTab.extension && imageExtensions.includes(activeTab.extension.toLowerCase())) {
+      return (
+        <div className='h-full'>
+          <ImageExtension 
+            tabId={activeTab.id}
+          />
+        </div>
+      )
+    }
+    
     // For code files, use the CodeEditor component
     return (
       <div className='h-full'>
         <CodeEditor 
           tabId={activeTab.id} 
-       
         />
       </div>
     )
@@ -58,8 +72,9 @@ const EditorWindowContent = memo(() => {
           {renderEditor()}
         </div>
       ) : (
-        <div className='flex items-center justify-center h-full text-gray-500'>
-          <Image src="/undraw_ghost.svg" alt="No file selected" width={200} height={200} />
+        <div className='flex items-center justify-center h-full text-gray-500 flex-col'>
+          <Image src="/Charco-High-Five.png" alt="No file selected" width={400} height={400} />
+          <p className="text-sm text-gray-500 mt-2">Select a file to start editing</p>
         </div>
       )}
     </div>

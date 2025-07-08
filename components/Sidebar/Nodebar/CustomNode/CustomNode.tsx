@@ -36,6 +36,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
+import { host, port } from '@/config/server'
 
 // Define interfaces for proper type safety
 interface NodeIO {
@@ -220,7 +221,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       }
       
       // Make the API call
-      const response = await fetch('http://localhost:8000/api/v1/workflow-manager/execute/function/convert-to-node', {
+      const response = await fetch(`http://${host}:${port}/api/v1/workflow-manager/execute/function/convert-to-node`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -453,7 +454,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         // Make the API call to save the node
         console.log('Making API call to save node')
         
-        const response = await fetch('http://localhost:8000/api/v1/workflow-manager/custom-nodes/', {
+        const response = await fetch(`http://${host}:${port}/api/v1/workflow-manager/custom-nodes/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

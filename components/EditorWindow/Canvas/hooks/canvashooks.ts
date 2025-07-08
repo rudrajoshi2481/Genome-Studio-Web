@@ -1,6 +1,7 @@
     
 
 import { useTabStore } from '@/components/FileTabs/useTabStore';
+import { host, port } from '@/config/server';
 import authService from '@/lib/services/auth-service';
 import { useFileContentStore } from '@/lib/stores/file-content-store';
 
@@ -97,7 +98,7 @@ export const updateTabFileContent = async (tabId: string, content: string): Prom
       console.log(`Saving file with API call. Has original content: ${!!originalContent}`);
       
       // Send the update request
-      const response = await fetch(`http://localhost:8000/api/v1/file-explorer/update-file-content?root_path=${encodeURIComponent(rootPath)}`, {
+      const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/update-file-content?root_path=${encodeURIComponent(rootPath)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

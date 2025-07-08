@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useTerminalStore } from './store/terminal-store'
 import 'xterm/css/xterm.css'
+import { host, port } from '@/config/server';
 
 // Define proper types
 interface XTerminal {
@@ -276,7 +277,7 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
   // Check server health
   const checkServerHealth = useCallback(async (): Promise<boolean> => {
     try {
-      const response = await fetch('http://localhost:8000/health')
+      const response = await fetch(`http://${host}:${port}/health`)
       if (response.ok) {
         return true
       } else {
@@ -335,7 +336,7 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
         console.log(`Using fallback dimensions for WebSocket: ${dimensions.rows} rows × ${dimensions.cols} columns`);
       }
 
-      const wsUrl = `ws://localhost:8000/api/v1/direct-terminal/ws?token=${token}&rows=${dimensions.rows}&cols=${dimensions.cols}&tabId=${tabId}`
+      const wsUrl = `ws://${host}:${port}/api/v1/direct-terminal/ws?token=${token}&rows=${dimensions.rows}&cols=${dimensions.cols}&tabId=${tabId}`
 
       try {
         const ws = new WebSocket(wsUrl)
@@ -397,7 +398,7 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
 
         ws.onerror = (event) => {
           
-          // setError('Failed to connect to terminal server. Check that the backend server is running at localhost:8000')
+         
         }
 
         // Handle user input

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { useAuthToken } from './auth-store'
 import * as authService from '../services/auth-service'
 import { toast } from "sonner"
+import { host, port } from '@/config/server'
 
 interface FileContent {
   path: string
@@ -10,6 +11,7 @@ interface FileContent {
   metadata: any
   lastUpdated: number
   hasConflicts?: boolean    // Indicates if the file has merge conflicts
+  encoding?: string        // Encoding of the content (utf-8 or base64)
 }
 
 interface MergeResult {
@@ -61,7 +63,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
 
       // Fetch the file content from the API
       const token = authService.getToken()
-      const response = await fetch(`http://localhost:8000/api/v1/file-explorer/file-content?path=${encodeURIComponent(path)}&root_path=${encodeURIComponent(rootPath)}`, {
+      const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/file-content?path=${encodeURIComponent(path)}&root_path=${encodeURIComponent(rootPath)}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -81,10 +83,13 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
         content: data.content,
         originalContent: data.content, // Save original content for conflict resolution
         metadata: data.metadata,
+        encoding: data.metadata?.encoding || 'utf-8', // Store encoding information
         lastUpdated: now,
-        // Check if content contains conflict markers
-        hasConflicts: data.content.includes('<<<<<<< FRONTEND CHANGES') || 
-                     data.content.includes('>>>>>>> BACKEND CHANGES')
+        // Check if content contains conflict markers (only for text files)
+        hasConflicts: data.metadata?.encoding !== 'base64' && (
+          data.content.includes('<<<<<<< FRONTEND CHANGES') || 
+          data.content.includes('>>>>>>> BACKEND CHANGES')
+        )
       }
 
       set(state => ({
@@ -115,7 +120,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       }));
       
       const token = authService.getToken()
-      const response = await fetch(`http://localhost:8000/api/v1/file-explorer/update-file-content?root_path=${encodeURIComponent(rootPath)}`, {
+      const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/update-file-content?root_path=${encodeURIComponent(rootPath)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,7 +202,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       // If we don't have a socket or it's closed, create a new one
       if (!socket || socket.readyState === WebSocket.CLOSED) {
         const token = authService.getToken()
-        const newSocket = new WebSocket(`ws://localhost:8000/api/v1/file-explorer/watch?token=${token}&directory=${encodeURIComponent(directory)}`)
+        const newSocket = new WebSocket(`ws://${host}:${port}/api/v1/file-explorer/watch?token=${token}&directory=${encodeURIComponent(directory)}`)
         
         newSocket.onmessage = (event) => {
           try {
@@ -511,7 +516,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       const rootPath = lastSlashIndex >= 0 ? filePath.substring(0, lastSlashIndex) : ''
       
       const response = await fetch(
-        `http://localhost:8000/api/v1/file-explorer/file-content?path=${encodeURIComponent(filePath)}&root_path=${encodeURIComponent(rootPath)}`,
+        `http://${host}:${port}/api/v1/file-explorer/file-content?path=${encodeURIComponent(filePath)}&root_path=${encodeURIComponent(rootPath)}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

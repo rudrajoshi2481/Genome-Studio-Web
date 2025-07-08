@@ -1,10 +1,4 @@
 import React from 'react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
 import { useAuthStore } from '@/lib/stores/auth-store'
 
 function Appbar() {

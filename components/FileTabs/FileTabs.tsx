@@ -18,6 +18,7 @@ import {
   DialogDescription,
 } from "../ui/dialog";
 import * as authService from '@/lib/services/auth-service'
+import { host, port } from '@/config/server'
 
 interface FileTabsProps {
   initialFiles?: Array<{
@@ -114,7 +115,7 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
         const newPath = `${directory}/${newFileName}`;
         
         // Call backend API to rename file
-        const response = await fetch('http://localhost:8000/api/v1/file-explorer/rename-file', {
+        const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/rename-file`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -165,7 +166,7 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
         const directory = lastSlashIndex >= 0 ? filePath.substring(0, lastSlashIndex) : '';
         
         // Call backend API to delete file
-        const response = await fetch('/api/v1/file-explorer/delete-file', {
+        const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/delete-file`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',

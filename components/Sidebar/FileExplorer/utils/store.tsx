@@ -5,6 +5,7 @@ import { persist } from 'zustand/middleware'
 import { FileExplorer, FileNode, InitialTreeEvent } from './FileExplorerClass'
 import { useAuthToken } from '@/lib/stores/auth-store'
 import * as authService from '@/lib/services/auth-service'
+import { host, port } from '@/config/server'
 
 interface FileExplorerStore {
   // Core state
@@ -169,7 +170,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
           console.log('Using token for API request:', token ? 'Token available' : 'No token')
           
           // Fetch the file tree from the API
-          fetch(`http://localhost:8000/api/v1/file-explorer/tree?directory=${directory}`, {
+          fetch(`http://${host}:${port}/api/v1/file-explorer/tree?directory=${directory}`, {
             headers: {
               'accept': 'application/json',
               'Authorization': `Bearer ${token}`
@@ -303,7 +304,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
             }
             
             // Create the new file via API
-            const response = await fetch(`http://localhost:8000/api/v1/file-explorer/create-file`, {
+            const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/create-file`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -346,7 +347,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()(
             }
             
             // Create the new folder via API
-            const response = await fetch(`http://localhost:8000/api/v1/file-explorer/create-directory`, {
+            const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/create-directory`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

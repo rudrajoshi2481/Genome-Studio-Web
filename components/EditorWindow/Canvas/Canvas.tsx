@@ -474,9 +474,10 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
 
       console.log('Drop position:', position);
 
-      // Create a new node with unique ID
+      // Create a new node with guaranteed unique ID
+      const uniqueId = `node_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
       const newNode = {
-        id: `node_${nodeData.id || nodeData.node_id || Date.now()}`,
+        id: uniqueId,
         type: 'dynamicNode',
         position,
         data: {
@@ -487,6 +488,8 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
           language: nodeData.language || 'python',
           function_name: nodeData.function_name || 'function',
           source_code: nodeData.source_code || '',
+          // Store the original node ID for reference if needed
+          originalId: nodeData.id || nodeData.node_id,
           onNodeDelete: handleNodeDelete // Add delete handler
         }
       };

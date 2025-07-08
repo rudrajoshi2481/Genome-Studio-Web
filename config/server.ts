@@ -1,9 +1,17 @@
+
+
 /**
  * Server Configuration
  * 
  * This file contains configuration settings for connecting to the backend server.
  * Values can be overridden by environment variables.
  */
+
+export const host = process.env.NEXT_PUBLIC_API_HOST || '150.250.96.50';
+export const port = process.env.NEXT_PUBLIC_API_PORT || '8000';
+
+
+
 
 interface ServerConfig {
   // Backend API connection details
@@ -36,16 +44,16 @@ interface ServerConfig {
 const defaultConfig: ServerConfig = {
   api: {
     protocol: process.env.NEXT_PUBLIC_API_PROTOCOL || 'http',
-    host: process.env.NEXT_PUBLIC_API_HOST || 'localhost',
-    port: parseInt(process.env.NEXT_PUBLIC_API_PORT || '8000', 10),
+    host: host,
+    port: parseInt(port, 10),
     baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1',
     timeout: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
     version: process.env.NEXT_PUBLIC_API_VERSION || 'v1',
   },
   websocket: {
     protocol: process.env.NEXT_PUBLIC_WS_PROTOCOL || 'ws',
-    host: process.env.NEXT_PUBLIC_WS_HOST || 'localhost',
-    port: parseInt(process.env.NEXT_PUBLIC_WS_PORT || '8000', 10),
+    host: host,
+    port: parseInt(port, 10),
     path: process.env.NEXT_PUBLIC_WS_PATH || '/ws',
   },
   auth: {
