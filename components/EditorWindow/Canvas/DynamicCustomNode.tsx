@@ -2,6 +2,7 @@
 
 import React, { useMemo, useLayoutEffect, useRef, useState, useCallback, MouseEvent } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals } from 'reactflow';
+import { NodeExecutionService } from './services/nodeExecutionService';
 
 // Define NodeIO interface
 export interface NodeIO {
@@ -44,6 +45,9 @@ export interface NodeData extends Record<string, any> {
   };
   // Add logs
   logs?: LogEntry[];
+  // Add execution logs (persisted from backend)
+  execution_logs?: LogEntry[];
+  last_executed?: string;
 }
 
 // Format duration in milliseconds to a compact string (e.g., "2.5s" or "1.2m")
@@ -59,9 +63,16 @@ const formatDuration = (ms: number): string => {
   }
 };
 
+interface DynamicCustomNodeProps extends NodeProps {
+  filePath?: string;
+}
+
 const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
   // Ensure data is properly typed
   const nodeData: NodeData = data as NodeData;
+  
+  // Get filePath from node data (passed from Canvas)
+  const filePath = (data as any)?.filePath;
   const updateNodeInternals = useUpdateNodeInternals();
   const nodeRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ 
@@ -69,6 +80,21 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
     height: 100 
   });
   const [logsOpen, setLogsOpen] = useState(true);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionError, setExecutionError] = useState<string | null>(null);
+  const [executionLogs, setExecutionLogs] = useState<Array<{
+    timestamp: string;
+    level: string;
+    message: string;
+    source: string;
+  }>>(nodeData.execution_logs || []);
+
+  // Sync execution logs when node data changes (when file is reloaded)
+  React.useEffect(() => {
+    if (nodeData.execution_logs) {
+      setExecutionLogs(nodeData.execution_logs);
+    }
+  }, [nodeData.execution_logs]);
 
   // Calculate node dimensions for proper handle spacing
   useLayoutEffect(() => {
@@ -338,42 +364,85 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
       {/* Run button at bottom */}
       <div className="px-3 py-2 border-t border-gray-200 dark:border-zinc-800">
         <button 
-          className="w-full bg-gray-900 hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 text-white text-sm py-1 px-3 rounded flex items-center justify-center"
-          onClick={() => {
-            // Log the node ID prominently
+          className={`w-full text-white text-sm py-1 px-3 rounded flex items-center justify-center transition-colors ${
+            isExecuting 
+              ? 'bg-orange-600 hover:bg-orange-700 cursor-not-allowed' 
+              : 'bg-gray-900 hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700'
+          }`}
+          disabled={isExecuting}
+          onClick={async () => {
+            // Check if we have a file path
+            if (!filePath) {
+              console.error('❌ No file path available for node execution');
+              setExecutionError('No file path available');
+              return;
+            }
+
+            // Log the execution attempt
             console.log('==================================');
-            console.log(`NODE ID: ${id}`);
+            console.log(`🚀 EXECUTING NODE: ${id}`);
+            console.log(`📁 File Path: ${filePath}`);
+            console.log(`📝 Node Title: ${nodeData.title || 'Untitled Node'}`);
+            console.log(`🔤 Language: ${nodeData.language}`);
             console.log('==================================');
             
-            // console.log(`Running node: ${nodeData.title || 'Untitled Node'}`);
+            setIsExecuting(true);
+            setExecutionError(null);
             
-            // // Log node_id from data if available
-            // if (nodeData.node_id) {
-            //   console.log('Internal node_id:', nodeData.node_id);
-            // }
-            
-            // // Log all node data
-            // console.log('Complete Node Data:', nodeData);
-            
-            // // Log specific properties for easier access
-            // console.log('Title:', nodeData.title);
-            // console.log('Description:', nodeData.description);
-            // console.log('Function Name:', nodeData.function_name);
-            // console.log('Language:', nodeData.language);
-            // console.log('Source Code:', nodeData.source_code);
-            // console.log('Inputs:', nodeData.inputs);
-            // console.log('Outputs:', nodeData.outputs);
-            // console.log('Status:', nodeData.status);
-            // console.log('Execution Count:', nodeData.execution_count);
-            // console.log('Execution Timing:', nodeData.execution_timing);
-            // console.log('Logs:', nodeData.logs);
+            try {
+              const result = await NodeExecutionService.executeNode({
+                file_path: filePath,
+                block_id: id
+              });
+              
+              if (result.status === 'success') {
+                console.log('✅ Node execution completed successfully:', result);
+                setExecutionError(null);
+      
+                // Update execution logs if available
+                if (result.result?.logs) {
+                  setExecutionLogs(result.result.logs);
+                }
+                
+                // Note: Logs are now automatically saved to the .flow file by the backend
+                // The logs will be loaded from the file when the workflow is reopened
+                console.log('📝 Execution logs have been saved to the .flow file');
+              } else {
+                console.error('❌ Node execution failed:', result.error);
+                setExecutionError(result.error || 'Execution failed');
+                
+                // Update execution logs even for errors
+                if (result.result?.logs) {
+                  setExecutionLogs(result.result.logs);
+                }
+              }
+            } catch (error) {
+              console.error('❌ Node execution error:', error);
+              setExecutionError(error instanceof Error ? error.message : 'Unknown error');
+            } finally {
+              setIsExecuting(false);
+            }
           }}
         >
-          <svg className="h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-          Run
+          {isExecuting ? (
+            <svg className="h-3 w-3 mr-1 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 11-6.219-8.56"/>
+            </svg>
+          ) : (
+            <svg className="h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          )}
+          {isExecuting ? 'Running...' : 'Run'}
         </button>
+        
+        {/* Error display */}
+        {executionError && (
+          <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs">
+            <div className="text-red-600 dark:text-red-400 font-medium">Execution Error:</div>
+            <div className="text-red-700 dark:text-red-300 mt-1">{executionError}</div>
+          </div>
+        )}
         
         {/* Logs section */}
         {nodeData.logs && nodeData.logs.length > 0 && (
@@ -416,6 +485,62 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
                     {log.message}
                   </pre>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Execution Logs Section */}
+        {executionLogs.length > 0 && (
+          <div className="mt-2 border-t border-gray-200 dark:border-zinc-700 pt-2">
+            <div 
+              className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-zinc-400 cursor-pointer hover:text-gray-800 dark:hover:text-zinc-200 mb-1"
+              onClick={() => setLogsOpen(!logsOpen)}
+            >
+              <svg 
+                className={`w-3 h-3 transition-transform ${logsOpen ? 'rotate-90' : ''}`}
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+              <span>Execution Logs ({executionLogs.length})</span>
+            </div>
+            
+            {logsOpen && (
+              <div 
+                className="text-sm bg-gray-50 dark:bg-zinc-900 p-3 rounded-md overflow-hidden select-text border border-gray-200 dark:border-zinc-700" 
+                style={{ maxHeight: '200px', overflowY: 'auto' }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {executionLogs
+                  .filter(log => log.source === 'stdout' || log.source === 'stderr' || log.level === 'ERROR')
+                  .map((log, index) => (
+                    <div 
+                      key={index} 
+                      className="mb-2 last:mb-0"
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <pre 
+                        className={`whitespace-pre-wrap text-sm leading-relaxed font-mono ${
+                          log.level === 'ERROR' || log.source === 'stderr' 
+                            ? 'text-red-600 dark:text-red-400' 
+                            : 'text-gray-800 dark:text-zinc-200'
+                        }`}
+                      >
+                        {log.message}
+                      </pre>
+                    </div>
+                  ))}
               </div>
             )}
           </div>

@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator'
 import { useTerminalStore } from './store/terminal-store'
 import { toast } from "sonner"
 import { cn } from '@/lib/utils'
+import TerminalStyleStats from './SystemStats/TerminalStyleStats'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -110,10 +111,9 @@ function Appbar() {
             </Tooltip>
           </div>
           <Separator orientation="vertical" />
-          <div className='flex flex-col text-xs'>
-            <span className='font-mono text-xs'>SERVER IP</span>
-            <span className='font-mono text-xs'>150.250.96.50</span>
-          </div>
+          <TerminalStyleStats 
+            refreshInterval={3000}
+          />
         </div>
       </div>
       

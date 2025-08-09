@@ -175,12 +175,13 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
           // Convert flow nodes to ReactFlow nodes with dynamic node support
           const reactFlowNodes = convertFlowNodesToReactFlow(flowData.nodes);
           
-          // Add delete handler to each node
+          // Add delete handler and filePath to each node
           const nodesWithHandlers = reactFlowNodes.map(node => ({
             ...node,
             data: {
               ...node.data,
-              onNodeDelete: handleNodeDelete
+              onNodeDelete: handleNodeDelete,
+              filePath: path // Pass the current file path to each node for execution
             }
           }));
           
@@ -249,6 +250,20 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
       }
     }
   }, [fileContent, setEdges]);
+  
+  // Update existing nodes with current filePath when filePath changes
+  React.useEffect(() => {
+    if (filePath && nodes.length > 0) {
+      const updatedNodes = nodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          filePath: filePath // Update filePath for all existing nodes
+        }
+      }));
+      setNodes(updatedNodes);
+    }
+  }, [filePath]); // Only depend on filePath, not nodes to avoid infinite loop
   
   // Initial data fetch when tab changes
   React.useEffect(() => {

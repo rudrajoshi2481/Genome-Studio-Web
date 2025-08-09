@@ -661,20 +661,29 @@ const FileExplorer: React.FC = () => {
                 <div className="text-sm text-red-500 p-2">Error: {error}</div>
               ) : fileTree && fileTree.children ? (
                 // Render children of root instead of root itself
-                fileTree.children.map((childNode, index) => (
-                  <FileNodeComponent
-                    key={childNode.path}
-                    node={childNode}
-                    depth={0}
-                    onToggle={toggleNode}
-                    onSelect={selectNode}
-                    isNodeExpanded={isNodeExpanded}
-                    onOpenFile={handleOpenFile}
-                    onRename={handleRename}
-                    onDelete={handleDelete}
-                    onContextMenu={handleNodeContextMenu}
-                  />
-                ))
+                // Sort to show folders first, then files
+                fileTree.children
+                  .sort((a, b) => {
+                    // Folders first, then files
+                    if (a.is_dir && !b.is_dir) return -1;
+                    if (!a.is_dir && b.is_dir) return 1;
+                    // Within same type, sort alphabetically
+                    return a.name.localeCompare(b.name);
+                  })
+                  .map((childNode, index) => (
+                    <FileNodeComponent
+                      key={childNode.path}
+                      node={childNode}
+                      depth={0}
+                      onToggle={toggleNode}
+                      onSelect={selectNode}
+                      isNodeExpanded={isNodeExpanded}
+                      onOpenFile={handleOpenFile}
+                      onRename={handleRename}
+                      onDelete={handleDelete}
+                      onContextMenu={handleNodeContextMenu}
+                    />
+                  ))
               ) : (
                 <div className="text-sm text-gray-500 p-2">No files found</div>
               )}

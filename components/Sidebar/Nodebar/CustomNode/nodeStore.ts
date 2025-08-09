@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 interface NodeState {
   // Node properties
   nodeName: string
-  nodeLanguage: 'Python' | 'R'
+  nodeLanguage: 'Python' | 'R' | 'Bash'
   description: string
   tags: string[]
   
@@ -13,7 +13,7 @@ interface NodeState {
   
   // Actions
   setNodeName: (name: string) => void
-  setNodeLanguage: (language: 'Python' | 'R') => void
+  setNodeLanguage: (language: 'Python' | 'R' | 'Bash') => void
   setDescription: (description: string) => void
   setTags: (tags: string[]) => void
   addTag: (tag: string) => void
@@ -22,14 +22,32 @@ interface NodeState {
   resetNode: () => void
 }
 
-// Default node code template
-const DEFAULT_NODE_CODE = `@node()
-def functionName():
+// Language-specific code templates
+const CODE_TEMPLATES = {
+  Python: `@node()
+def functionName(name: str):
+    print("Hello World")
+    return f"Hello, {name}"
+`,
+  R: `@node()
+functionName <- function(name) {
+    print("Hello World")
+    return(paste("Hello,", name))
+}
+`,
+  Bash: `#!/bin/bash
+# Input variables (will become input handles)
+THREADS=8
+INPUT_FILE="./files.fq"
 
+# Your bash commands here
+echo "Running alignment with $THREADS threads"
+alignmer $INPUT_FILE -p $THREADS
 
-  res = ""
-  return res
+# Fixed output variable (always 'done')
+done="completed"
 `
+}
 
 // Create the store with persistence
 export const useNodeStore = create<NodeState>()(
@@ -40,11 +58,14 @@ export const useNodeStore = create<NodeState>()(
       nodeLanguage: 'Python',
       description: '',
       tags: [],
-      code: DEFAULT_NODE_CODE,
+      code: CODE_TEMPLATES.Python,
       
       // Actions
       setNodeName: (name) => set({ nodeName: name }),
-      setNodeLanguage: (language) => set({ nodeLanguage: language }),
+      setNodeLanguage: (language) => set({ 
+        nodeLanguage: language,
+        code: CODE_TEMPLATES[language] // Update code template when language changes
+      }),
       setDescription: (description) => set({ description }),
       setTags: (tags) => set({ tags }),
       addTag: (tag) => set((state) => ({ 
@@ -59,7 +80,7 @@ export const useNodeStore = create<NodeState>()(
         nodeLanguage: 'Python',
         description: '',
         tags: [],
-        code: DEFAULT_NODE_CODE,
+        code: CODE_TEMPLATES.Python,
       }),
     }),
     {

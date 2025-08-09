@@ -217,7 +217,8 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         position: {
           x: 100,
           y: 200
-        }
+        },
+        language: nodeLanguage.toLowerCase() // Add language parameter
       }
       
       // Make the API call
@@ -571,10 +572,11 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                     <select 
                       className="w-full px-3 py-2 border rounded-md text-sm"
                       value={nodeLanguage}
-                      onChange={(e) => setNodeLanguage(e.target.value as 'Python' | 'R')}
+                      onChange={(e) => setNodeLanguage(e.target.value as 'Python' | 'R' | 'Bash')}
                     >
                       <option>Python</option>
                       <option>R</option>
+                      <option>Bash</option>
                     </select>
                   </div>
 

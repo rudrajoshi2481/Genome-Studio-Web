@@ -101,7 +101,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
 
       return fileContent
     } catch (error) {
-      console.error('Error fetching file content:', error)
+      // console.error('Error fetching file content:', error)
       throw error
     }
   },
