@@ -57,12 +57,12 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       type: "sidebar",
       component: () => <FileExplorer_New />
     },
-    // {
-    //   name: "File Explorer (Legacy)",
-    //   icon: Folder,
-    //   type: "sidebar",
-    //   component: () => <FileExplorerComponent />
-    // },
+    {
+      name: "File Explorer (Legacy)",
+      icon: Folder,
+      type: "sidebar",
+      component: () => <FileExplorerComponent />
+    },
     {
       name: "Nodebar",
       icon: Workflow,

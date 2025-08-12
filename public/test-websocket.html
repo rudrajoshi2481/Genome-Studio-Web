@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>System Stats WebSocket Test</h1>
+    <div id="status">Disconnected</div>
+    <div id="output"></div>
+    <button onclick="connect()">Connect</button>
+    <button onclick="disconnect()">Disconnect</button>
+    
+    <script>
+        let ws = null;
+        const statusEl = document.getElementById('status');
+        const outputEl = document.getElementById('output');
+        
+        function log(message) {
+            const div = document.createElement('div');
+            div.textContent = new Date().toISOString() + ': ' + message;
+            outputEl.appendChild(div);
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
+        
+        function connect() {
+            if (ws) {
+                ws.close();
+            }
+            
+            const wsUrl = 'ws://localhost:8000/api/v1/system/ws';
+            log('Connecting to: ' + wsUrl);
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                statusEl.textContent = 'Connected';
+                statusEl.style.color = 'green';
+                log('WebSocket connected');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    log('Received: ' + JSON.stringify(data, null, 2));
+                } catch (e) {
+                    log('Raw message: ' + event.data);
+                }
+            };
+            
+            ws.onclose = function(event) {
+                statusEl.textContent = 'Disconnected';
+                statusEl.style.color = 'red';
+                log('WebSocket closed: ' + event.code + ' - ' + event.reason);
+            };
+            
+            ws.onerror = function(error) {
+                statusEl.textContent = 'Error';
+                statusEl.style.color = 'red';
+                log('WebSocket error: ' + JSON.stringify({
+                    type: error.type,
+                    target: error.target ? error.target.constructor.name : 'unknown'
+                }));
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+    </script>
+</body>
+</html>

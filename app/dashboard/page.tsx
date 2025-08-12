@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/resizable"
 import Terminal from '@/components/Terminal/Terminal'
 import Traybar from '@/components/Sidebar/Traybar/Traybar'
-import EditorWindowStore from '@/components/EditorWindow/EditorWindow'
+// import EditorWindowStore from '@/components/EditorWindow/EditorWindow'
+import EditorWindow from '@/components/Editorwindow_new/EditorWindow'
 
 function Page() {
   return (
@@ -20,9 +21,12 @@ function Page() {
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={60} minSize={40} maxSize={80}>
-          <ResizablePanelGroup direction="vertical" className="h-full">
+          <ResizablePanelGroup direction="vertical" >
             <ResizablePanel defaultSize={70} minSize={30} maxSize={90}>
-              <EditorWindowStore />
+              {/* <EditorWindowStore /> */}
+              
+                <EditorWindow />
+              
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={30} minSize={10} maxSize={70}>

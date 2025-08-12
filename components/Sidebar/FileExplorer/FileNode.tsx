@@ -47,8 +47,8 @@ const FileNode: React.FC<FileNodeProps> = ({
     onSelect(node.path, e.ctrlKey || e.metaKey)
   }
   
-  // Generate a unique key by combining path with the modified timestamp
-  const nodeKey = `${node.path}-${node.modified || Date.now()}`
+  // Generate a stable key for SSR compatibility
+  const nodeKey = `${node.path}-${node.modified || 'unknown'}`
   
   return (
     <div key={nodeKey}>
@@ -90,8 +90,10 @@ const FileNode: React.FC<FileNodeProps> = ({
                 if (onContextMenu) {
                   // Set the context to this folder
                   onContextMenu(node.path, true);
-                  // Trigger the new file action via the parent component
-                  window.dispatchEvent(new CustomEvent('fileexplorer:newfile'));
+                  // Trigger the new file action via the parent component (SSR safe)
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('fileexplorer:newfile'));
+                  }
                 }
               }}>
                 <FilePlusIcon className="h-4 w-4 mr-2" />
@@ -101,8 +103,10 @@ const FileNode: React.FC<FileNodeProps> = ({
                 if (onContextMenu) {
                   // Set the context to this folder
                   onContextMenu(node.path, true);
-                  // Trigger the new folder action via the parent component
-                  window.dispatchEvent(new CustomEvent('fileexplorer:newfolder'));
+                  // Trigger the new folder action via the parent component (SSR safe)
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('fileexplorer:newfolder'));
+                  }
                 }
               }}>
                 <FolderPlusIcon className="h-4 w-4 mr-2" />

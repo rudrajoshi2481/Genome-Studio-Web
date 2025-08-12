@@ -8,7 +8,19 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+} from '@/components/ui/context-menu'
+
+// SSR-safe client check hook
+const useIsClient = () => {
+  const [isClient, setIsClient] = React.useState(false)
+  
+  React.useEffect(() => {
+    setIsClient(true)
+  }, [])
+  
+  return isClient
+}
+
 import {
   Dialog,
   DialogContent,
@@ -44,6 +56,7 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
   autoSave = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const isClient = useIsClient(); // SSR protection for context menus
   
   // Get state and actions from the store
   const tabs = useTabStore(state => state.getAllTabs());
@@ -212,10 +225,12 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
                 onClose={handleTabClose}
               />
             </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem onClick={() => handleRename(tab.id)}>Rename</ContextMenuItem>
-              <ContextMenuItem onClick={() => handleDelete(tab.id)}>Delete</ContextMenuItem>
-            </ContextMenuContent>
+            {isClient && (
+              <ContextMenuContent>
+                <ContextMenuItem onClick={() => handleRename(tab.id)}>Rename</ContextMenuItem>
+                <ContextMenuItem onClick={() => handleDelete(tab.id)}>Delete</ContextMenuItem>
+              </ContextMenuContent>
+            )}
           </ContextMenu>
         ))}
       </div>
