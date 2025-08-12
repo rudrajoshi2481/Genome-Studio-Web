@@ -235,8 +235,8 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
           </div>
         )}
         
-        {/* Floating status badge */}
-        {nodeData.status && (
+        {/* Floating status badges */}
+        {(nodeData.executionStatus || nodeData.status || (nodeData as any).lastExecution?.status) && (
           <div className="absolute -top-7 right-1 flex items-center gap-1 z-10">
             {/* Duration badge */}
             {nodeData.execution_timing?.duration !== undefined && (
@@ -248,32 +248,123 @@ const DynamicCustomNode = ({ id, data, selected }: NodeProps) => {
                 {formatDuration(nodeData.execution_timing.duration)}
               </div>
             )}
-            {/* Status indicator */}
-            <div className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm ${nodeData.status === 'completed' ? 'bg-green-100 text-green-800 border border-green-200' : nodeData.status === 'running' ? 'bg-blue-100 text-blue-800 border border-blue-200 animate-pulse' : 'bg-yellow-100 text-yellow-800 border border-yellow-200'}`}>
-              {nodeData.status === 'completed' ? (
-                <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-              ) : nodeData.status === 'running' ? (
-                <svg className="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="2" x2="12" y2="6"></line>
-                  <line x1="12" y1="18" x2="12" y2="22"></line>
-                  <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
-                  <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
-                  <line x1="2" y1="12" x2="6" y2="12"></line>
-                  <line x1="18" y1="12" x2="22" y2="12"></line>
-                  <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
-                  <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
-                </svg>
-              ) : (
-                <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
-              )}
-              <span className="capitalize">{nodeData.status}</span>
-              {nodeData.execution_count !== undefined && (
-                <span className="ml-1 opacity-75">#{nodeData.execution_count}</span>
-              )}
-            </div>
+            
+            {/* Main execution status badge */}
+            {(() => {
+              // Check for local pending/running state first (takes priority)
+              const localExecutionState = (nodeData as any).currentExecutionState;
+              
+              // Determine the current execution status from multiple possible sources
+              const currentStatus = localExecutionState?.status ||
+                                   nodeData.executionStatus || 
+                                   nodeData.status || 
+                                   (nodeData as any).lastExecution?.status ||
+                                   (nodeData as any).execution_status;
+              
+              // Check if node is in detached mode
+              const isDetached = (nodeData as any).detached || 
+                               (nodeData as any).lastExecution?.detached ||
+                               executionLogs.some(log => log.source === 'detached_start');
+              
+              // Determine status styling and icon
+              let statusConfig = {
+                bg: 'bg-gray-100 text-gray-800 border-gray-200',
+                darkBg: 'dark:bg-zinc-700 dark:text-zinc-200 dark:border-zinc-600',
+                icon: null as any,
+                animate: false,
+                label: currentStatus || 'idle'
+              };
+
+              switch (currentStatus) {
+                case 'success':
+                case 'completed':
+                  statusConfig = {
+                    bg: 'bg-green-100 text-green-800 border-green-200',
+                    darkBg: 'dark:bg-green-900/30 dark:text-green-300 dark:border-green-700',
+                    animate: false,
+                    label: 'done',
+                    icon: (
+                      <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                      </svg>
+                    )
+                  };
+                  break;
+                case 'running':
+                  statusConfig = {
+                    bg: 'bg-blue-100 text-blue-800 border-blue-200',
+                    darkBg: 'dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+                    animate: true,
+                    label: isDetached ? 'running (detached)' : 'running',
+                    icon: (
+                      <svg className="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="2" x2="12" y2="6"></line>
+                        <line x1="12" y1="18" x2="12" y2="22"></line>
+                        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                        <line x1="2" y1="12" x2="6" y2="12"></line>
+                        <line x1="18" y1="12" x2="22" y2="12"></line>
+                        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                      </svg>
+                    )
+                  };
+                  break;
+                case 'error':
+                case 'failed':
+                  statusConfig = {
+                    bg: 'bg-red-100 text-red-800 border-red-200',
+                    darkBg: 'dark:bg-red-900/30 dark:text-red-300 dark:border-red-700',
+                    animate: false,
+                    label: 'error',
+                    icon: (
+                      <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                      </svg>
+                    )
+                  };
+                  break;
+                case 'pending':
+                case 'queued':
+                  statusConfig = {
+                    bg: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                    darkBg: 'dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700',
+                    animate: true,
+                    label: 'pending',
+                    icon: (
+                      <svg className="h-3 w-3 animate-pulse" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                    )
+                  };
+                  break;
+                default:
+                  if (currentStatus) {
+                    statusConfig.label = currentStatus;
+                    statusConfig.icon = <div className="h-2 w-2 rounded-full bg-gray-500"></div>;
+                  }
+              }
+
+              return currentStatus ? (
+                <div className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm border ${statusConfig.bg} ${statusConfig.darkBg} ${statusConfig.animate ? 'animate-pulse' : ''}`}>
+                  {statusConfig.icon}
+                  <span className="capitalize">{statusConfig.label}</span>
+                  {isDetached && (
+                    <svg className="h-3 w-3 ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                  )}
+                  {nodeData.execution_count !== undefined && (
+                    <span className="ml-1 opacity-75">#{nodeData.execution_count}</span>
+                  )}
+                </div>
+              ) : null;
+            })()}
           </div>
         )}
         

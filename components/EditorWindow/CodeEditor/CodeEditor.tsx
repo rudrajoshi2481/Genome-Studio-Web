@@ -16,6 +16,8 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { autocompletion, completionKeymap } from '@codemirror/autocomplete'
 import { useCodeEditor } from './hooks/useCodeEditor'
 import { Loader2 } from 'lucide-react'
+import useRealtimeFileSync from '@/hooks/useRealtimeFileSync'
+import { useTabStore } from '@/components/FileTabs/useTabStore'
 
 interface CodeEditorProps {
   tabId: string
@@ -27,6 +29,7 @@ interface CodeEditorProps {
 function CodeEditor({ tabId, initialContent = '', extension = '', readOnly = false }: CodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const [filePath, setFilePath] = React.useState<string>('')
   
   // Use the code editor hook
   const {
@@ -37,6 +40,68 @@ function CodeEditor({ tabId, initialContent = '', extension = '', readOnly = fal
     handleContentChange,
     saveFileContent
   } = useCodeEditor(tabId, initialContent)
+
+  // Get file path from tab store
+  const tabStore = useTabStore();
+  const activeTab = tabStore.getTab(tabId);
+
+  // Update local file path state when tab changes
+  React.useEffect(() => {
+    if (activeTab?.path && activeTab.path !== filePath) {
+      setFilePath(activeTab.path);
+    }
+  }, [activeTab?.path]); // Remove filePath from dependencies to prevent loop
+
+  // Track if we're currently typing to prevent sync overwrites
+  const isTypingRef = React.useRef(false);
+  const lastUserInputRef = React.useRef(Date.now());
+
+  // Real-time file sync integration - only enable if file path exists
+  const { saveFile, forceSave, isConnected } = useRealtimeFileSync({
+    filePath: filePath || '', // Ensure we have a valid file path
+    onFileUpdated: (content, timestamp) => {
+      console.log('Real-time file update received in CodeEditor:', timestamp);
+      
+      // Don't update if user is currently typing (within last 2 seconds)
+      const timeSinceLastInput = Date.now() - lastUserInputRef.current;
+      if (isTypingRef.current || timeSinceLastInput < 2000) {
+        console.log('Skipping real-time update - user is typing');
+        return;
+      }
+      
+      // Only update if content is actually different
+      if (content !== activeContent) {
+        console.log('Applying real-time update to CodeEditor');
+        
+        // Update the CodeMirror editor view directly (don't trigger handleContentChange)
+        const view = viewRef.current;
+        if (view) {
+          const currentContent = view.state.doc.toString();
+          if (content !== currentContent) {
+            view.dispatch({
+              changes: { from: 0, to: currentContent.length, insert: content }
+            });
+          }
+        }
+        
+        // Update the hook's state without triggering save
+        // Note: We can't directly set activeContent as it's managed by useCodeEditor hook
+        // The content will be updated through the CodeMirror view dispatch above
+      }
+    },
+    onFileChanged: (changeType, content) => {
+      console.log(`File ${changeType} in CodeEditor:`, filePath);
+      if (changeType === 'deleted') {
+        console.warn('File was deleted:', filePath);
+      }
+      // Don't auto-update on file changes to prevent overwrites
+    },
+    onError: (error) => {
+      console.error('Real-time sync error in CodeEditor:', error);
+    },
+    autoSave: false, // Disable auto-save to prevent feedback loops
+    saveDebounceMs: 1000
+  });
 
   // Get language extension based on file extension
   const getLanguageExtension = (fileExtension: string) => {
@@ -114,7 +179,30 @@ function CodeEditor({ tabId, initialContent = '', extension = '', readOnly = fal
         getLanguageExtension(extension),
         EditorView.updateListener.of(update => {
           if (update.docChanged) {
-            handleContentChange(update.state.doc.toString())
+            const newContent = update.state.doc.toString();
+            
+            // Check if this change was triggered by user input
+            // For now, assume all changes are user input unless we're in the middle of a sync update
+            const isUserInput = !isTypingRef.current || Date.now() - lastUserInputRef.current > 100;
+            
+            if (isUserInput) {
+              // Mark that user is typing and update timestamp
+              isTypingRef.current = true;
+              lastUserInputRef.current = Date.now();
+              
+              // Clear typing flag after 1 second of no input
+              setTimeout(() => {
+                isTypingRef.current = false;
+              }, 1000);
+              
+              // Manual save to real-time sync for user input (with debouncing)
+              if (isConnected() && filePath && !readOnly) {
+                saveFile(newContent);
+              }
+            }
+            
+            // Always update the local content state
+            handleContentChange(newContent);
           }
         }),
         EditorView.editable.of(!readOnly)

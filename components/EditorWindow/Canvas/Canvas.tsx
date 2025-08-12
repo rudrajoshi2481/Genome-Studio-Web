@@ -1,6 +1,6 @@
 "use client"
 
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactFlow, {
   ReactFlowProvider,
   Controls,
@@ -22,6 +22,8 @@ import { fetchTabFilePath, fetchTabFileContent } from './hooks/canvashooks';
 import { isValidFlowFormat, convertToFlowEdges, convertToFlowNodes, convertFlowNodesToReactFlow } from './hooks/fileParser';
 import Toolbar from './components/Toolbar';
 import DynamicCustomNode from './DynamicCustomNode';
+import useRealtimeFileSync from '@/hooks/useRealtimeFileSync';
+import { useAtomicFileSync } from '@/hooks/useAtomicFileSync';
 
 // Import styles for ReactFlow
 import 'reactflow/dist/style.css';
@@ -32,9 +34,10 @@ interface CanvasProps {
 }
 
 // Canvas content component
-interface CanvasContentProps extends CanvasProps {
+interface CanvasContentProps {
+  tabId?: string;
   onRefresh: () => void;
-  isRefreshing: boolean;
+  isRefreshing?: boolean;
   nodes: Node<any, string | undefined>[];
   edges: Edge<any>[];
   onNodesChange: (changes: any) => void;
@@ -42,6 +45,7 @@ interface CanvasContentProps extends CanvasProps {
   onConnect: (connection: Connection) => void;
   onDrop: (event: React.DragEvent<HTMLDivElement>, reactFlowInstance: any) => void;
   onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
+  onSelectionChange?: (selection: { nodes: Node[]; edges: Edge[] }) => void;
   fileContent?: string | null;
   filePath?: string;
 }
@@ -63,6 +67,7 @@ const CanvasContent: React.FC<CanvasContentProps> = (props) => {
     onConnect,
     onDrop,
     onDragOver,
+    onSelectionChange,
     fileContent,
     filePath
   } = props;
@@ -80,6 +85,7 @@ const CanvasContent: React.FC<CanvasContentProps> = (props) => {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
+      onSelectionChange={onSelectionChange}
       nodeTypes={nodeTypes}
       onDrop={(event) => onDrop(event, reactFlowInstance)}
       onDragOver={onDragOver}
@@ -93,6 +99,7 @@ const CanvasContent: React.FC<CanvasContentProps> = (props) => {
         nodes={nodes}
         edges={edges}
         tabId={tabId}
+        filePath={filePath}
       />
       <Controls />
       <MiniMap nodeStrokeWidth={3} zoomable pannable />
@@ -119,9 +126,277 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
   // Ref to track if validation toast has been shown
   const validationToastShown = React.useRef<boolean>(false);
   
+  // Auto-save state tracking
+  const [isSaving, setIsSaving] = React.useState<boolean>(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState<boolean>(false);
+  const [lastSavedContent, setLastSavedContent] = React.useState<string>('');
+  const autoSaveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  
+  // Tab store for dirty state management
+  const { setTabDirty } = useTabStore();
+  
   // State for ReactFlow nodes and edges
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  
+  // State for selected nodes
+  const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
+  const [nodeExecutionStates, setNodeExecutionStates] = useState<Record<string, {
+    status: 'pending' | 'running' | 'completed' | 'error';
+    timestamp: number;
+  }>>({});
+
+  // Functions to manage node execution states
+  const setNodePending = useCallback((nodeId: string) => {
+    setNodeExecutionStates(prev => ({
+      ...prev,
+      [nodeId]: { status: 'pending', timestamp: Date.now() }
+    }));
+  }, []);
+
+  const setNodeRunning = useCallback((nodeId: string) => {
+    setNodeExecutionStates(prev => ({
+      ...prev,
+      [nodeId]: { status: 'running', timestamp: Date.now() }
+    }));
+  }, []);
+
+  const setNodeCompleted = useCallback((nodeId: string) => {
+    setNodeExecutionStates(prev => ({
+      ...prev,
+      [nodeId]: { status: 'completed', timestamp: Date.now() }
+    }));
+  }, []);
+
+  const setNodeError = useCallback((nodeId: string) => {
+    setNodeExecutionStates(prev => ({
+      ...prev,
+      [nodeId]: { status: 'error', timestamp: Date.now() }
+    }));
+  }, []);
+
+  const clearNodeExecutionState = useCallback((nodeId: string) => {
+    setNodeExecutionStates(prev => {
+      const newStates = { ...prev };
+      delete newStates[nodeId];
+      return newStates;
+    });
+  }, []);
+
+  // Handle selection changes
+  const handleSelectionChange = useCallback(({ nodes: selectedNodeList }: { nodes: Node[] }) => {
+    setSelectedNodes(selectedNodeList);
+  }, []);
+
+  // Enhanced atomic file sync integration for .flow files
+  const { updateNode, updateFile, isConnected, getSyncStatus } = useAtomicFileSync({
+    filePath: filePath || '',
+    enableNodeUpdates: true, // Enable atomic node updates for .flow files
+    onFileUpdated: (content, checksum, timestamp) => {
+      console.log('Atomic file update received in Canvas:', timestamp);
+      setFileContent(content);
+      
+      // Parse and update nodes/edges from the new content
+      const validationResult = isValidFlowFormat(content);
+      if (validationResult.isValid && validationResult.parsedData) {
+        const flowData = validationResult.parsedData;
+        
+        if (flowData.nodes) {
+          const reactFlowNodes = convertFlowNodesToReactFlow(flowData.nodes);
+          const nodesWithHandlers = reactFlowNodes.map(node => ({
+            ...node,
+            data: {
+              ...node.data,
+              onNodeDelete: handleNodeDelete,
+              filePath: filePath,
+              // Add execution state management
+              currentExecutionState: nodeExecutionStates[node.id],
+              setNodePending: () => setNodePending(node.id),
+              setNodeRunning: () => setNodeRunning(node.id),
+              setNodeCompleted: () => setNodeCompleted(node.id),
+              setNodeError: () => setNodeError(node.id),
+              clearExecutionState: () => clearNodeExecutionState(node.id)
+            }
+          }));
+          setNodes(nodesWithHandlers);
+        }
+        
+        if (flowData.edges) {
+          setEdges(flowData.edges.map(edge => ({
+            id: edge.id,
+            source: edge.source,
+            sourceHandle: edge.sourceHandle,
+            target: edge.target,
+            targetHandle: edge.targetHandle,
+            type: edge.type || 'default'
+          })));
+        }
+      }
+    },
+    onNodeUpdated: (nodeData, timestamp) => {
+      console.log('Atomic node update received in Canvas:', nodeData.id, timestamp);
+      
+      // Update only the specific node in the React Flow state
+      setNodes(currentNodes => 
+        currentNodes.map(node => 
+          node.id === nodeData.id 
+            ? {
+                ...node,
+                data: { 
+                  ...node.data, 
+                  ...nodeData,
+                  // Preserve execution state management functions
+                  currentExecutionState: nodeExecutionStates[node.id],
+                  setNodePending: () => setNodePending(node.id),
+                  setNodeRunning: () => setNodeRunning(node.id),
+                  setNodeCompleted: () => setNodeCompleted(node.id),
+                  setNodeError: () => setNodeError(node.id),
+                  clearExecutionState: () => clearNodeExecutionState(node.id)
+                },
+                position: nodeData.position || node.position
+              }
+            : node
+        )
+      );
+    },
+    onBackendChange: (changeType, content, checksum) => {
+      console.log(`Backend change detected in Canvas: ${changeType}`, filePath);
+      if (changeType === 'deleted') {
+        toast.error('File was deleted', { description: 'The .flow file you are editing was deleted from the filesystem' });
+      } else if (content) {
+        // File was modified by backend, update content
+        setFileContent(content);
+      }
+    },
+    onError: (error) => {
+      console.error('Atomic sync error in Canvas:', error);
+      toast.error('Sync Error', { description: error });
+    }
+  });
+
+  // Robust auto-save function with retry logic
+  const performAutoSave = React.useCallback(async (content: string, retryCount = 0) => {
+    if (!filePath || !content || content === lastSavedContent) {
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      if (isConnected()) {
+        await updateFile(content);
+        setLastSavedContent(content);
+        setHasUnsavedChanges(false);
+        
+        // Update tab dirty state - mark as clean (saved)
+        if (tabId) {
+          setTabDirty(tabId, false);
+        }
+        
+        console.log('✅ Auto-save successful for:', filePath);
+        toast.success('File saved automatically', { duration: 2000 });
+      } else {
+        throw new Error('Not connected to sync service');
+      }
+    } catch (error) {
+      console.error('❌ Auto-save failed:', error);
+      
+      // Retry logic - up to 3 attempts
+      if (retryCount < 3) {
+        console.log(`🔄 Retrying auto-save (attempt ${retryCount + 1}/3)...`);
+        setTimeout(() => {
+          performAutoSave(content, retryCount + 1);
+        }, 1000 * (retryCount + 1)); // Exponential backoff
+      } else {
+        console.error('💥 Auto-save failed after 3 attempts');
+        toast.error('Auto-save failed after multiple attempts. Please save manually.');
+        
+        // Keep tab marked as dirty since save failed
+        if (tabId) {
+          setTabDirty(tabId, true);
+        }
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [filePath, lastSavedContent, isConnected, updateFile, tabId, setTabDirty]);
+  
+  // Debounced auto-save trigger
+  const triggerAutoSave = React.useCallback((content: string) => {
+    if (content !== lastSavedContent) {
+      setHasUnsavedChanges(true);
+      
+      // Mark tab as dirty immediately when changes are detected
+      if (tabId) {
+        setTabDirty(tabId, true);
+      }
+    }
+    
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    // Trigger unsaved changes
+    setHasUnsavedChanges(true);
+    
+    // Trigger auto-save after a short delay
+    setTimeout(() => {
+      performAutoSave(content);
+    }, 500);
+  }, [performAutoSave]);
+
+  // Handle node execution updates from "Run All"
+  const handleNodeExecutionUpdate = React.useCallback((executionResult: any) => {
+    console.log('🔄 Handling node execution update:', executionResult);
+    
+    // Extract node ID from the execution result
+    const nodeId = executionResult.cell_id;
+    if (!nodeId) {
+      console.warn('⚠️ No cell_id found in execution result');
+      return;
+    }
+    
+    // Update the specific node with execution results
+    setNodes(currentNodes => 
+      currentNodes.map(node => {
+        if (node.id === nodeId) {
+          console.log(`✅ Updating node ${nodeId} with execution results`);
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              executionLogs: executionResult.logs || [],
+              executionStatus: executionResult.status || 'completed',
+              lastExecuted: new Date().toISOString(),
+              executionOutput: executionResult.output || {}
+            }
+          };
+        }
+        return node;
+      })
+    );
+  }, []);
+
+  // Initialize last saved content when file content loads
+  React.useEffect(() => {
+    if (fileContent && !lastSavedContent) {
+      setLastSavedContent(fileContent);
+      setHasUnsavedChanges(false);
+      if (tabId) {
+        setTabDirty(tabId, false);
+      }
+    }
+  }, [fileContent, lastSavedContent, tabId, setTabDirty]);
+
+  // Cleanup auto-save timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Function to fetch data from the tab
   const fetchData = React.useCallback(async (forceRefresh = false) => {
@@ -181,7 +456,14 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
             data: {
               ...node.data,
               onNodeDelete: handleNodeDelete,
-              filePath: path // Pass the current file path to each node for execution
+              filePath: path, // Pass the current file path to each node for execution
+              // Add execution state management
+              currentExecutionState: nodeExecutionStates[node.id],
+              setNodePending: () => setNodePending(node.id),
+              setNodeRunning: () => setNodeRunning(node.id),
+              setNodeCompleted: () => setNodeCompleted(node.id),
+              setNodeError: () => setNodeError(node.id),
+              clearExecutionState: () => clearNodeExecutionState(node.id)
             }
           }));
           
@@ -217,7 +499,7 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
     fetchData(true); // Pass true to force refresh
   }, [fetchData]);
   
-  // Handle connection of nodes
+  // Handle connection of nodes with real-time sync
   const onConnect = React.useCallback((params: Connection) => {
     // Create a unique ID for the new edge
     const newEdge = {
@@ -227,8 +509,8 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
     };
     setEdges((eds) => addEdge(newEdge, eds));
     
-    // Update the fileContent to include the new edge
-    if (fileContent) {
+    // Update the fileContent to include the new edge and sync
+    if (fileContent && filePath) {
       try {
         const validationResult = isValidFlowFormat(fileContent);
         if (validationResult.isValid && validationResult.parsedData) {
@@ -243,13 +525,18 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
               type: newEdge.type || 'default'
             }]
           };
-          setFileContent(JSON.stringify(updatedFlowData, null, 2));
+          
+          const newContent = JSON.stringify(updatedFlowData, null, 2);
+          setFileContent(newContent);
+          
+          // Trigger auto-save
+          triggerAutoSave(newContent);
         }
       } catch (error) {
-        // console.error("Error updating file content with new edge:", error);
+        console.error("Error updating file content with new edge:", error);
       }
     }
-  }, [fileContent, setEdges]);
+  }, [fileContent, setEdges, filePath, triggerAutoSave]);
   
   // Update existing nodes with current filePath when filePath changes
   React.useEffect(() => {
@@ -285,7 +572,7 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
  
   // Handle node deletion
   const handleNodeDelete = React.useCallback((nodeId: string) => {
-    // console.log(`Deleting node: ${nodeId}`);
+    console.log(`Deleting node: ${nodeId}`);
     
     // Helper function to check if an edge is connected to the deleted node
     // This needs to be very precise to avoid removing unrelated edges
@@ -314,23 +601,18 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
       return false;
     };
     
-    // Find edges connected to this specific node
-    const edgesToRemove = edges.filter(isEdgeConnectedToNode);
+    // Remove the node
+    setNodes(currentNodes => currentNodes.filter(node => node.id !== nodeId));
     
-    // Log detailed information for debugging
-    // console.log('Connected edges to remove:', edgesToRemove);
-    // console.log('Edge IDs to remove:', edgesToRemove.map(e => e.id));
-    
-    // Remove the node from the state
-    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-    
-    // Only remove edges that are connected to this specific node
-    setEdges((currentEdges) => {
-      // Filter out only the edges connected to this node
+    // Remove all edges connected to this node
+    setEdges(currentEdges => {
+      const edgesToRemove = currentEdges.filter(isEdgeConnectedToNode);
       const remainingEdges = currentEdges.filter(edge => !isEdgeConnectedToNode(edge));
       
-      // Log  before/after counts
-      // console.log(`Edges before: ${currentEdges.length}, after: ${remainingEdges.length}`);
+      console.log(`Removing ${edgesToRemove.length} edges connected to node ${nodeId}`);
+      edgesToRemove.forEach(edge => {
+        console.log(`  - Removing edge: ${edge.id} (${edge.source} -> ${edge.target})`);
+      });
       // console.log('Removed edge count:', currentEdges.length - remainingEdges.length);
       
       return remainingEdges;
@@ -377,18 +659,13 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
     }
   }, [fileContent, nodes, edges, setFileContent]);
   
-  // Handle node changes and update file content
+  // Handle node changes and update file content with real-time sync
   const handleNodesChange = React.useCallback((changes: any) => {
-    // Check if any of the changes is a node removal
-    const nodeRemovals = changes.filter(
-      (change: any) => change.type === 'remove'
-    );
-    
     // Process normal node changes
     onNodesChange(changes);
     
-    // Update file content after node changes (position, deletion, etc)
-    if (fileContent && changes.length > 0) {
+    // Update file content and sync after node changes (position, deletion, etc)
+    if (fileContent && changes.length > 0 && filePath) {
       setTimeout(() => {
         try {
           const validationResult = isValidFlowFormat(fileContent);
@@ -417,21 +694,26 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
                 type: edge.type || 'default'
               }))
             };
-            setFileContent(JSON.stringify(updatedFlowData, null, 2));
+            
+            const newContent = JSON.stringify(updatedFlowData, null, 2);
+            setFileContent(newContent);
+            
+            // Trigger auto-save and mark as unsaved changes (makes save button yellow)
+            triggerAutoSave(newContent);
           }
         } catch (error) {
-          // console.error("Error updating file content after node changes:", error);
+          console.error("Error updating file content after node changes:", error);
         }
       }, 100); // Small delay to ensure nodes state is updated
     }
-  }, [fileContent, nodes, edges, onNodesChange]);
+  }, [fileContent, nodes, edges, onNodesChange, filePath, triggerAutoSave]);
   
-  // Handle edge changes and update file content
+  // Handle edge changes and update file content with real-time sync
   const handleEdgesChange = React.useCallback((changes: any) => {
     onEdgesChange(changes);
     
-    // Update file content after edge changes
-    if (fileContent && changes.length > 0) {
+    // Update file content and sync after edge changes
+    if (fileContent && changes.length > 0 && filePath) {
       setTimeout(() => {
         try {
           const validationResult = isValidFlowFormat(fileContent);
@@ -447,14 +729,19 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
                 type: edge.type || 'default'
               }))
             };
-            setFileContent(JSON.stringify(updatedFlowData, null, 2));
+            
+            const newContent = JSON.stringify(updatedFlowData, null, 2);
+            setFileContent(newContent);
+            
+            // Trigger auto-save and mark as unsaved changes (makes save button yellow)
+            triggerAutoSave(newContent);
           }
         } catch (error) {
           console.error("Error updating file content after edge changes:", error);
         }
       }, 100); // Small delay to ensure edges state is updated
     }
-  }, [fileContent, edges, onEdgesChange]);
+  }, [fileContent, edges, onEdgesChange, filePath, triggerAutoSave]);
 
   // Handle drag over event (needed for drop functionality)
   const onDragOver = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
@@ -512,8 +799,8 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
       // Add the new node to the flow
       setNodes((nds) => nds.concat(newNode));
       
-      // Update the file content to include the new node
-      if (fileContent) {
+      // Update the file content to include the new node and sync
+      if (fileContent && filePath) {
         try {
           const validationResult = isValidFlowFormat(fileContent);
           if (validationResult.isValid && validationResult.parsedData) {
@@ -529,18 +816,53 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
                 deletable: true
               }]
             };
-            setFileContent(JSON.stringify(updatedFlowData, null, 2));
+            
+            const newContent = JSON.stringify(updatedFlowData, null, 2);
+            setFileContent(newContent);
+            
+            // Trigger auto-save and mark as unsaved changes (makes save button yellow)
+            triggerAutoSave(newContent);
           }
         } catch (error) {
           console.error("Error updating file content with new node:", error);
         }
       }
     },
-    [fileContent, setNodes]
+    [fileContent, setNodes, filePath, triggerAutoSave]
   );
 
   return (
-    <div className="w-full h-[95%] overflow-auto">
+    <div className="w-full h-full flex flex-col relative">
+      {/* Auto-save status indicator */}
+      {(isSaving || hasUnsavedChanges) && (
+        <div className="absolute top-2 right-2 z-50 flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-md shadow-sm border text-sm">
+          {isSaving ? (
+            <>
+              <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-blue-600">Saving...</span>
+            </>
+          ) : hasUnsavedChanges ? (
+            <>
+              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+              <span className="text-orange-600">Unsaved changes</span>
+            </>
+          ) : null}
+        </div>
+      )}
+      
+      <Toolbar 
+        nodes={nodes}
+        edges={edges}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+        fileContent={fileContent}
+        fileName={filePath ? filePath.split('/').pop() : undefined}
+        tabId={tabId}
+        hasUnsavedChanges={hasUnsavedChanges}
+        filePath={filePath}
+        onNodeExecutionUpdate={handleNodeExecutionUpdate}
+        selectedNodes={selectedNodes}
+      /> 
       <ReactFlowProvider>
         <CanvasContent 
           tabId={tabId} 
@@ -548,9 +870,10 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
           isRefreshing={isRefreshing}
           nodes={nodes}
           edges={edges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={handleEdgesChange}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onSelectionChange={handleSelectionChange}
           onDrop={onDrop}
           onDragOver={onDragOver}
           fileContent={fileContent}

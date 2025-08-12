@@ -1,6 +1,7 @@
 import React from 'react'
 import { FileNodeProps } from './types'
-import { FolderIcon, FileIcon, ChevronRightIcon, FilePlusIcon, FolderPlusIcon } from 'lucide-react'
+import { ChevronRightIcon, FilePlusIcon, FolderPlusIcon } from 'lucide-react'
+import { FileIconComponent } from './utils/fileIcons'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -76,7 +77,7 @@ const FileNode: React.FC<FileNodeProps> = ({
             )}
             
             <span className="mr-2">
-              {node.is_dir ? <FolderIcon size={16} /> : <FileIcon size={16} />}
+              <FileIconComponent fileName={node.name} isDirectory={node.is_dir} size={16} />
             </span>
             
             <span className="text-sm truncate">{node.name}</span>

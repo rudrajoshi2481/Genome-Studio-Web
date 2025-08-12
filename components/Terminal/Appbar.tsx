@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { TerminalIcon, X as CloseIcon, Pencil, Trash2 } from 'lucide-react'
+import { TerminalIcon, X as CloseIcon, Pencil, Trash2, Pin, PinOff } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { useTerminalStore } from './store/terminal-store'
@@ -22,6 +22,7 @@ function Appbar() {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [tabToRename, setTabToRename] = useState<{id: string, name: string} | null>(null);
   const [newTabName, setNewTabName] = useState('');
+  const [pinnedTabs, setPinnedTabs] = useState<Set<string>>(new Set());
   
   const handleCreateNewTab = () => {
     createTab();
@@ -35,25 +36,71 @@ function Appbar() {
       setIsRenameDialogOpen(false);
     }
   };
+
+  // Load pinned tabs from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedPinnedTabs = localStorage.getItem('terminal_pinned_tabs');
+        if (savedPinnedTabs) {
+          const pinnedArray = JSON.parse(savedPinnedTabs);
+          setPinnedTabs(new Set(pinnedArray));
+        }
+      } catch (error) {
+        console.warn('Failed to load pinned terminal tabs from localStorage:', error);
+      }
+    }
+  }, []);
+
+  // Handle pin/unpin functionality for terminal tabs
+  const handlePinToggle = (tabId: string) => {
+    const newPinnedTabs = new Set(pinnedTabs);
+    
+    if (pinnedTabs.has(tabId)) {
+      newPinnedTabs.delete(tabId);
+      toast.info('Terminal tab unpinned');
+    } else {
+      newPinnedTabs.add(tabId);
+      toast.success('Terminal tab pinned');
+    }
+    
+    setPinnedTabs(newPinnedTabs);
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('terminal_pinned_tabs', JSON.stringify(Array.from(newPinnedTabs)));
+      } catch (error) {
+        console.warn('Failed to save pinned terminal tabs to localStorage:', error);
+      }
+    }
+  };
   
   return (
     <>
       <div className='flex justify-between border-b w-full p-1 pr-3'>
         <div>
           <div className="flex items-center space-x-1 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => (
+            {tabs.map((tab) => {
+              const isPinned = pinnedTabs.has(tab.id);
+              return (
               <ContextMenu key={tab.id}>
                 <ContextMenuTrigger>
                   <div 
                     className={cn(
-                      "flex items-center px-3 py-1.5 text-xs rounded-t-md cursor-pointer",
+                      "flex items-center px-3 py-1.5 text-xs rounded-t-md cursor-pointer relative",
                       tab.id === activeTabId 
                         ? "bg-background border-b-2 border-primary" 
-                        : "bg-muted/50 hover:bg-muted"
+                        : "bg-muted/50 hover:bg-muted",
+                      isPinned && "bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50"
                     )}
                     onClick={() => setActiveTab(tab.id)}
+                    title={`${tab.name}${isPinned ? ' (Pinned)' : ''}`}
                   >
                     <span className="mr-1 max-w-[100px] truncate">{tab.name}</span>
+                    {isPinned && (
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-background" />
+                    )}
                     <button 
                       className="ml-1 rounded-full hover:bg-muted p-0.5"
                       onClick={(e) => {
@@ -67,6 +114,22 @@ function Appbar() {
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-44">
+                  <ContextMenuItem
+                    onClick={() => handlePinToggle(tab.id)}
+                  >
+                    {isPinned ? (
+                      <>
+                        <PinOff className="mr-2 h-4 w-4" />
+                        Unpin tab
+                      </>
+                    ) : (
+                      <>
+                        <Pin className="mr-2 h-4 w-4" />
+                        Pin tab
+                      </>
+                    )}
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
                   <ContextMenuItem
                     onClick={() => {
                       setTabToRename({id: tab.id, name: tab.name});
@@ -90,7 +153,8 @@ function Appbar() {
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
-            ))}
+              );
+            })}
           </div>
         </div>
         <div className='flex items-center gap-2'>

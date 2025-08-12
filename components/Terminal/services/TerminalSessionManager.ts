@@ -230,7 +230,7 @@ class TerminalSessionManager {
 
     try {
       const { rows, cols } = session.lastDimensions;
-      const wsUrl = `ws://${host}:${port}/api/v1/direct-terminal/ws?token=${encodeURIComponent(token)}&rows=${rows}&cols=${cols}`;
+      const wsUrl = `ws://${host}:${port}/api/v1/terminal/ws?token=${encodeURIComponent(token)}&rows=${rows}&cols=${cols}`;
       
       const ws = new WebSocket(wsUrl);
       
