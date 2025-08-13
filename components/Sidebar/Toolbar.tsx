@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Folder, LucideIcon, Workflow } from 'lucide-react'
+import { Folder, LucideIcon, Workflow,KanbanSquare } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
@@ -14,7 +14,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
-import { Pin, PinOff } from 'lucide-react'
+import { Pin, PinOff,GitCompareArrows,AtomIcon } from 'lucide-react'
 import FileExplorerComponent from './FileExplorer/FileExplorer'
 import { FileExplorer_New } from './FileExplorer_New'
 import Nodebar from './Nodebar/Nodebar'
@@ -57,12 +57,12 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       type: "sidebar",
       component: () => <FileExplorer_New />
     },
-    {
-      name: "File Explorer (Legacy)",
-      icon: Folder,
-      type: "sidebar",
-      component: () => <FileExplorerComponent />
-    },
+    // {
+    //   name: "File Explorer (Legacy)",
+    //   icon: Folder,
+    //   type: "sidebar",
+    //   component: () => <FileExplorerComponent />
+    // },
     {
       name: "Nodebar",
       icon: Workflow,
@@ -70,11 +70,25 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       component: () => <Nodebar />
     },
     // {
-    //   name: "Settings",
-    //   icon: Settings,
+    //   name: "Git",
+    //   icon: GitCompareArrows,
+    //   type: "sidebar",
+    //   component: () => <>Dummy git component</>
+    // },
+    // {
+    //   name: "Planning Board",
+    //   icon: KanbanSquare,
+    //   type: "sidebar",
+    //   component: () => <>Dummy planning board component</>
+    // },
+    // {
+    //   name: "Pipeline Monitor",
+    //   icon: AtomIcon,
     //   type: "page",
-    //   link: "/settings"
-    // }
+    //   link: "/pipeline-monitor"
+    // },
+    
+
   ]
 
   /**
