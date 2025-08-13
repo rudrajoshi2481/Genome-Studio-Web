@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import * as authService from '@/lib/services/auth-service';
 import { fileExplorerApi } from '../services/api';
+import { host, port } from '@/config/server';
 
 // FileNode interface (compatible with API types)
 interface FileNode {
@@ -429,7 +430,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set, get) => ({
     
     const { rootPath } = get();
     const token = getToken();
-    const wsUrl = `ws://localhost:8000/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`;
+    const wsUrl = `ws://${host}:${port}/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`;
     
     try {
       const ws = new WebSocket(wsUrl);

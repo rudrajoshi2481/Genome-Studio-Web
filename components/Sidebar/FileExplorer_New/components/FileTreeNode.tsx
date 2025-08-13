@@ -6,19 +6,12 @@
 import React, { memo, useCallback } from 'react';
 import { 
   ChevronRightIcon, 
-  ChevronDownIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  DocumentIcon,
-  CodeBracketIcon,
-  PhotoIcon,
-  FilmIcon,
-  MusicalNoteIcon,
-  ArchiveBoxIcon
-} from '@heroicons/react/24/outline';
+  ChevronDownIcon
+} from 'lucide-react';
 import { FileNode } from '../types';
 import { useFileExplorerStore } from '../store/fileExplorerStore';
 import { FileContextMenu } from './ContextMenu';
+import { FileIconComponent } from '../utils/fileIcons';
 
 interface FileTreeNodeProps {
   node: FileNode;
@@ -29,43 +22,9 @@ interface FileTreeNodeProps {
   selectedPaths: Set<string>;
 }
 
-// File type icon mapping
-const getFileIcon = (fileName: string, isDir: boolean, isExpanded?: boolean) => {
-  if (isDir) {
-    return isExpanded ? FolderOpenIcon : FolderIcon;
-  }
-  
-  const ext = fileName.toLowerCase().split('.').pop() || '';
-  
-  // Code files
-  if (['js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'cs', 'php', 'rb', 'go', 'rs', 'swift', 'kt'].includes(ext)) {
-    return CodeBracketIcon;
-  }
-  
-  // Images
-  if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico'].includes(ext)) {
-    return PhotoIcon;
-  }
-  
-  // Videos
-  if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv'].includes(ext)) {
-    return FilmIcon;
-  }
-  
-  // Audio
-  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma'].includes(ext)) {
-    return MusicalNoteIcon;
-  }
-  
-  // Archives
-  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) {
-    return ArchiveBoxIcon;
-  }
-  
-  return DocumentIcon;
-};
 
-// File type color mapping
+
+// File type color mapping for different file types
 const getFileColor = (fileName: string, isDir: boolean) => {
   if (isDir) {
     return 'text-blue-500';
@@ -84,6 +43,12 @@ const getFileColor = (fileName: string, isDir: boolean) => {
   if (['rb'].includes(ext)) return 'text-red-500';
   if (['go'].includes(ext)) return 'text-cyan-600';
   if (['rs'].includes(ext)) return 'text-orange-600';
+  if (['html', 'htm'].includes(ext)) return 'text-orange-500';
+  if (['css', 'scss', 'sass'].includes(ext)) return 'text-pink-500';
+  if (['json'].includes(ext)) return 'text-yellow-600';
+  if (['xml'].includes(ext)) return 'text-green-700';
+  if (['sql'].includes(ext)) return 'text-blue-800';
+  if (['md', 'markdown'].includes(ext)) return 'text-gray-700';
   
   // Images
   if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico'].includes(ext)) {
@@ -103,6 +68,11 @@ const getFileColor = (fileName: string, isDir: boolean) => {
   // Archives
   if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) {
     return 'text-orange-500';
+  }
+  
+  // Scientific/Bioinformatics
+  if (['fasta', 'fa', 'fastq', 'fq', 'sam', 'bam', 'vcf'].includes(ext)) {
+    return 'text-teal-600';
   }
   
   return 'text-gray-500';
@@ -129,15 +99,12 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
 }) => {
   const { 
     isNodeExpanded, 
-    toggleNode, 
-    expandNode, 
-    collapseNode 
+    toggleNode
   } = useFileExplorerStore();
 
   const isExpanded = isNodeExpanded(node.path);
   const isSelected = selectedPaths.has(node.path);
   
-  const IconComponent = getFileIcon(node.name, node.is_dir, isExpanded);
   const iconColor = getFileColor(node.name, node.is_dir);
 
   // Handle node click
@@ -184,17 +151,17 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
       case 'ArrowRight':
         event.preventDefault();
         if (node.is_dir && !isExpanded) {
-          expandNode(node.path);
+          toggleNode(node.path);
         }
         break;
       case 'ArrowLeft':
         event.preventDefault();
         if (node.is_dir && isExpanded) {
-          collapseNode(node.path);
+          toggleNode(node.path);
         }
         break;
     }
-  }, [node.path, node.is_dir, isExpanded, toggleNode, expandNode, collapseNode, onOpen]);
+  }, [node.path, node.is_dir, isExpanded, toggleNode, onOpen]);
 
   return (
     <div className="select-none">
@@ -233,7 +200,12 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
           )}
 
           {/* File/folder icon */}
-          <IconComponent className={`w-4 h-4 mr-2 flex-shrink-0 ${iconColor}`} />
+          <FileIconComponent 
+            fileName={node.name} 
+            isDirectory={node.is_dir} 
+            size={16} 
+            className={`mr-2 flex-shrink-0 ${iconColor}`} 
+          />
 
           {/* File/folder name */}
           <span className="flex-1 truncate text-sm">

@@ -126,7 +126,8 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
             </ContextMenuItem>
             <ContextMenuItem onClick={() => handleActionClick('preview')} className="flex items-center">
               <EyeIcon className="w-4 h-4 mr-2" />
-              Preview
+              Preview in Editor
+              <span className="ml-auto text-xs text-muted-foreground">Text View</span>
             </ContextMenuItem>
             <ContextMenuItem onClick={() => handleActionClick('download')} className="flex items-center">
               <ArrowDownTrayIcon className="w-4 h-4 mr-2" />

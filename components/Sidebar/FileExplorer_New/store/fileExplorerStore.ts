@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import * as authService from '@/lib/services/auth-service';
 import { fileExplorerApi } from '../services/api';
+import { host, port } from '@/config/server';
 
 // Import helper functions for upload conflict handling
 const buildUrl = (endpoint: string) => {
@@ -446,7 +447,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     
     const { rootPath } = get();
     const token = getToken();
-    const wsUrl = `ws://localhost:8000/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`;
+    const wsUrl = `ws://${host}:${port}/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`;
     
     try {
       const ws = new WebSocket(wsUrl);

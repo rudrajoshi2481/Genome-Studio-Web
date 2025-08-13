@@ -175,9 +175,7 @@ function Appbar() {
             </Tooltip>
           </div>
           <Separator orientation="vertical" />
-          <TerminalStyleStats 
-            refreshInterval={3000}
-          />
+          <TerminalStyleStats />
         </div>
       </div>
       

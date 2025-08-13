@@ -416,9 +416,7 @@ export class EditorAPIService {
         file_path: filePath,
         operation: {
           id: `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          type: 'replace',
-          start: 0,
-          end: -1, // Replace entire content
+          type: 'full_replace', // Use full_replace instead of replace with end: -1
           text: content,
           timestamp: new Date().toISOString()
         },

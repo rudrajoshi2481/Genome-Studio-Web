@@ -5,20 +5,20 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { 
-  ChevronRightIcon, 
-  ChevronDownIcon,
-  FolderIcon,
-  DocumentIcon,
-  PlusIcon,
+  RefreshCwIcon, 
+  FilePlusIcon, 
+  FolderPlusIcon, 
+  ChevronsDownIcon, 
+  UploadIcon,
+  SearchIcon,
   TrashIcon,
-  MagnifyingGlassIcon,
-  ArrowPathIcon,
-  CloudArrowUpIcon,
-  EllipsisVerticalIcon
-} from '@heroicons/react/24/outline';
+  FolderIcon
+} from 'lucide-react';
+import { FileIconComponent } from './utils/fileIcons';
 import { FileNode, SearchFilters } from './types';
 import { useFileExplorerStore } from './store/fileExplorerStore';
 import { fileExplorerApi } from './services/api';
+import { useTabStore } from '@/components/FileTabs/useTabStore';
 import { FileTreeNode } from './components/FileTreeNode';
 import { SearchBar } from './components/SearchBar';
 import { UploadDialog } from './components/UploadDialog';
@@ -125,14 +125,109 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
   }, [selectNode, onFileSelect]);
 
   // Handle file double-click (open)
-  const handleFileOpen = useCallback((path: string) => {
+  const handleFileOpen = useCallback(async (path: string) => {
+    // Call the optional callback first
     onFileOpen?.(path);
+    
+    // Open file in tab (similar to old FileExplorer implementation)
+    await openFileInTab(path);
   }, [onFileOpen]);
 
+  // Function to open a file in a tab (inspired by old FileExplorer)
+  const openFileInTab = useCallback(async (filePath: string) => {
+    try {
+      // Get all existing tabs
+      const tabs = useTabStore.getState().getAllTabs();
+      
+      // Check if file is already open in a tab
+      const existingTab = tabs.find(tab => tab.path === filePath);
+      
+      if (existingTab) {
+        // If tab already exists, just activate it
+        useTabStore.getState().activateTab(existingTab.id);
+        console.log(`✅ Activated existing tab for: ${filePath}`);
+      } else {
+        // Extract file name from path
+        const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+        
+        // Add the file to tabs with empty content initially
+        // Content will be loaded in the EditorWindow component
+        const tabId = useTabStore.getState().addTab(filePath, fileName, '');
+        console.log(`✅ Opened new tab for: ${filePath}`);
+        
+        // Activate the newly created tab
+        if (tabId) {
+          useTabStore.getState().activateTab(tabId);
+        }
+      }
+    } catch (error) {
+      console.error('Error opening file in tab:', error);
+      // You could add a toast notification here if available
+      alert(`Failed to open file: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, []);
+
+  // Function to force open a file in the code editor (for preview action)
+  const openFileInEditor = useCallback(async (filePath: string) => {
+    try {
+      // Get all existing tabs
+      const tabs = useTabStore.getState().getAllTabs();
+      
+      // Extract file name from path
+      const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+      
+      // Create a special filename that signals to EditorFactory to use code editor
+      const previewFileName = `${fileName} (Text Preview)`;
+      
+      // Check if a preview tab for this file already exists
+      const existingPreviewTab = tabs.find(tab => 
+        tab.path === filePath && tab.name.includes('(Text Preview)')
+      );
+      
+      if (existingPreviewTab) {
+        // If preview tab already exists, just activate it
+        useTabStore.getState().activateTab(existingPreviewTab.id);
+        console.log(`✅ Activated existing preview tab: ${filePath}`);
+      } else {
+        // Always create a new preview tab, even if the regular file is already open
+        // This allows users to have both the regular view and text preview open simultaneously
+        const tabId = useTabStore.getState().addTab(filePath, previewFileName, '');
+        console.log(`✅ Opened new preview tab in code editor: ${filePath}`);
+        
+        // Activate the newly created tab
+        if (tabId) {
+          useTabStore.getState().activateTab(tabId);
+          
+          // Update the tab to mark it as a preview tab
+          useTabStore.getState().updateTab(tabId, {
+            name: previewFileName,
+            // Force text extension to ensure code editor
+            extension: 'txt'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error opening file in code editor:', error);
+      alert(`Failed to open file in editor: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, []);
+
   // Handle context menu actions
-  const handleContextAction = useCallback((action: string, node: FileNode) => {
+  const handleContextAction = useCallback(async (action: string, node: FileNode) => {
     
     switch (action) {
+      case 'open':
+        // Handle file open from context menu
+        if (!node.is_dir) {
+          handleFileOpen(node.path);
+        }
+        break;
+      case 'preview':
+        // Handle file preview in editor (force open in code editor instead of specialized viewers)
+        if (!node.is_dir) {
+          await openFileInEditor(node.path);
+        }
+        break;
       case 'create_file':
         setShowCreateDialog({ type: 'file', parentPath: node.is_dir ? node.path : node.path.substring(0, node.path.lastIndexOf('/')) });
         break;
@@ -176,7 +271,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         handleCopyPath(node);
         break;
     }
-  }, [activePath, rootPath, cutItems, copyItems]);
+  }, [activePath, rootPath, cutItems, copyItems, handleFileOpen, openFileInEditor]);
 
   // Handle download
   const handleDownload = useCallback(async (node: FileNode) => {
@@ -306,13 +401,19 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
               key={`${result.path}-${index}`}
               className="flex items-center px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded text-sm"
               onClick={() => handleFileSelect(result.path)}
-              onDoubleClick={() => handleFileOpen(result.path)}
+              onDoubleClick={() => {
+                // Only open files, not directories
+                if (!result.is_dir) {
+                  handleFileOpen(result.path);
+                }
+              }}
             >
-              {result.is_dir ? (
-                <FolderIcon className="w-4 h-4 mr-2 text-blue-500" />
-              ) : (
-                <DocumentIcon className="w-4 h-4 mr-2 text-gray-500" />
-              )}
+              <FileIconComponent 
+                fileName={result.name} 
+                isDirectory={result.is_dir} 
+                size={16} 
+                className={`mr-2 ${result.is_dir ? 'text-blue-500' : 'text-gray-500'}`} 
+              />
               <div className="flex-1 min-w-0">
                 <div className="truncate">{result.name}</div>
                 <div className="text-xs text-gray-500 truncate">{result.path}</div>
@@ -326,7 +427,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
     if (searchQuery && searchResults.length === 0 && !isSearching) {
       return (
         <div className="text-center py-8 text-gray-500">
-          <MagnifyingGlassIcon className="w-8 h-8 mx-auto mb-2" />
+          <SearchIcon className="w-8 h-8 mx-auto mb-2" />
           <div>No files found</div>
         </div>
       );
@@ -377,10 +478,28 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
           <button
             onClick={() => refreshFileTree(true)} // Force refresh
             disabled={isLoading}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
             title="Refresh"
           >
-            <ArrowPathIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCwIcon className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+          
+          {/* New File button */}
+          <button
+            onClick={() => setShowCreateDialog({ type: 'file', parentPath: activePath || rootPath })}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
+            title="New File"
+          >
+            <FilePlusIcon className="h-4 w-4" />
+          </button>
+          
+          {/* New Folder button */}
+          <button
+            onClick={() => setShowCreateDialog({ type: 'directory', parentPath: activePath || rootPath })}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
+            title="New Folder"
+          >
+            <FolderPlusIcon className="h-4 w-4" />
           </button>
           
           {/* Upload button */}
@@ -389,19 +508,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
               const targetPath = activePath || rootPath;
               setShowUploadDialog({ targetPath });
             }}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-            title="Upload files"
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
+            title="Upload Files"
           >
-            <CloudArrowUpIcon className="w-4 h-4" />
-          </button>
-          
-          {/* Create menu */}
-          <button
-            onClick={() => setShowCreateDialog({ type: 'file', parentPath: activePath || rootPath })}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-            title="Create file"
-          >
-            <PlusIcon className="w-4 h-4" />
+            <UploadIcon className="h-4 w-4" />
           </button>
           
           {/* Delete selected */}
@@ -443,7 +553,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
       <div className="flex-1 overflow-auto p-2">
         {isLoading && !fileTree ? (
           <div className="text-center py-8 text-gray-500">
-            <ArrowPathIcon className="w-8 h-8 mx-auto mb-2 animate-spin" />
+            <RefreshCwIcon className="w-8 h-8 mx-auto mb-2 animate-spin" />
             <div>Loading files...</div>
           </div>
         ) : (
