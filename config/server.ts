@@ -7,7 +7,7 @@
  * Values can be overridden by environment variables.
  */
 
-export const host = process.env.NEXT_PUBLIC_API_HOST || '150.250.96.50';
+export const host = process.env.NEXT_PUBLIC_API_HOST || '10.0.0.44';
 export const port = process.env.NEXT_PUBLIC_API_PORT || '8000';
 
 

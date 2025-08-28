@@ -6,11 +6,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+
 function Appbar() {
   return (
-    <div className='p-2 border-b flex justify-between items-center'>
+    <div className='p-1 border-b flex justify-between items-center'>
         <div>
-          <span>Light Speed</span>
+          <span className="font-semibold text-sm">Genome Speed</span>
 
           </div>
 

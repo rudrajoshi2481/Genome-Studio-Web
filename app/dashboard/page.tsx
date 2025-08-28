@@ -19,23 +19,23 @@ function Page() {
         <ResizablePanel defaultSize={20} minSize={10} maxSize={30}>
           <Sidebar />
         </ResizablePanel>
-        <ResizableHandle withHandle />
+        <ResizableHandle />
         <ResizablePanel defaultSize={60} minSize={40} maxSize={80}>
           <ResizablePanelGroup direction="vertical" >
-            <ResizablePanel defaultSize={70} minSize={30} maxSize={90}>
+            <ResizablePanel defaultSize={70} minSize={20} maxSize={90}>
               {/* <EditorWindowStore /> */}
               
                 <EditorWindow />
               
             </ResizablePanel>
-            <ResizableHandle withHandle />
+            <ResizableHandle />
             <ResizablePanel defaultSize={30} minSize={10} maxSize={70}>
               <Terminal />
             </ResizablePanel> 
           </ResizablePanelGroup>
         </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={20} minSize={10} maxSize={30}>
+        <ResizableHandle />
+        <ResizablePanel defaultSize={20} minSize={5} maxSize={50}>
           <Traybar />
         </ResizablePanel>
       </ResizablePanelGroup>

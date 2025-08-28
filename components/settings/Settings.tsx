@@ -137,7 +137,7 @@ function Settings() {
           <SettingsIcon className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="min-w-[40vw] max-h-[80vh] overflow-hidden">
+      <DialogContent className="min-w-[80vw] max-h-[1000vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <SettingsIcon className="h-5 w-5" />
@@ -349,75 +349,7 @@ function Settings() {
                   <CardDescription>Customize the look and feel of your workspace</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="space-y-3">
-                    <Label>Theme</Label>
-                    <RadioGroup
-                      value={settings.theme}
-                      onValueChange={(value) => updateSetting('theme', value)}
-                      className="flex gap-6"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="light" id="light" />
-                        <Label htmlFor="light">Light</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="dark" id="dark" />
-                        <Label htmlFor="dark">Dark</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="system" id="system" />
-                        <Label htmlFor="system">System</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label>Font Size: {settings.fontSize}px</Label>
-                    <Slider
-                      value={[settings.fontSize]}
-                      onValueChange={([value]) => updateSetting('fontSize', value)}
-                      max={24}
-                      min={10}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label>Sidebar Width: {settings.sidebarWidth}px</Label>
-                    <Slider
-                      value={[settings.sidebarWidth]}
-                      onValueChange={([value]) => updateSetting('sidebarWidth', value)}
-                      max={400}
-                      min={200}
-                      step={10}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Show Line Numbers</Label>
-                        <p className="text-sm text-muted-foreground">Display line numbers in code editor</p>
-                      </div>
-                      <Switch
-                        checked={settings.showLineNumbers}
-                        onCheckedChange={(checked) => updateSetting('showLineNumbers', checked)}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Word Wrap</Label>
-                        <p className="text-sm text-muted-foreground">Wrap long lines in editor</p>
-                      </div>
-                      <Switch
-                        checked={settings.wordWrap}
-                        onCheckedChange={(checked) => updateSetting('wordWrap', checked)}
-                      />
-                    </div>
-                  </div>
+                  <p>Coming soon...</p>
                 </CardContent>
               </Card>
               </div>
