@@ -530,7 +530,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                 {executionLogs.map((log: LogEntry, index: number) => (
                   <pre 
                     key={index} 
-                    className="text-sm p-1 border-b border-border select-text"
+                    className="text-sm p-1 border-b border-border select-text text-wrap"
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     {log.message}
