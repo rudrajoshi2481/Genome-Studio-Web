@@ -264,11 +264,16 @@ const EditorContext = createContext<{
   updateSyncStatus: (status: Partial<SyncStatus>) => void
   setSyncStatus: (status: 'connected' | 'disconnected' | 'error') => void
   getEditor: (tabId: string) => EditorInstance | undefined
+  // Save callback management
+  registerSaveCallback: (tabId: string, callback: () => Promise<void>) => void
+  unregisterSaveCallback: (tabId: string) => void
+  saveTab: (tabId: string) => Promise<boolean>
 } | null>(null)
 
 // Provider component
 export function EditorProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(editorReducer, initialState)
+  const [saveCallbacks] = React.useState(new Map<string, () => Promise<void>>())
 
   // Helper functions
   const registerEditor = useCallback((tabId: string, filePath: string, fileType: FileType) => {
@@ -329,6 +334,29 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     return state.activeEditors.get(tabId)
   }, [state.activeEditors])
 
+  // Save callback management
+  const registerSaveCallback = useCallback((tabId: string, callback: () => Promise<void>) => {
+    saveCallbacks.set(tabId, callback)
+  }, [saveCallbacks])
+
+  const unregisterSaveCallback = useCallback((tabId: string) => {
+    saveCallbacks.delete(tabId)
+  }, [saveCallbacks])
+
+  const saveTab = useCallback(async (tabId: string): Promise<boolean> => {
+    const saveCallback = saveCallbacks.get(tabId)
+    if (saveCallback) {
+      try {
+        await saveCallback()
+        return true
+      } catch (error) {
+        console.error('Error saving tab:', error)
+        return false
+      }
+    }
+    return false
+  }, [saveCallbacks])
+
   const value = {
     state,
     dispatch,
@@ -345,6 +373,9 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     updateSyncStatus,
     setSyncStatus,
     getEditor,
+    registerSaveCallback,
+    unregisterSaveCallback,
+    saveTab,
   }
 
   return (

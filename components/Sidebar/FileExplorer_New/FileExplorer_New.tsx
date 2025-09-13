@@ -5,14 +5,19 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { 
-  RefreshCwIcon, 
-  FilePlusIcon, 
-  FolderPlusIcon, 
-  ChevronsDownIcon, 
-  UploadIcon,
-  SearchIcon,
-  TrashIcon,
-  FolderIcon
+  RefreshCw, 
+  FilePlus, 
+  FolderPlus, 
+  Upload,
+  Search,
+  Trash2,
+  MoreHorizontal,
+  Wifi,
+  WifiOff,
+  Loader2,
+  Settings,
+  X,
+  Folder
 } from 'lucide-react';
 import { FileIconComponent } from './utils/fileIcons';
 import { FileNode, SearchFilters } from './types';
@@ -32,6 +37,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 interface FileExplorerNewProps {
   className?: string;
@@ -426,18 +449,20 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
 
     if (searchQuery && searchResults.length === 0 && !isSearching) {
       return (
-        <div className="text-center py-8 text-gray-500">
-          <SearchIcon className="w-8 h-8 mx-auto mb-2" />
-          <div>No files found</div>
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Search className="w-8 h-8 mb-3" />
+          <p className="text-sm font-medium">No files found</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">Try adjusting your search filters</p>
         </div>
       );
     }
 
     if (!fileTree) {
       return (
-        <div className="text-center py-8 text-gray-500">
-          <FolderIcon className="w-8 h-8 mx-auto mb-2" />
-          <div>No files to display</div>
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Folder className="w-8 h-8 mb-3" />
+          <p className="text-sm font-medium">No files to display</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">The directory appears to be empty</p>
         </div>
       );
     }
@@ -460,104 +485,181 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          File Explorer
-        </h2>
-        
-        <div className="flex items-center space-x-1">
-          {/* WebSocket status indicator */}
-          <div className={`w-2 h-2 rounded-full ${
-            wsStatus === 'connected' ? 'bg-green-500' : 
-            wsStatus === 'connecting' ? 'bg-yellow-500' : 
-            'bg-red-500'
-          }`} title={`WebSocket: ${wsStatus}`} />
+      {/* Modern Header with Shadcn Components */}
+      <TooltipProvider>
+        <div className="flex items-center justify-between p-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold tracking-tight">
+              File Explorer
+            </h2>
+            
+            {/* WebSocket status indicator */}
+            {/* <div className={cn(
+              "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors",
+              wsStatus === 'connected' 
+                ? "bg-green-50 text-green-700 border border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800"
+                : wsStatus === 'connecting'
+                ? "bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400 dark:border-yellow-800"
+                : "bg-red-50 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800"
+            )}>
+              {wsStatus === 'connected' ? (
+                <><div className="w-2 h-2 bg-green-500 rounded-full" />Online</>
+              ) : wsStatus === 'connecting' ? (
+                <><Loader2 className="h-3 w-3 animate-spin" />Connecting</>
+              ) : (
+                <><div className="w-2 h-2 bg-red-500 rounded-full" />Offline</>
+              )}
+            </div> */}
+          </div>
           
-          {/* Refresh button */}
-          <button
-            onClick={() => refreshFileTree(true)} // Force refresh
-            disabled={isLoading}
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
-            title="Refresh"
-          >
-            <RefreshCwIcon className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
-          
-          {/* New File button */}
-          <button
-            onClick={() => setShowCreateDialog({ type: 'file', parentPath: activePath || rootPath })}
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
-            title="New File"
-          >
-            <FilePlusIcon className="h-4 w-4" />
-          </button>
-          
-          {/* New Folder button */}
-          <button
-            onClick={() => setShowCreateDialog({ type: 'directory', parentPath: activePath || rootPath })}
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
-            title="New Folder"
-          >
-            <FolderPlusIcon className="h-4 w-4" />
-          </button>
-          
-          {/* Upload button */}
-          <button
-            onClick={() => {
-              const targetPath = activePath || rootPath;
-              setShowUploadDialog({ targetPath });
-            }}
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded"
-            title="Upload Files"
-          >
-            <UploadIcon className="h-4 w-4" />
-          </button>
-          
-          {/* Delete selected */}
-          {/* {selectedPaths.length > 0 && (
-            <button
-              onClick={handleBulkDelete}
-              className="p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded text-red-600"
-              title={`Delete ${selectedPaths.length} selected item${selectedPaths.length !== 1 ? 's' : ''}`}
-            >
-              <TrashIcon className="w-4 h-4" />
-            </button>
-          )} */}
+          <div className="flex items-center ">
+            {/* Primary action buttons */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => refreshFileTree(true)}
+                  disabled={isLoading}
+                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                >
+                  <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Refresh file tree</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowCreateDialog({ type: 'file', parentPath: activePath || rootPath })}
+                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                >
+                  <FilePlus className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>New file</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowCreateDialog({ type: 'directory', parentPath: activePath || rootPath })}
+                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>New folder</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const targetPath = activePath || rootPath;
+                    setShowUploadDialog({ targetPath });
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                >
+                  <Upload className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Upload files</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            <Separator orientation="vertical" className="h-6 mx-1" />
+            
+            {/* More actions dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (selectedPaths.length > 0) {
+                      const names = selectedPaths.map(path => path.split('/').pop() || path);
+                      setShowDeleteDialog({ paths: selectedPaths, names });
+                    }
+                  }}
+                  disabled={selectedPaths.length === 0}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete selected ({selectedPaths.length})
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      </div>
+      </TooltipProvider>
 
       {/* Search bar */}
-      <SearchBar
-        onSearch={handleSearch}
-        isSearching={isSearching}
-        className="border-b border-gray-200 dark:border-gray-700"
-      />
+      <div className="p-3 border-b bg-muted/30">
+        <SearchBar
+          onSearch={handleSearch}
+          isSearching={isSearching}
+          className=""
+        />
+      </div>
 
       {/* Error display */}
       {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-red-800 dark:text-red-200">{error}</div>
-            <button
+        <div className="p-3 border-b">
+          <Alert variant="destructive" className="relative">
+            <AlertDescription className="pr-8">
+              {error}
+            </AlertDescription>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={clearError}
-              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+              className="absolute right-2 top-2 h-6 w-6 p-0 hover:bg-destructive/20"
             >
-              ×
-            </button>
-          </div>
+              <X className="h-4 w-4" />
+            </Button>
+          </Alert>
         </div>
       )}
 
       {/* File tree content */}
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-auto">
         {isLoading && !fileTree ? (
-          <div className="text-center py-8 text-gray-500">
-            <RefreshCwIcon className="w-8 h-8 mx-auto mb-2 animate-spin" />
-            <div>Loading files...</div>
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Loader2 className="w-8 h-8 mb-3 animate-spin" />
+            <p className="text-sm font-medium">Loading files...</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Please wait while we fetch your files</p>
           </div>
         ) : (
-          renderContent()
+          <div className="p-2 space-y-1">
+            {renderContent()}
+          </div>
         )}
       </div>
 

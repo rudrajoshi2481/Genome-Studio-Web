@@ -4,17 +4,22 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { DocumentPlusIcon, FolderPlusIcon } from '@heroicons/react/24/outline';
+import { FilePlus, FolderPlus, AlertCircle, Sparkles } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 interface CreateDialogProps {
   open: boolean;
@@ -80,9 +85,7 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
   };
 
   // Handle form submission
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    
+  const handleConfirm = () => {
     const validationError = validateName(name);
     if (validationError) {
       setError(validationError);
@@ -93,66 +96,101 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
     onCancel(); // Close dialog after confirm
   };
 
+  // Handle keyboard events
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleConfirm();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      onCancel();
+    }
+  };
+
+  // Common file extensions
+  const fileExtensions = ['.txt', '.md', '.js', '.ts', '.py', '.html', '.css', '.json', '.xml', '.yml'];
+
   const isFile = type === 'file';
-  const Icon = isFile ? DocumentPlusIcon : FolderPlusIcon;
-  const title = `Create New ${isFile ? 'File' : 'Directory'}`;
-  const placeholder = `Enter ${type} name...`;
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Icon className="w-5 h-5 text-blue-600" />
-            {title}
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="flex items-center gap-3">
+            <div className={cn(
+              "p-2 rounded-lg",
+              type === 'file' 
+                ? "bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" 
+                : "bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
+            )}>
+              {type === 'file' ? (
+                <FilePlus className="h-5 w-5" />
+              ) : (
+                <FolderPlus className="h-5 w-5" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Create New {type === 'file' ? 'File' : 'Folder'}</h3>
+              <p className="text-sm text-muted-foreground font-normal">
+                in <Badge variant="outline" className="font-mono text-xs">{parentPath || '/'}</Badge>
+              </p>
+            </div>
           </DialogTitle>
-          <DialogDescription>
-            Create a new {type} in the selected directory.
-          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="parent-path">Parent Directory</Label>
-            <div className="text-sm text-muted-foreground bg-muted p-2 rounded font-mono">
-              {parentPath}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="item-name">{isFile ? 'File' : 'Directory'} Name</Label>
+        <div className="space-y-6">
+          {/* Name input */}
+          <div className="space-y-3">
+            <Label htmlFor="name" className="text-sm font-medium">
+              {type === 'file' ? 'File' : 'Folder'} Name
+            </Label>
             <Input
-              id="item-name"
               ref={inputRef}
-              type="text"
+              id="name"
               value={name}
-              onChange={(e) => handleInputChange(e.target.value)}
-              placeholder={placeholder}
-              className={error ? 'border-red-500 focus:border-red-500' : ''}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (error) setError(null);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={type === 'file' ? 'my-file.txt' : 'my-folder'}
+              className={cn(
+                "h-10",
+                error && "border-destructive focus-visible:ring-destructive"
+              )}
             />
+            
             {error && (
-              <p className="text-sm text-red-500">
-                {error}
-              </p>
+              <Alert variant="destructive" className="py-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  {error}
+                </AlertDescription>
+              </Alert>
             )}
           </div>
 
           {/* File extension suggestions for files */}
-          {isFile && (
-            <div className="space-y-2">
-              <Label>Common Extensions</Label>
+          {type === 'file' && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Quick Extensions
+                </Label>
+              </div>
               <div className="flex flex-wrap gap-2">
-                {['.txt', '.md', '.js', '.ts', '.py', '.json', '.html', '.css'].map((ext) => (
+                {fileExtensions.map((ext) => (
                   <Button
                     key={ext}
-                    type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const baseName = name.replace(/\.[^/.]+$/, ''); // Remove existing extension
-                      handleInputChange(baseName + ext);
+                      const baseName = name.split('.')[0] || 'untitled';
+                      setName(`${baseName}${ext}`);
+                      if (error) setError(null);
                     }}
-                    className="h-7 px-2 text-xs"
+                    className="h-7 px-3 text-xs font-mono hover:bg-accent"
                   >
                     {ext}
                   </Button>
@@ -160,19 +198,29 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
               </div>
             </div>
           )}
+        </div>
 
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={!!error || !name.trim()}
-            >
-              Create {isFile ? 'File' : 'Directory'}
-            </Button>
-          </div>
-        </form>
+        <Separator />
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirm} 
+            disabled={!name.trim()}
+            className="min-w-[100px]"
+          >
+            <div className="flex items-center gap-2">
+              {type === 'file' ? (
+                <FilePlus className="h-4 w-4" />
+              ) : (
+                <FolderPlus className="h-4 w-4" />
+              )}
+              Create
+            </div>
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

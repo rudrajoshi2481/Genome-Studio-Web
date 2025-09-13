@@ -5,13 +5,18 @@
 
 import React, { memo, useCallback } from 'react';
 import { 
-  ChevronRightIcon, 
-  ChevronDownIcon
+  ChevronRight, 
+  ChevronDown,
+  File,
+  Folder,
+  FolderOpen
 } from 'lucide-react';
 import { FileNode } from '../types';
 import { useFileExplorerStore } from '../store/fileExplorerStore';
 import { FileContextMenu } from './ContextMenu';
 import { FileIconComponent } from '../utils/fileIcons';
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface FileTreeNodeProps {
   node: FileNode;
@@ -168,11 +173,12 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
       {/* Current node */}
       <FileContextMenu node={node} onAction={handleContextAction}>
         <div
-          className={`
-            flex items-center py-1 px-2 rounded cursor-pointer group
-            hover:bg-gray-100 dark:hover:bg-gray-700
-            ${isSelected ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100' : ''}
-          `}
+          className={cn(
+            "flex items-center py-1.5 px-2 rounded-md cursor-pointer group transition-all duration-200",
+            "hover:bg-accent hover:text-accent-foreground",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            isSelected && "bg-accent text-accent-foreground shadow-sm"
+          )}
           style={{ paddingLeft: `${level * 16 + 8}px` }}
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
@@ -184,17 +190,19 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
         >
           {/* Expand/collapse button for directories */}
           {node.is_dir ? (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleToggle}
-              className="flex-shrink-0 p-0.5 mr-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+              className="h-5 w-5 p-0 mr-1 hover:bg-accent/50 flex-shrink-0"
               aria-label={isExpanded ? 'Collapse' : 'Expand'}
             >
               {isExpanded ? (
-                <ChevronDownIcon className="w-4 h-4" />
+                <ChevronDown className="h-3 w-3" />
               ) : (
-                <ChevronRightIcon className="w-4 h-4" />
+                <ChevronRight className="h-3 w-3" />
               )}
-            </button>
+            </Button>
           ) : (
             <div className="w-5 mr-1" /> // Spacer for alignment
           )}
@@ -204,24 +212,24 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
             fileName={node.name} 
             isDirectory={node.is_dir} 
             size={16} 
-            className={`mr-2 flex-shrink-0 ${iconColor}`} 
+            className={cn("mr-2 flex-shrink-0 transition-colors", iconColor)} 
           />
 
           {/* File/folder name */}
-          <span className="flex-1 truncate text-sm">
+          <span className="flex-1 truncate text-sm font-medium">
             {node.name}
           </span>
 
           {/* File size for files */}
           {!node.is_dir && node.size !== undefined && (
-            <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+            <span className="text-xs text-muted-foreground ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               {formatFileSize(node.size)}
             </span>
           )}
 
           {/* Child count for directories */}
           {node.is_dir && node.children && node.children.length > 0 && (
-            <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+            <span className="text-xs text-muted-foreground ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               {node.children.length}
             </span>
           )}

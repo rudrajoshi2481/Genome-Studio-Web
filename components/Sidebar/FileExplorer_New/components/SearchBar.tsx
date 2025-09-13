@@ -9,9 +9,23 @@ import {
   X, 
   Filter, 
   File, 
-  Folder 
+  Folder,
+  Loader2
 } from 'lucide-react';
 import { SearchFilters } from '../types';
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 interface SearchBarProps {
   onSearch: (query: string, filters?: SearchFilters) => void;
@@ -90,213 +104,229 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     }
   }, [showFilters]);
 
+  const hasActiveFilters = Object.values(filters).some(v => 
+    Array.isArray(v) ? v.length > 0 : v === true
+  );
+
   return (
-    <div className={`relative ${className}`}>
-      {/* Search input */}
+    <div className={cn("relative", className)}>
+      {/* Modern Search Input */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           {isSearching ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent" />
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           ) : (
-            <Search className="h-4 w-4 text-gray-400" />
+            <Search className="h-4 w-4 text-muted-foreground" />
           )}
         </div>
         
-        <input
+        <Input
           ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search files..."
-          className="w-full pl-10 pr-20 py-2 text-sm border-0 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-600"
+          placeholder="Search files and folders..."
+          className="pl-10 pr-20 h-9 bg-background border-input focus-visible:ring-2 focus-visible:ring-ring"
         />
         
-        <div className="absolute inset-y-0 right-0 flex items-center">
+        <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
           {/* Clear button */}
           {query && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleClear}
-              className="p-1 mr-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-              title="Clear search"
+              className="h-6 w-6 p-0 hover:bg-accent"
             >
-              <X className="h-4 w-4" />
-            </button>
+              <X className="h-3 w-3" />
+            </Button>
           )}
           
-          {/* Filters button */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`p-1 mr-2 rounded ${
-              showFilters || Object.values(filters).some(v => 
-                Array.isArray(v) ? v.length > 0 : v === true
-              ) 
-                ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400' 
-                : 'hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400'
-            }`}
-            title="Search filters"
-          >
-            <Filter className="h-4 w-4" />
-          </button>
+          {/* Filters popover */}
+          <Popover open={showFilters} onOpenChange={setShowFilters}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={hasActiveFilters ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-6 w-6 p-0",
+                  hasActiveFilters 
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90" 
+                    : "hover:bg-accent"
+                )}
+              >
+                <Filter className="h-3 w-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-4" align="end">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm">Search Filters</h4>
+                  {hasActiveFilters && (
+                    <Badge variant="secondary" className="text-xs">
+                      {Object.values(filters).filter(v => 
+                        Array.isArray(v) ? v.length > 0 : v === true
+                      ).length} active
+                    </Badge>
+                  )}
+                </div>
+
+                
+                <Separator />
+                
+                {/* File types */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">File Types</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {['files', 'directories'].map((type) => (
+                      <Button
+                        key={type}
+                        variant={filters.file_types?.includes(type) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          const newTypes = filters.file_types?.includes(type)
+                            ? filters.file_types.filter(t => t !== type)
+                            : [...(filters.file_types || []), type];
+                          handleFilterChange({ file_types: newTypes });
+                        }}
+                        className="h-7 px-3 text-xs"
+                      >
+                        {type === 'files' ? (
+                          <File className="h-3 w-3 mr-1" />
+                        ) : (
+                          <Folder className="h-3 w-3 mr-1" />
+                        )}
+                        {type}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* File extensions */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Common Extensions</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {['.js', '.ts', '.py', '.java', '.cpp', '.html', '.css', '.json', '.md', '.txt'].map((ext) => (
+                      <Button
+                        key={ext}
+                        variant={filters.file_types?.includes(ext) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          const newTypes = filters.file_types?.includes(ext)
+                            ? filters.file_types.filter(t => t !== ext)
+                            : [...(filters.file_types || []), ext];
+                          handleFilterChange({ file_types: newTypes });
+                        }}
+                        className="h-6 px-2 text-xs font-mono"
+                      >
+                        {ext}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Search options */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Search Options</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="include-content"
+                        checked={filters.include_content || false}
+                        onCheckedChange={(checked) => handleFilterChange({ include_content: !!checked })}
+                      />
+                      <Label htmlFor="include-content" className="text-sm font-normal">
+                        Search file contents
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="case-sensitive"
+                        checked={filters.case_sensitive || false}
+                        onCheckedChange={(checked) => handleFilterChange({ case_sensitive: !!checked })}
+                      />
+                      <Label htmlFor="case-sensitive" className="text-sm font-normal">
+                        Case sensitive
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="regex"
+                        checked={filters.regex || false}
+                        onCheckedChange={(checked) => handleFilterChange({ regex: !!checked })}
+                      />
+                      <Label htmlFor="regex" className="text-sm font-normal">
+                        Regular expressions
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Max results */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Max Results</Label>
+                    <Badge variant="outline" className="text-xs">
+                      {filters.max_results}
+                    </Badge>
+                  </div>
+                  <Slider
+                    value={[filters.max_results || 100]}
+                    onValueChange={([value]) => handleFilterChange({ max_results: value })}
+                    max={1000}
+                    min={10}
+                    step={10}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>10</span>
+                    <span>1000</span>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Actions */}
+                <div className="flex justify-between gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const resetFilters: SearchFilters = {
+                        file_types: [],
+                        include_content: false,
+                        case_sensitive: false,
+                        regex: false,
+                        max_results: 100
+                      };
+                      setFilters(resetFilters);
+                      if (query.trim()) {
+                        onSearch(query, resetFilters);
+                      }
+                    }}
+                    className="flex-1"
+                  >
+                    Reset
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    onClick={() => setShowFilters(false)}
+                    className="flex-1"
+                  >
+                    Apply
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
-
-      {/* Filters dropdown */}
-      {showFilters && (
-        <div 
-          ref={filtersRef}
-          className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
-        >
-          <div className="p-4 space-y-4">
-            {/* File types */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                File Types
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {['files', 'directories'].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => {
-                      const newTypes = filters.file_types?.includes(type)
-                        ? filters.file_types.filter(t => t !== type)
-                        : [...(filters.file_types || []), type];
-                      handleFilterChange({ file_types: newTypes });
-                    }}
-                    className={`px-3 py-1 text-xs rounded-full border ${
-                      filters.file_types?.includes(type)
-                        ? 'bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200'
-                        : 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {type === 'files' ? (
-                      <File className="h-4 w-4 mr-2" />
-                    ) : (
-                      <Folder className="h-4 w-4 mr-2" />
-                    )}
-                    {type}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* File extensions */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Common Extensions
-              </label>
-              <div className="flex flex-wrap gap-1">
-                {['.js', '.ts', '.py', '.java', '.cpp', '.html', '.css', '.json', '.md', '.txt'].map((ext) => (
-                  <button
-                    key={ext}
-                    onClick={() => {
-                      const newTypes = filters.file_types?.includes(ext)
-                        ? filters.file_types.filter(t => t !== ext)
-                        : [...(filters.file_types || []), ext];
-                      handleFilterChange({ file_types: newTypes });
-                    }}
-                    className={`px-2 py-1 text-xs rounded border ${
-                      filters.file_types?.includes(ext)
-                        ? 'bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200'
-                        : 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {ext}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Search options */}
-            <div className="space-y-2">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={filters.include_content || false}
-                  onChange={(e) => handleFilterChange({ include_content: e.target.checked })}
-                  className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Search file contents
-                </span>
-              </label>
-              
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={filters.case_sensitive || false}
-                  onChange={(e) => handleFilterChange({ case_sensitive: e.target.checked })}
-                  className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Case sensitive
-                </span>
-              </label>
-              
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={filters.regex || false}
-                  onChange={(e) => handleFilterChange({ regex: e.target.checked })}
-                  className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Regular expressions
-                </span>
-              </label>
-            </div>
-
-            {/* Max results */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Max Results: {filters.max_results}
-              </label>
-              <input
-                type="range"
-                min="10"
-                max="1000"
-                step="10"
-                value={filters.max_results || 100}
-                onChange={(e) => handleFilterChange({ max_results: parseInt(e.target.value) })}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>10</span>
-                <span>1000</span>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => {
-                  const resetFilters: SearchFilters = {
-                    file_types: [],
-                    include_content: false,
-                    case_sensitive: false,
-                    regex: false,
-                    max_results: 100
-                  };
-                  setFilters(resetFilters);
-                  if (query.trim()) {
-                    onSearch(query, resetFilters);
-                  }
-                }}
-                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-              >
-                Reset Filters
-              </button>
-              
-              <button
-                onClick={() => setShowFilters(false)}
-                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

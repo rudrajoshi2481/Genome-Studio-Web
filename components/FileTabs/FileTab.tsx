@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react'
 import { X, FileText, FileCode, Palette, Globe, FileJson, FileType } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import UnsavedChangesDialog from './UnsavedChangesDialog'
+import { useEditorContext } from '../Editorwindow_new/context/EditorContext'
 
 interface FileTabProps {
   id: string
@@ -11,7 +13,7 @@ interface FileTabProps {
   isActive?: boolean
   isDirty?: boolean
   onActivate?: (id: string) => void
-  onClose?: (id: string) => void
+  onClose?: (id: string, forceClose?: boolean) => void
 }
 
 function FileTab({
@@ -24,11 +26,15 @@ function FileTab({
   onActivate,
   onClose
 }: FileTabProps) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+  
+  // Get editor context for save functionality
+  let editorContext: any = null;
+  try {
+    editorContext = useEditorContext();
+  } catch (error) {
+    // Editor context not available
+  }
 
   const getFileIcon = () => {
     const iconProps = { size: 14, className: "mr-1 flex-shrink-0" }
@@ -57,17 +63,80 @@ function FileTab({
 
   const handleActivate = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (onActivate && mounted) {
+    if (onActivate) {
       onActivate(id)
     }
   }
 
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (onClose && mounted) {
+    
+    console.log('🔍 FileTab: Attempting to close tab:', id, 'isDirty:', isDirty);
+    console.log('🔍 FileTab: Callback functions available:', {
+      hasOnClose: !!onClose,
+      handleCancelClose: !!handleCancelClose,
+      handleSaveAndClose: !!handleSaveAndClose,
+      handleCloseAnyway: !!handleCloseAnyway
+    });
+    
+    // Check if file has unsaved changes
+    if (isDirty) {
+      console.log('✋ FileTab: Tab is dirty, showing unsaved changes dialog');
+      setShowUnsavedDialog(true)
+      console.log('🔍 FileTab: showUnsavedDialog set to true');
+      return
+    }
+    
+    console.log('✅ FileTab: Tab is clean, closing immediately');
+    if (onClose) {
       onClose(id)
     }
   }
+  
+  // Handle unsaved changes dialog actions
+  const handleSaveAndClose = async () => {
+    // Try to save using the editor context
+    if (editorContext) {
+      try {
+        const saveSuccess = await editorContext.saveTab(id);
+        
+        if (saveSuccess) {
+          // Save successful, now close the tab
+          if (onClose) {
+            onClose(id);
+          }
+        } else {
+          console.error('Failed to save tab:', id);
+          return;
+        }
+      } catch (error) {
+        console.error('Error saving tab:', error);
+        return;
+      }
+    } else {
+      // If editor context is not available, fall back to old behavior
+      console.warn('Editor context not available, closing without save');
+      if (onClose) {
+        onClose(id);
+      }
+    }
+    setShowUnsavedDialog(false);
+  };
+
+  const handleCloseAnyway = () => {
+    console.log('🗑️ FileTab: Close Anyway clicked for tab:', id);
+    if (onClose) {
+      onClose(id, true); 
+      console.log('✅ FileTab: onClose called for tab with forceClose:', id);
+    } else {
+      console.error('❌ FileTab: onClose is not available');
+    }
+    setShowUnsavedDialog(false);
+  };
+
+  const handleCancelClose = () => {
+    setShowUnsavedDialog(false);
+  };
 
   return (
     <div 
@@ -76,13 +145,13 @@ function FileTab({
         'transition-colors duration-200',
         isActive ? 'bg-gray-100' : 'hover:bg-gray-50',
       )}
-      onClick={mounted ? handleActivate : undefined}
+      onClick={handleActivate}
       data-tab-id={id}
       title={path}
       suppressHydrationWarning
     >
-      {mounted ? getFileIcon() : <FileText size={14} className="mr-1 flex-shrink-0 text-gray-500" />}
-      <span className="truncate max-w-[100px]">{name}</span>
+      {getFileIcon()}
+      <span className="whitespace-nowrap">{name}</span>
       {isDirty && (
         <span 
           className="ml-1 text-orange-500 font-bold text-lg leading-none" 
@@ -91,17 +160,24 @@ function FileTab({
           •
         </span>
       )}
-      {mounted ? (
-        <button 
-          className="ml-2 opacity-0 group-hover:opacity-100 rounded p-0.5 hover:bg-gray-200 transition-all duration-150"
-          onClick={handleClose}
-          aria-label={`Close ${name} tab`}
-          type="button"
-        >
-          <X size={14} />
-        </button>
-      ) : (
-        <div className="ml-2 w-[22px] h-[22px]" />
+      <button 
+        className="ml-2 opacity-0 group-hover:opacity-100 rounded p-0.5 hover:bg-gray-200 transition-all duration-150"
+        onClick={handleClose}
+        aria-label={`Close ${name} tab`}
+        type="button"
+      >
+        <X size={14} />
+      </button>
+      
+      {/* Unsaved Changes Dialog */}
+      {showUnsavedDialog && (
+        <UnsavedChangesDialog
+          isOpen={showUnsavedDialog}
+          fileName={name}
+          onClose={handleCancelClose}
+          onSave={handleSaveAndClose}
+          onConfirm={handleCloseAnyway}
+        />
       )}
     </div>
   )

@@ -28,9 +28,12 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from "../ui/dialog";
+} from "@/components/ui/dialog";
 import * as authService from '@/lib/services/auth-service'
 import { host, port } from '@/config/server'
+import UnsavedChangesDialog from './UnsavedChangesDialog'
+import { Button } from '@/components/ui/button'
+import { useEditorContext } from '@/components/Editorwindow_new/context/EditorContext'
 
 interface FileTabsProps {
   initialFiles?: Array<{
@@ -58,14 +61,40 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const isClient = useIsClient(); // SSR protection for context menus
   
+  // Get editor context at the top level
+  let editorContext: any = null;
+  try {
+    editorContext = useEditorContext();
+  } catch (error) {
+    // Editor context not available (e.g., not within EditorProvider)
+    console.warn('EditorContext not available in FileTabs');
+  }
+  
   // Get state and actions from the store
-  const tabs = useTabStore(state => state.getAllTabs());
-  const activeTabId = useTabStore(state => state.activeTabId);
-  const addTab = useTabStore(state => state.addTab);
-  const removeTab = useTabStore(state => state.removeTab);
-  const activateTab = useTabStore(state => state.activateTab);
-  const getTab = useTabStore(state => state.getTab);
-  const setOptions = useTabStore(state => state.setOptions);
+  const { 
+    activeTabId, 
+    tabOrder, 
+    addTab, 
+    removeTab, 
+    forceRemoveTab,
+    activateTab, 
+    getTab, 
+    getAllTabs,
+    setTabDirty,
+    setOptions 
+  } = useTabStore();
+  
+  // Get tabs as array for rendering
+  const tabs = getAllTabs();
+
+  // State for unsaved changes dialog - MUST be declared before use
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [tabToClose, setTabToClose] = useState<string | null>(null);
+
+  // State for rename dialog
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newFileName, setNewFileName] = useState('');
+  const [currentTab, setCurrentTab] = useState<TabFile | null>(null);
 
   // Set options
   useEffect(() => {
@@ -74,7 +103,7 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
       allowDuplicates,
       autoSave
     });
-  }, [maxTabs, allowDuplicates, autoSave]);
+  }, [maxTabs, allowDuplicates, autoSave, setOptions]);
 
   // Handle tab events
   const handleTabClick = (tabId: string) => {
@@ -86,12 +115,90 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
     }
   };
 
-  const handleTabClose = (tabId: string) => {
+  const handleTabClose = (tabId: string, forceClose = false) => {
     const tab = getTab(tabId);
+    
+    console.log('🔍 FileTabs: Attempting to close tab:', tabId, 'isDirty:', tab?.isDirty, 'forceClose:', forceClose, 'tab:', tab);
+    
+    // Check if tab has unsaved changes (unless force closing)
+    if (tab && tab.isDirty && !forceClose) {
+      console.log('✋ FileTabs: Tab is dirty, showing unsaved changes dialog');
+      setTabToClose(tabId);
+      setShowUnsavedDialog(true);
+      return;
+    }
+    
+    console.log('✅ FileTabs: Closing tab immediately');
+    // Close tab immediately if no unsaved changes or force closing
     if (tab && onTabClose) {
       onTabClose(tabId, tab);
     }
-    removeTab(tabId);
+    
+    if (forceClose) {
+      forceRemoveTab(tabId);
+    } else {
+      removeTab(tabId);
+    }
+  };
+
+  // Handle unsaved changes dialog actions
+  const handleSaveAndClose = async () => {
+    if (tabToClose) {
+      const tab = getTab(tabToClose);
+      
+      // Try to save using the editor context
+      if (editorContext) {
+        try {
+          const saveSuccess = await editorContext.saveTab(tabToClose);
+          
+          if (saveSuccess) {
+            // Save successful, now close the tab
+            if (tab && onTabClose) {
+              onTabClose(tabToClose, tab);
+            }
+            removeTab(tabToClose);
+          } else {
+            // Save failed, don't close the tab
+            console.error('Failed to save tab:', tabToClose);
+            return;
+          }
+        } catch (error) {
+          console.error('Error saving tab:', error);
+          return;
+        }
+      } else {
+        // If editor context is not available, fall back to old behavior
+        console.warn('Editor context not available, using fallback save method');
+        if (tab && onTabClose) {
+          onTabClose(tabToClose, tab);
+        }
+        removeTab(tabToClose);
+      }
+    }
+    setShowUnsavedDialog(false);
+    setTabToClose(null);
+  };
+
+  const handleCloseAnyway = () => {
+    console.log('🗑️ FileTabs: handleCloseAnyway called for tab:', tabToClose);
+    if (tabToClose) {
+      const tab = getTab(tabToClose);
+      console.log('📋 FileTabs: Tab to close:', tab);
+      if (tab && onTabClose) {
+        onTabClose(tabToClose, tab);
+      }
+      // Use forceRemoveTab to bypass dirty check since user confirmed
+      console.log('🔥 FileTabs: Force removing tab...');
+      const removed = forceRemoveTab(tabToClose);
+      console.log('✅ FileTabs: Tab removal result:', removed);
+    }
+    setShowUnsavedDialog(false);
+    setTabToClose(null);
+  };
+
+  const handleCancelClose = () => {
+    setShowUnsavedDialog(false);
+    setTabToClose(null);
   };
 
   // Allow horizontal scrolling with mouse wheel
@@ -102,10 +209,6 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
     }
   };
 
-  // State for rename dialog
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [newFileName, setNewFileName] = useState('');
-  const [currentTab, setCurrentTab] = useState<TabFile | null>(null);
 
   // Handle file rename
   const handleRename = async (tabId: string) => {
@@ -150,8 +253,9 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
             extension: newFileName.includes('.') ? newFileName.split('.').pop() || '' : ''
           };
           
-          // Update tab in store
-          useTabStore.getState().updateTab(currentTab.id, updatedTab);
+          // Update tab in store using the hook
+          const { updateTab } = useTabStore.getState();
+          updateTab(currentTab.id, updatedTab);
           
           // Notify parent component
           if (onTabChange) {
@@ -211,7 +315,6 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
         ref={containerRef}
       >
         {tabs.map(tab => (
-          
           <ContextMenu key={tab.id}>
             <ContextMenuTrigger>
               <FileTab
@@ -256,22 +359,30 @@ const FileTabsStore: React.FC<FileTabsProps> = ({
           </div>
           <DialogFooter>
             <div className="flex justify-end space-x-2">
-              <button 
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded"
+              <Button 
+                variant="outline"
                 onClick={() => setIsRenaming(false)}
               >
                 Cancel
-              </button>
-              <button 
-                className="px-4 py-2 bg-blue-500 text-white rounded"
+              </Button>
+              <Button 
                 onClick={submitRename}
               >
                 Rename
-              </button>
+              </Button>
             </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Unsaved Changes Dialog */}
+      <UnsavedChangesDialog
+        isOpen={showUnsavedDialog}
+        fileName={tabToClose ? getTab(tabToClose)?.name || 'Unknown file' : ''}
+        onClose={handleCancelClose}
+        onSave={handleSaveAndClose}
+        onConfirm={handleCloseAnyway}
+      />
     </>
   );
 };

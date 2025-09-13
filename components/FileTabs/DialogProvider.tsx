@@ -2,6 +2,7 @@ import React from 'react'
 import { useDialogStore } from './useDialogStore'
 import { useTabStore } from './useTabStore'
 import UnsavedChangesDialog from './UnsavedChangesDialog'
+import { toast } from 'sonner'
 
 interface DialogProviderProps {
   children: React.ReactNode
@@ -15,7 +16,33 @@ const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
     closeUnsavedChangesDialog 
   } = useDialogStore()
   
-  const { removeTab } = useTabStore()
+  const { removeTab, saveTab } = useTabStore()
+  
+  const handleSaveAndClose = async () => {
+    if (pendingTabToClose) {
+      try {
+        // First, save the tab
+        const state = useTabStore.getState()
+        const tab = state.tabs.get(pendingTabToClose)
+        
+        if (tab) {
+          // Mark tab as saved (remove dirty flag)
+          saveTab(pendingTabToClose)
+          
+          // TODO: Here you would typically call your save API
+          // For now, we'll just simulate a successful save
+          toast.success(`${tab.name} saved successfully`)
+          
+          // Then close the tab
+          handleConfirmClose()
+        }
+      } catch (error) {
+        console.error('Error saving file:', error)
+        toast.error('Failed to save file')
+        // Don't close the dialog if save failed
+      }
+    }
+  }
   
   const handleConfirmClose = () => {
     if (pendingTabToClose) {
@@ -61,6 +88,7 @@ const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
         isOpen={isUnsavedChangesDialogOpen}
         fileName={fileName}
         onClose={closeUnsavedChangesDialog}
+        onSave={handleSaveAndClose}
         onConfirm={handleConfirmClose}
       />
     </>

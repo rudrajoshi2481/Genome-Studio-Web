@@ -4,16 +4,21 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import { CloudArrowUpIcon, XMarkIcon, DocumentIcon } from '@heroicons/react/24/outline';
+import { Upload, X, File, FolderOpen, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 interface UploadDialogProps {
   open: boolean;
@@ -90,64 +95,80 @@ export const UploadDialog: React.FC<UploadDialogProps> = ({
   return (
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CloudArrowUpIcon className="w-5 h-5 text-blue-600" />
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Upload className="h-5 w-5 text-primary" />
+              </div>
               Upload Files
             </DialogTitle>
             <DialogDescription>
-              Upload files to the selected directory.
+              Select files to upload to the target directory. Drag and drop or browse to select files.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Upload to</Label>
-              <div className="text-sm text-muted-foreground bg-muted p-2 rounded font-mono">
-                {targetPath}
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Target Directory</Label>
+              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
+                <FolderOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <code className="text-sm font-mono text-foreground truncate">
+                  {targetPath}
+                </code>
               </div>
             </div>
 
-            {/* Drop zone */}
-            <div
-              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                isDragOver
-                  ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-              }`}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
-              <CloudArrowUpIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mb-2">
-                Drag and drop files here, or
-              </p>
-              <Button
-                type="button"
-                variant="link"
+            <Separator />
+
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">File Selection</Label>
+              <div
+                className={cn(
+                  "border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 cursor-pointer",
+                  "hover:border-primary/50 hover:bg-accent/50",
+                  isDragOver
+                    ? "border-primary bg-primary/5 scale-[1.02]"
+                    : "border-muted-foreground/25"
+                )}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
                 onClick={() => fileInputRef.current?.click()}
-                className="p-0 h-auto font-medium"
               >
-                browse files
-              </Button>
+                <Upload className={cn(
+                  "h-12 w-12 mx-auto mb-4 transition-colors",
+                  isDragOver ? "text-primary" : "text-muted-foreground"
+                )} />
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">
+                    {isDragOver ? "Drop files here" : "Drag and drop files here"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    or click to browse files
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Selected files */}
             {selectedFiles.length > 0 && (
-              <div className="space-y-2">
-                <Label>Selected Files ({selectedFiles.length})</Label>
-                <div className="max-h-40 overflow-y-auto space-y-2">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Selected Files</Label>
+                  <Badge variant="secondary" className="text-xs">
+                    {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}
+                  </Badge>
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-2 border rounded-lg p-2">
                   {selectedFiles.map((file, index) => (
                     <div
                       key={`${file.name}-${index}`}
-                      className="flex items-center justify-between p-2 bg-muted rounded"
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-md hover:bg-muted transition-colors"
                     >
-                      <div className="flex items-center flex-1 min-w-0">
-                        <DocumentIcon className="w-4 h-4 mr-2 text-muted-foreground flex-shrink-0" />
+                      <div className="flex items-center flex-1 min-w-0 gap-3">
+                        <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm truncate">
+                          <p className="text-sm font-medium truncate">
                             {file.name}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -160,33 +181,55 @@ export const UploadDialog: React.FC<UploadDialogProps> = ({
                         variant="ghost"
                         size="sm"
                         onClick={() => removeFile(index)}
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
+                        className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                       >
-                        <XMarkIcon className="w-4 h-4" />
+                        <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
                 </div>
                 
-                {/* Total size */}
-                <div className="text-xs text-muted-foreground">
-                  Total size: {formatFileSize(selectedFiles.reduce((sum, file) => sum + file.size, 0))}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    Total size: {formatFileSize(selectedFiles.reduce((sum, file) => sum + file.size, 0))}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedFiles([])}
+                    className="h-6 px-2 text-xs hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    Clear all
+                  </Button>
                 </div>
               </div>
             )}
 
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={onCancel}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleUpload}
-                disabled={selectedFiles.length === 0}
-              >
-                Upload {selectedFiles.length > 0 ? `${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}` : 'Files'}
-              </Button>
-            </div>
+            {selectedFiles.length === 0 && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  No files selected. Choose files to upload using the area above.
+                </AlertDescription>
+              </Alert>
+            )}
+
           </div>
+          
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpload}
+              disabled={selectedFiles.length === 0}
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Upload {selectedFiles.length > 0 ? `${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}` : 'Files'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

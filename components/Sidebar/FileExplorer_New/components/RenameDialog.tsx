@@ -4,17 +4,21 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { PencilIcon } from '@heroicons/react/24/outline';
+import { Edit3, File, Folder, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 interface RenameDialogProps {
   open: boolean;
@@ -98,9 +102,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
   };
 
   // Handle form submission
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    
+  const handleConfirm = () => {
     const validationError = validateName(name);
     if (validationError) {
       setError(validationError);
@@ -109,6 +111,17 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
 
     onConfirm(name.trim());
     onCancel(); // Close dialog after confirm
+  };
+
+  // Handle keyboard events
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleConfirm();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      onCancel();
+    }
   };
 
   // Get file extension for display
@@ -121,69 +134,93 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
   const newExtension = getFileExtension(name);
   const extensionChanged = currentExtension !== newExtension;
 
+  const isDirectory = !currentName.includes('.');
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <PencilIcon className="w-5 h-5 text-blue-600" />
-            Rename Item
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Edit3 className="h-5 w-5 text-primary" />
+            </div>
+            Rename {isDirectory ? 'Directory' : 'File'}
           </DialogTitle>
           <DialogDescription>
-            Enter a new name for the selected item.
+            Enter a new name for the selected {isDirectory ? 'directory' : 'file'}. Make sure the name follows your system's naming conventions.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="current-name">Current Name</Label>
-            <div className="text-sm text-muted-foreground bg-muted p-2 rounded font-mono">
-              {currentName}
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Current Name</Label>
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
+              {isDirectory ? (
+                <Folder className="h-4 w-4 text-blue-500 flex-shrink-0" />
+              ) : (
+                <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              )}
+              <code className="text-sm font-mono text-foreground">
+                {currentName}
+              </code>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="new-name">New Name</Label>
+          <Separator />
+
+          <div className="space-y-3">
+            <Label htmlFor="new-name" className="text-sm font-medium">New Name</Label>
             <Input
               id="new-name"
               ref={inputRef}
               type="text"
               value={name}
               onChange={(e) => handleInputChange(e.target.value)}
-              className={`font-mono ${error ? 'border-red-500 focus:border-red-500' : ''}`}
+              onKeyDown={handleKeyDown}
+              className={cn(
+                "font-mono",
+                error && "border-destructive focus-visible:ring-destructive"
+              )}
+              placeholder="Enter new name..."
             />
             {error && (
-              <p className="text-sm text-red-500">
-                {error}
-              </p>
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {error}
+                </AlertDescription>
+              </Alert>
             )}
           </div>
 
-          {/* Extension change warning */}
           {extensionChanged && currentExtension && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                <strong>Warning:</strong> You are changing the file extension from 
-                <code className="mx-1 px-1 bg-yellow-100 dark:bg-yellow-800 rounded">{currentExtension}</code>
-                to
-                <code className="mx-1 px-1 bg-yellow-100 dark:bg-yellow-800 rounded">{newExtension || '(none)'}</code>.
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Extension Change:</strong> You are changing the file extension from{' '}
+                <code className="mx-1 px-1 bg-muted rounded text-xs">{currentExtension}</code>
+                to{' '}
+                <code className="mx-1 px-1 bg-muted rounded text-xs">{newExtension || '(none)'}</code>.
                 This may affect how the file is handled by applications.
-              </p>
-            </div>
+              </AlertDescription>
+            </Alert>
           )}
 
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={!!error || !name.trim() || name === currentName}
-            >
-              Rename
-            </Button>
-          </div>
-        </form>
+        </div>
+        
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirm}
+            disabled={!!error || !name.trim() || name === currentName}
+            className="gap-2"
+          >
+            <Edit3 className="h-4 w-4" />
+            Rename
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

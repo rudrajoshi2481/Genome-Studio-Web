@@ -13,6 +13,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 
+
 function Nodebar() {
   const [customNodes, setCustomNodes] = useState<CustomNodeType[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -164,6 +165,7 @@ function Nodebar() {
                         draggable
                         onDragStart={(event) => {
                           // Set the drag data with the custom node information
+                          console.log('🎯 Nodebar: Drag start:', node);
                           event.dataTransfer.setData('application/reactflow', JSON.stringify(node));
                           event.dataTransfer.effectAllowed = 'move';
                         }}

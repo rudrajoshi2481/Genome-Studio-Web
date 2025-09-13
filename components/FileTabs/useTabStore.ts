@@ -27,6 +27,7 @@ interface TabState {
   // Actions
   addTab: (filePath: string, fileName?: string, content?: string) => string | null;
   removeTab: (tabId: string) => boolean;
+  forceRemoveTab: (tabId: string) => boolean;
   closeTab: (tabId: string) => boolean;
   activateTab: (tabId: string) => boolean;
   updateTabContent: (tabId: string, content: string) => boolean;
@@ -209,6 +210,54 @@ export const useTabStore = create<TabState>()(
           activeTabId: newActiveTabId
         });
         
+        return true;
+      },
+      
+      forceRemoveTab: (tabId) => {
+        const state = get();
+        
+        console.log('🗑️ TabStore: Force removing tab:', tabId);
+        
+        // Ensure tabs is a Map
+        if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in forceRemoveTab');
+          return false;
+        }
+        
+        const tab = state.tabs.get(tabId);
+        if (!tab) {
+          console.warn('Tab not found for forceRemoveTab:', tabId);
+          return false;
+        }
+
+        // Skip dirty check - force remove regardless of state
+        const newTabs = new Map(state.tabs);
+        newTabs.delete(tabId);
+        
+        const newTabOrder = state.tabOrder.filter(id => id !== tabId);
+        
+        // Handle active tab removal
+        let newActiveTabId = state.activeTabId;
+        if (state.activeTabId === tabId) {
+          const currentIndex = state.tabOrder.indexOf(tabId);
+          if (newTabOrder.length > 0) {
+            if (currentIndex < newTabOrder.length) {
+              newActiveTabId = newTabOrder[currentIndex];
+            } else {
+              newActiveTabId = newTabOrder[newTabOrder.length - 1];
+            }
+          } else {
+            newActiveTabId = null;
+          }
+        }
+        
+        set({
+          tabs: newTabs,
+          tabOrder: newTabOrder,
+          activeTabId: newActiveTabId
+        });
+        
+        console.log('✅ TabStore: Tab force removed successfully:', tabId);
         return true;
       },
       

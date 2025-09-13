@@ -3,10 +3,13 @@
  * Based on the original FileExplorer class logic for reliable real-time updates
  */
 
+import { toast } from 'sonner';
 import { create } from 'zustand';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import * as authService from '@/lib/services/auth-service';
 import { fileExplorerApi } from '../services/api';
 import { host, port } from '@/config/server';
+import { useTabStore } from '@/components/FileTabs/useTabStore';
 
 // Import helper functions for upload conflict handling
 const buildUrl = (endpoint: string) => {
@@ -869,6 +872,27 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
         const node = get().nodes.get(path);
         const isDir = node ? node.is_dir : false;
         await fileExplorerApi.deleteItem(path, isDir);
+        
+        // Close any open tabs for deleted files/directories
+        const tabStore = useTabStore.getState();
+        const allTabs = tabStore.getAllTabs();
+        
+        // Find tabs that match the deleted path (exact match or within deleted directory)
+        const tabsToClose = allTabs.filter(tab => {
+          if (isDir) {
+            // If deleting a directory, close all tabs within that directory
+            return tab.path.startsWith(path + '/') || tab.path === path;
+          } else {
+            // If deleting a file, close the exact tab
+            return tab.path === path;
+          }
+        });
+        
+        // Close the matching tabs
+        tabsToClose.forEach(tab => {
+          tabStore.closeTab(tab.id);
+          console.log(`🗑️ Closed tab for deleted ${isDir ? 'directory' : 'file'}: ${tab.path}`);
+        });
       }
       
       // Refresh tree to remove deleted items
@@ -892,6 +916,56 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       const newPath = `${parentPath}/${newName}`.replace(/\/+/g, '/');
       
       await fileExplorerApi.renameItem(oldPath, newPath);
+      
+      // Update any open tabs for renamed files/directories
+      const tabStore = useTabStore.getState();
+      const allTabs = tabStore.getAllTabs();
+      
+      // Find tabs that match the renamed path
+      const tabsToUpdate = allTabs.filter(tab => {
+        const node = get().nodes.get(oldPath);
+        const isDir = node ? node.is_dir : false;
+        
+        if (isDir) {
+          // If renaming a directory, update all tabs within that directory
+          return tab.path.startsWith(oldPath + '/') || tab.path === oldPath;
+        } else {
+          // If renaming a file, update the exact tab
+          return tab.path === oldPath;
+        }
+      });
+      
+      // Update the matching tabs with new paths and names
+      tabsToUpdate.forEach(tab => {
+        const node = get().nodes.get(oldPath);
+        const isDir = node ? node.is_dir : false;
+        
+        let updatedPath: string;
+        let updatedName: string;
+        
+        if (isDir) {
+          // For directory renames, update the path prefix
+          if (tab.path === oldPath) {
+            updatedPath = newPath;
+            updatedName = newName;
+          } else {
+            // Update paths within the renamed directory
+            updatedPath = tab.path.replace(oldPath + '/', newPath + '/');
+            updatedName = updatedPath.substring(updatedPath.lastIndexOf('/') + 1);
+          }
+        } else {
+          // For file renames, update the exact path and name
+          updatedPath = newPath;
+          updatedName = newName;
+        }
+        
+        tabStore.updateTab(tab.id, {
+          path: updatedPath,
+          name: updatedName
+        });
+        
+        console.log(`✏️ Updated tab: ${tab.path} → ${updatedPath}`);
+      });
       
       // Refresh tree to show renamed item
       await get().loadFileTree();
@@ -956,7 +1030,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
               formData.append('file', file);
 
               // Get auth token for upload (no Content-Type header for FormData)
-              const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+              const token = typeof window !== 'undefined' ? useAuthStore.getState().token : null;
               const uploadHeaders: Record<string, string> = {};
               if (token) {
                 uploadHeaders['Authorization'] = `Bearer ${token}`;

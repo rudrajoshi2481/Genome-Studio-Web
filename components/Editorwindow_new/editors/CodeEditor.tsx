@@ -50,8 +50,12 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     setSaved,
     getEditor,
     setSyncStatus,
-    state: { globalSettings }
+    registerSaveCallback, 
+    unregisterSaveCallback,
+    state
   } = useEditorContext()
+  
+  const globalSettings = state.globalSettings
   
   const { updateTab } = useTabStore()
   const editor = getEditor(tabId)
@@ -222,13 +226,27 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   }, [extension, filePath])
 
-  // Handle keyboard shortcuts with minimal logging
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault()
-      saveFileContent()
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        saveFileContent()
+      }
     }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [saveFileContent])
+
+  // Register save callback
+  useEffect(() => {
+    registerSaveCallback(tabId, saveFileContent);
+    
+    return () => {
+      unregisterSaveCallback(tabId);
+    };
+  }, [tabId, registerSaveCallback, unregisterSaveCallback, saveFileContent])
 
   // Initialize CodeMirror editor
   useEffect(() => {
@@ -421,11 +439,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   }, [editor?.content, editor?.isDirty, isTyping])
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
+  // Note: Keyboard shortcuts are handled in the earlier useEffect
 
   // Cleanup auto-save timeout
   useEffect(() => {
