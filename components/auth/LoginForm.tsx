@@ -3,94 +3,239 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+import { host, port } from '@/config/server';
 
 export default function LoginForm() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerError, setRegisterError] = useState('');
   
   // Use auth store
   const { login, isLoading, error, clearError } = useAuthStore();
   
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Ensure the redirect path doesn't start with a slash if it's already in the URL
   const redirectParam = searchParams.get('redirect');
   const redirect = redirectParam ? redirectParam.replace(/^\//, '') : 'dashboard';
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     console.log('Attempting login with username:', username);
     
-    // Use the login function from auth store
     const success = await login(username, password);
     
     if (success) {
-      // Redirect to the original destination or dashboard
-      // Ensure we use the correct path format
       router.push(`/dashboard`);
       console.log(`Redirecting to: /dashboard`);
     }
   };
   
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegisterError('');
+    
+    // Validation
+    if (registerPassword !== confirmPassword) {
+      setRegisterError('Passwords do not match');
+      return;
+    }
+    
+    if (registerPassword.length < 8) {
+      setRegisterError('Password must be at least 8 characters');
+      return;
+    }
+    
+    setRegisterLoading(true);
+    
+    try {
+      const response = await fetch(`http://${host}:${port}/api/v1/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          email,
+          password: registerPassword,
+          full_name: fullName || null,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Registration failed');
+      }
+      
+      toast.success('Account created successfully! Please sign in.');
+      
+      // Switch to login tab
+      setPassword(registerPassword);
+      setRegisterPassword('');
+      setConfirmPassword('');
+      setEmail('');
+      setFullName('');
+      
+    } catch (err: any) {
+      setRegisterError(err.message || 'Failed to create account');
+      toast.error(err.message || 'Failed to create account');
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+  
   return (
-    <div className="w-full max-w-md space-y-8 rounded-lg border p-6 shadow-md">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold">Genome Studio</h1>
-        <h2 className="mt-2 text-xl">Sign in to your account</h2>
-      </div>
+    <Card className="w-full max-w-md">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">Genome Studio</CardTitle>
+        <CardDescription>Sign in or create a new account</CardDescription>
+      </CardHeader>
       
-      {error && (
-        <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-      
-      <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-        <div className="space-y-4 rounded-md shadow-sm">
-          <div>
-            <label htmlFor="username" className="block text-sm font-medium">
-              Username
-            </label>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </div>
+      <CardContent>
+        <Tabs defaultValue="login" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="login">Sign In</TabsTrigger>
+            <TabsTrigger value="register">Create Account</TabsTrigger>
+          </TabsList>
           
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-        </div>
-        
-        <div>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-300"
-          >
-            {isLoading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </div>
-      </form>
-    </div>
+          {/* Login Tab */}
+          <TabsContent value="login">
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-username">Username</Label>
+                <Input
+                  id="login-username"
+                  type="text"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Password</Label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Signing in...' : 'Sign In'}
+              </Button>
+            </form>
+          </TabsContent>
+          
+          {/* Register Tab */}
+          <TabsContent value="register">
+            {registerError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{registerError}</AlertDescription>
+              </Alert>
+            )}
+            
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="register-username">Username *</Label>
+                <Input
+                  id="register-username"
+                  type="text"
+                  placeholder="Choose a username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  minLength={3}
+                  maxLength={50}
+                />
+                <p className="text-xs text-muted-foreground">3-50 characters, alphanumeric only</p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="register-email">Email *</Label>
+                <Input
+                  id="register-email"
+                  type="email"
+                  placeholder="your.email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="register-fullname">Full Name (Optional)</Label>
+                <Input
+                  id="register-fullname"
+                  type="text"
+                  placeholder="Your full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="register-password">Password *</Label>
+                <Input
+                  id="register-password"
+                  type="password"
+                  placeholder="Create a password"
+                  value={registerPassword}
+                  onChange={(e) => setRegisterPassword(e.target.value)}
+                  required
+                  minLength={8}
+                />
+                <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password *</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <Alert>
+                <AlertDescription className="text-xs">
+                  ℹ️ The first user created will automatically be an admin.
+                </AlertDescription>
+              </Alert>
+              
+              <Button type="submit" className="w-full" disabled={registerLoading}>
+                {registerLoading ? 'Creating Account...' : 'Create Account'}
+              </Button>
+            </form>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 }

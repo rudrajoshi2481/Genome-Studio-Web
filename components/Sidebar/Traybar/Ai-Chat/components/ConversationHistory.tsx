@@ -76,7 +76,7 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
       case 'analysis':
         return 'Genomic Data Analyst';
       default:
-        return 'Genome Speed';
+        return 'Genome Studio AI';
     }
   };
 

@@ -1,6 +1,45 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "xterm/css/xterm.css";
+
+/* Enable text selection in xterm terminal */
+.xterm {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  cursor: text !important;
+}
+
+.xterm .xterm-screen {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text !important;
+}
+
+.xterm .xterm-rows {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* Selection highlight styling */
+.xterm .xterm-selection div {
+  background-color: rgba(59, 130, 246, 0.4) !important;
+  position: absolute !important;
+  pointer-events: none !important;
+}
+
+/* Alternative: Use CSS ::selection for better visibility */
+.xterm ::selection {
+  background-color: rgba(59, 130, 246, 0.5) !important;
+  color: inherit !important;
+}
+
+.xterm ::-moz-selection {
+  background-color: rgba(59, 130, 246, 0.5) !important;
+  color: inherit !important;
+}
+
 /* 
 /* Add this to your global CSS file */
 .react-flow__node.node-resizing {

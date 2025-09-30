@@ -10,11 +10,18 @@ export interface Message {
   isComplete?: boolean
   conversationId?: string
   model?: string
+  toolName?: string
+  toolResult?: {
+    status?: string
+    error?: string
+    [key: string]: any
+  }
   metadata?: {
     toolName?: string
     toolArgs?: Record<string, any>
     toolIndex?: number
     totalTools?: number
+    iteration?: number
     toolResults?: Array<{
       status?: string
       filepath?: string

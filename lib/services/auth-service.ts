@@ -99,19 +99,30 @@ export function logout(): void {
  * @returns User information or null if not authenticated
  */
 export async function getCurrentUser(token?: string): Promise<any> {
+  console.log('🔍 [AUTH-SERVICE] getCurrentUser called');
+  
   try {
     // Get token from cookies if not provided
     if (!token) {
+      console.log('🔍 [AUTH-SERVICE] No token provided, checking cookies');
       const cookies = document.cookie.split(';');
+      console.log('🔍 [AUTH-SERVICE] All cookies:', cookies.map(c => c.split('=')[0].trim()));
+      
       const tokenCookie = cookies.find(cookie => cookie.trim().startsWith(`${config.auth.tokenStorageKey}=`));
+      
       if (!tokenCookie) {
-        console.log('No token found in cookies');
+        console.error('❌ [AUTH-SERVICE] No token found in cookies');
+        console.error('❌ [AUTH-SERVICE] Looking for key:', config.auth.tokenStorageKey);
         return null;
       }
+      
       token = tokenCookie.split('=')[1];
+      console.log('✅ [AUTH-SERVICE] Token found in cookies:', token.substring(0, 20) + '...');
+    } else {
+      console.log('✅ [AUTH-SERVICE] Token provided:', token.substring(0, 20) + '...');
     }
     
-    console.log('Fetching user profile from:', endpoints.auth.user);
+    console.log('🔍 [AUTH-SERVICE] Fetching user profile from:', endpoints.auth.user);
     
     // Make API request
     const response = await fetch(endpoints.auth.user, {
@@ -121,18 +132,26 @@ export async function getCurrentUser(token?: string): Promise<any> {
       },
     });
     
-    console.log('User profile response status:', response.status);
+    console.log('🔍 [AUTH-SERVICE] Response status:', response.status);
     
     if (!response.ok) {
-      console.error('Failed to get user profile:', response.status, response.statusText);
+      console.error('❌ [AUTH-SERVICE] Failed to get user profile');
+      console.error('❌ [AUTH-SERVICE] Status:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ [AUTH-SERVICE] Error:', errorText);
       return null;
     }
     
     const userData = await response.json();
-    console.log('User profile data:', userData);
+    console.log('✅ [AUTH-SERVICE] User profile data received:', {
+      id: userData.id,
+      username: userData.username,
+      email: userData.email,
+      is_admin: userData.is_admin
+    });
     return userData;
   } catch (error) {
-    console.error('Error getting current user:', error);
+    console.error('❌ [AUTH-SERVICE] Exception in getCurrentUser:', error);
     return null;
   }
 }

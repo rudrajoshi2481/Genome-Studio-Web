@@ -13,27 +13,20 @@ interface AIMessageProps {
 
 function AIMessage({ message }: AIMessageProps) {
   return (
-    <div className="flex gap-3 p-4 group min-w-0 overflow-hidden">
-      {/* Avatar */}
-      <Avatar className="h-8 w-8 flex-shrink-0 mt-1">
-        <AvatarFallback className="bg-blue-500 text-white">
-          <Bot className="h-4 w-4" />
-        </AvatarFallback>
-      </Avatar>
+    <div className="flex gap-3 px-4 py-3 group min-w-0 overflow-hidden hover:bg-muted/30 transition-colors">
+      {/* Minimal Avatar */}
+      <div className="flex-shrink-0 mt-1">
+        <div className="h-6 w-6 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+          <Bot className="h-3.5 w-3.5 text-white" />
+        </div>
+      </div>
 
       {/* Message Content */}
       <div className="flex-1 min-w-0 overflow-hidden">
-        {/* Header with name, timestamp and model */}
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <Badge variant="secondary" className="text-xs px-2 py-0.5 font-medium">
-            Genome Speed
-          </Badge>
-          {message.model && (
-            <Badge variant="outline" className="text-xs px-1 py-0">
-              {message.model}
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Minimal Header */}
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-xs font-medium text-foreground">Genome Studio AI</span>
+          <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
             {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { 
               hour: '2-digit', 
               minute: '2-digit' 
@@ -42,8 +35,8 @@ function AIMessage({ message }: AIMessageProps) {
         </div>
 
         {/* Message content with markdown */}
-        <div className="min-w-0 overflow-hidden">
-          <div className="prose prose-xs dark:prose-invert max-w-none min-w-0">
+        <div className="min-w-0 overflow-hidden w-full">
+          <div className="prose prose-xs dark:prose-invert max-w-none w-full break-words">
             <ReactMarkdown
               components={{
                 code({ node, className, children, ...props }: any) {
@@ -55,12 +48,15 @@ function AIMessage({ message }: AIMessageProps) {
                       style={oneDark as any}
                       language={match[1]}
                       PreTag="div"
-                      className="rounded-md !mt-2 !mb-2 overflow-x-auto"
+                      className="rounded-md !mt-2 !mb-2 overflow-x-auto max-w-full"
                       customStyle={{
                         fontSize: '0.75rem',
                         lineHeight: '1.25',
                         maxWidth: '100%',
-                        margin: 0
+                        width: '100%',
+                        margin: 0,
+                        overflowWrap: 'break-word',
+                        wordBreak: 'break-word'
                       }}
                       {...props}
                     >

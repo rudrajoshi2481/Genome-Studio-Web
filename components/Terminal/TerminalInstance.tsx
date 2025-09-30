@@ -200,7 +200,12 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
     <div style={{ width: '100%', height: '100%', position: 'relative' }} className="w-full h-full">
         <div 
           ref={terminalRef} 
-          style={{ width: '100%', height: '100%' }}  
+          style={{ 
+            width: '100%', 
+            height: '100%',
+            userSelect: 'text',
+            cursor: 'text'
+          }}  
           data-testid="terminal"
         />
         {/* Show loading state */}

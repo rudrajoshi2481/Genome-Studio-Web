@@ -545,7 +545,7 @@ const FileExplorer: React.FC = () => {
     >
       {/* Header with buttons - fixed height */}
       <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
-        <div className="text-sm font-medium">Explorer</div>
+        <div className="text-xs font-medium">Explorer</div>
         <div className="flex space-x-1">
           <button
             onClick={() => refreshFileTree()}
@@ -593,19 +593,19 @@ const FileExplorer: React.FC = () => {
       </div>
       
       {/* Breadcrumb navigation - fixed height */}
-      <div className="px-2 py-1 border-b flex-shrink-0">
+      <div className="px-2 py-1 border-b flex-shrink-0 text-xs">
         {fileTree && (
           <Breadcrumb>
-            <BreadcrumbList className="flex-wrap">
+            <BreadcrumbList className="flex-wrap text-xs">
               <BreadcrumbItem>
                 <BreadcrumbLink 
                   href="#" 
+                  className="text-xs"
                   onClick={(e) => {
                     e.preventDefault();
                     setRootPath('/home');
                     refreshFileTree();
                   }}
-                  className="flex items-center"
                 >
                   <HomeIcon className="h-3 w-3 mr-1" />
                   Home
@@ -614,27 +614,28 @@ const FileExplorer: React.FC = () => {
               
               {rootPath.split('/').slice(2).map((segment, index, array) => {
                 // Create path up to this segment
-                const pathToSegment = '/home/' + array.slice(0, index + 1).join('/');
+                const pathUpToSegment = '/home/' + rootPath.split('/').slice(2, index + 2).join('/');
                 
                 return (
                   <React.Fragment key={index}>
-                    <BreadcrumbSeparator />
+                    <BreadcrumbSeparator className="text-xs" />
                     <BreadcrumbItem>
                       {index === array.length - 1 ? (
-                        <span className="font-medium">{segment}</span>
+                        <span className="font-medium text-xs">{segment}</span>
                       ) : (
                         <BreadcrumbLink 
                           href="#" 
+                          className="text-xs"
                           onClick={(e) => {
                             e.preventDefault();
-                            setRootPath(pathToSegment);
+                            setRootPath(pathUpToSegment);
                             refreshFileTree();
                           }}
                         >
                           {segment}
                         </BreadcrumbLink>
                       )}
-                    </BreadcrumbItem>
+                      </BreadcrumbItem>
                   </React.Fragment>
                 );
               })}

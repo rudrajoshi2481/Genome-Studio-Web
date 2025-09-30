@@ -48,7 +48,7 @@ export const useChatWebSocket = () => {
           break;
         case 'stream':
           const { currentStreamingMessageId: streamingId } = useChatStore.getState();
-          if (!streamingId) {
+          if (!streamingId && message.content) {
             const messageId = addMessage({
               type: 'ai',
               role: 'assistant',
@@ -57,13 +57,18 @@ export const useChatWebSocket = () => {
               isComplete: false
             });
             setStreamingMessage(messageId);
-          } else {
+          } else if (streamingId) {
             updateStreamingMessage(message.content, message.is_complete);
           }
           if (message.is_complete) {
             setStreamingMessage(null);
             setLoading(false);
           }
+          break;
+        case 'complete':
+          // Handle completion message
+          setStreamingMessage(null);
+          setLoading(false);
           break;
         case 'thinking':
           addMessage({
@@ -88,8 +93,9 @@ export const useChatWebSocket = () => {
           });
           break;
         case 'stream_chunk':
-          const { currentStreamingMessageId: streamingId2 } = useChatStore.getState();
+          const { currentStreamingMessageId: streamingId2, messages } = useChatStore.getState();
           if (!streamingId2) {
+            // Create new streaming message
             const messageId = addMessage({
               type: 'ai',
               role: 'assistant',
@@ -99,7 +105,10 @@ export const useChatWebSocket = () => {
             });
             setStreamingMessage(messageId);
           } else {
-            updateStreamingMessage(message.full_content, false);
+            // Accumulate chunks - get current content and append new chunk
+            const currentMessage = messages.find(m => m.id === streamingId2);
+            const newContent = (currentMessage?.content || '') + message.content;
+            updateStreamingMessage(newContent, false);
           }
           break;
         case 'followup_chunk':
@@ -118,66 +127,26 @@ export const useChatWebSocket = () => {
           }
           break;
         case 'tool_execution_start':
-          addMessage({
-            type: 'tool',
-            role: 'system',
-            content: `🔧 ${message.content} (Iteration ${message.iteration})`
-          });
+          // Don't add separate message for tool execution start
           break;
         case 'tool_start':
-          // Enhanced tool start message with detailed information
-          const toolArgs = message.tool_args || {};
-          let detailedContent = message.content;
-          
-          // Add file path information for file operations
-          if (message.tool_name === 'save_research_documents' && toolArgs.filename) {
-            detailedContent += `\n📁 **File**: ${toolArgs.filename}`;
-          } else if (message.tool_name === 'file_edit' && toolArgs.filepath) {
-            detailedContent += `\n📁 **File**: ${toolArgs.filepath}`;
-          } else if (message.tool_name === 'run_command' && toolArgs.working_directory) {
-            detailedContent += `\n📁 **Directory**: ${toolArgs.working_directory}`;
-          }
-          
+          // Add a single clean tool message
           addMessage({
             type: 'tool',
             role: 'system',
-            content: detailedContent,
+            content: message.content || `🔧 Executing: ${message.tool_name}`,
+            toolName: message.tool_name,
             metadata: {
               toolName: message.tool_name,
-              toolArgs: toolArgs,
+              toolArgs: message.tool_args || {},
               toolIndex: message.tool_index,
-              totalTools: message.total_tools
+              totalTools: message.total_tools,
+              iteration: message.iteration
             }
           });
           break;
         case 'tool_execution_complete':
-          // Enhanced completion message with file details
-          let completionContent = message.content;
-          
-          // Add file information from tool results
-          if (message.tool_results && message.tool_results.length > 0) {
-            const fileResults = message.tool_results.filter((result: any) => 
-              result.filepath || result.file_location
-            );
-            
-            if (fileResults.length > 0) {
-              completionContent += '\n\n📋 **Files Created/Modified**:';
-              fileResults.forEach((result: any) => {
-                const filePath = result.file_location || result.filepath;
-                const fileSize = result.file_size ? ` (${result.file_size} bytes)` : '';
-                completionContent += `\n• \`${filePath}\`${fileSize}`;
-              });
-            }
-          }
-          
-          addMessage({
-            type: 'tool',
-            role: 'system',
-            content: completionContent,
-            metadata: {
-              toolResults: message.tool_results || []
-            }
-          });
+          // Don't add separate completion message - let the AI response handle it
           break;
         case 'ai_followup':
           addMessage({
@@ -230,7 +199,13 @@ export const useChatWebSocket = () => {
     try {
       console.log('Sending message:', content);
       
-      // Don't add user message here - let backend confirmation handle it
+      // Add user message immediately for better UX
+      addMessage({
+        type: 'human',
+        role: 'user',
+        content: content
+      });
+      
       wsService.sendMessage({
         type: 'chat',
         content,

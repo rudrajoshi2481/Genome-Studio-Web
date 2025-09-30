@@ -7,11 +7,16 @@ const config = getServerConfig();
 
 // Define the user type
 export interface User {
-  id: string;
+  id: number;
   username: string;
   email?: string;
   full_name?: string;
+  avatar?: string;
+  bio?: string;
+  is_admin?: boolean;
   role?: string;
+  created_at?: string;
+  updated_at?: string;
   [key: string]: any; // Allow for additional properties
 }
 
@@ -39,12 +44,10 @@ const isBrowser = typeof window !== 'undefined';
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      isAuthenticated: isBrowser ? authService.isAuthenticated() : false,
+      isAuthenticated: false,
       user: null,
-      token: isBrowser ? authService.getToken() : null,
-      tokenExpiry: isBrowser && localStorage.getItem(config.auth.tokenExpiryKey) 
-        ? parseInt(localStorage.getItem(config.auth.tokenExpiryKey) || '0', 10) 
-        : null,
+      token: null,
+      tokenExpiry: null,
       isLoading: false,
       error: null,
       
@@ -149,12 +152,89 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Only persist these fields
+        // Persist authentication state and user info
         isAuthenticated: state.isAuthenticated,
         user: state.user,
+        tokenExpiry: state.tokenExpiry,
         // Don't persist token in localStorage for security
         // The actual token is stored in cookies by the auth service
       }),
+      onRehydrateStorage: () => (state) => {
+        console.log('🔄 [AUTH-STORE] Rehydration started');
+        
+        // After hydration, verify the token is still valid
+        if (state && isBrowser) {
+          console.log('🔄 [AUTH-STORE] State exists, checking authentication');
+          console.log('🔄 [AUTH-STORE] Current state:', {
+            isAuthenticated: state.isAuthenticated,
+            hasUser: !!state.user,
+            username: state.user?.username
+          });
+          
+          const isValid = authService.isAuthenticated();
+          const token = authService.getToken();
+          
+          console.log('🔄 [AUTH-STORE] Token validation:', {
+            isValid,
+            hasToken: !!token,
+            tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
+          });
+          
+          if (!isValid && state.isAuthenticated) {
+            console.warn('⚠️ [AUTH-STORE] Token expired, clearing auth state');
+            // Token expired, clear auth state
+            state.isAuthenticated = false;
+            state.user = null;
+            state.token = null;
+            state.tokenExpiry = null;
+          } else if (isValid && token) {
+            console.log('✅ [AUTH-STORE] Token is valid');
+            // Token exists and is valid
+            state.isAuthenticated = true;
+            state.token = token;
+            
+            // Fetch user data if not already present
+            if (!state.user) {
+              console.log('🔄 [AUTH-STORE] No user data, fetching from API...');
+              authService.getCurrentUser().then(user => {
+                if (user) {
+                  console.log('✅ [AUTH-STORE] User data fetched successfully:', {
+                    id: user.id,
+                    username: user.username,
+                    is_admin: user.is_admin
+                  });
+                  useAuthStore.setState({ 
+                    user,
+                    isAuthenticated: true,
+                    token,
+                    isLoading: false
+                  });
+                } else {
+                  console.error('❌ [AUTH-STORE] User data fetch returned null');
+                }
+              }).catch((error) => {
+                console.error('❌ [AUTH-STORE] Error fetching user data:', error);
+                // If fetching user fails, clear auth state
+                useAuthStore.setState({
+                  isAuthenticated: false,
+                  user: null,
+                  token: null,
+                  tokenExpiry: null
+                });
+              });
+            } else {
+              console.log('✅ [AUTH-STORE] User data already present:', {
+                username: state.user.username,
+                is_admin: state.user.is_admin
+              });
+            }
+          } else {
+            console.log('ℹ️ [AUTH-STORE] No valid token found');
+          }
+        } else {
+          console.log('ℹ️ [AUTH-STORE] No state or not in browser');
+        }
+      },
     }
   )
 );

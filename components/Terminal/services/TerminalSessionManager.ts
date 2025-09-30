@@ -92,12 +92,19 @@ class TerminalSessionManager {
         theme: {
           background: '#ffffff',
           foreground: '#333333',
-          cursor: '#000000'
+          cursor: '#000000',
+          // Selection colors for better visibility
+          selectionBackground: 'rgba(59, 130, 246, 0.5)',
+          selectionForeground: '#000000',
+          selectionInactiveBackground: 'rgba(59, 130, 246, 0.3)'
         },
         rows: 24,
         cols: 80,
         allowTransparency: true,
-        allowProposedApi: true
+        allowProposedApi: true,
+        // Enable text selection
+        disableStdin: false,
+        convertEol: true
       }) as XTerminal;
 
       const fitAddon = new FitAddon();
@@ -240,9 +247,9 @@ class TerminalSessionManager {
           session.websocket = ws;
           session.isConnected = true;
           
-          // Clear terminal and show connection message
-          session.terminal.clear();
-          session.terminal.writeln('\x1b[32mTerminal connected successfully!\x1b[0m\r\n');
+          // Don't clear terminal or show connection message - let it start clean
+          // session.terminal.clear();
+          // session.terminal.writeln('\x1b[32mTerminal connected successfully!\x1b[0m\r\n');
           
           resolve(true);
         };

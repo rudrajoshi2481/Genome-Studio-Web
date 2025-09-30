@@ -11,7 +11,7 @@ function Appbar() {
   return (
     <div className='p-1 border-b flex justify-between items-center'>
         <div>
-          <span className="font-semibold text-sm">Genome Speed</span>
+          <span className="font-semibold text-sm">Genome Studio AI</span>
 
           </div>
 

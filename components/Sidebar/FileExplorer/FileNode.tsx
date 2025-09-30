@@ -80,7 +80,7 @@ const FileNode: React.FC<FileNodeProps> = ({
               <FileIconComponent fileName={node.name} isDirectory={node.is_dir} size={16} />
             </span>
             
-            <span className="text-sm truncate">{node.name}</span>
+            <span className="text-xs truncate">{node.name}</span>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>

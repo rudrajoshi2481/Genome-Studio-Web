@@ -1,76 +1,72 @@
 import React from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Wrench, CheckCircle, XCircle } from 'lucide-react'
-import { ToolMessage as ToolMessageType } from './chatStore'
+import { Terminal, Code2, FileEdit } from 'lucide-react'
+import { Message } from './chatStore'
+import ReactMarkdown from 'react-markdown'
 
 interface ToolMessageProps {
-  message: ToolMessageType
+  message: Message
 }
 
 function ToolMessage({ message }: ToolMessageProps) {
-  const hasResult = message.toolResult !== undefined
-  const isSuccess = hasResult && !message.toolResult?.error
+  const toolName = message.metadata?.toolName || message.toolName || 'tool'
+  
+  // Determine icon based on tool type
+  const getIcon = () => {
+    if (toolName === 'run_command') return <Terminal className="h-3.5 w-3.5" />
+    if (toolName === 'file_edit') return <FileEdit className="h-3.5 w-3.5" />
+    return <Code2 className="h-3.5 w-3.5" />
+  }
 
   return (
-    <div className="flex gap-3 p-4 group min-w-0 overflow-hidden">
-      {/* Tool Icon */}
+    <div className="flex gap-3 px-4 py-2 group">
+      {/* Minimal Icon */}
       <div className="flex-shrink-0 mt-1">
-        <div className="h-8 w-8 rounded-full bg-amber-500 text-white flex items-center justify-center">
-          <Wrench className="h-4 w-4" />
+        <div className="h-6 w-6 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+          {getIcon()}
         </div>
       </div>
 
-      {/* Message Content */}
-      <div className="flex-1 min-w-0 overflow-hidden">
-        {/* Header with tool name and timestamp */}
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <Badge variant="outline" className="text-xs px-2 py-0.5 font-medium">
-            {message.toolName}
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        {/* Tool badge */}
+        <div className="flex items-center gap-2 mb-1.5">
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal">
+            {toolName}
           </Badge>
-          {hasResult && (
-            <div className="flex items-center gap-1">
-              {isSuccess ? (
-                <CheckCircle className="h-3 w-3 text-green-500" />
-              ) : (
-                <XCircle className="h-3 w-3 text-red-500" />
-              )}
-              <span className="text-xs text-muted-foreground">
-                {isSuccess ? 'Success' : 'Error'}
-              </span>
-            </div>
-          )}
-          <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-            {message.timestamp.toLocaleTimeString([], { 
+          <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+            {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { 
               hour: '2-digit', 
               minute: '2-digit' 
-            })}
+            }) : ''}
           </span>
         </div>
 
-        {/* Tool content */}
-        <Card className="bg-amber-50 border-amber-200">
-          <CardContent className="p-3">
-            <div className="space-y-2">
-              {/* Tool execution message */}
-              <p className="text-xs text-amber-800 font-medium">
-                {message.content}
-              </p>
-              
-              {/* Tool result if available */}
-              {hasResult && (
-                <div className="mt-2 p-2 bg-white rounded border">
-                  <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words">
-                    {typeof message.toolResult === 'string' 
-                      ? message.toolResult 
-                      : JSON.stringify(message.toolResult, null, 2)
-                    }
-                  </pre>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Tool message with markdown support */}
+        <div className="prose prose-xs dark:prose-invert max-w-none">
+          <div className="text-xs text-muted-foreground leading-relaxed">
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                code: ({ className, children, ...props }: any) => {
+                  const inline = !className
+                  return inline ? (
+                    <code className="px-1 py-0.5 rounded bg-muted text-[11px] font-mono" {...props}>
+                      {children}
+                    </code>
+                  ) : (
+                    <pre className="mt-2 p-3 rounded-lg bg-muted/50 border overflow-x-auto">
+                      <code className="text-[11px] font-mono leading-relaxed block">{children}</code>
+                    </pre>
+                  )
+                },
+                strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        </div>
       </div>
     </div>
   )
