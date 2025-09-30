@@ -1,6 +1,7 @@
 import React, { memo, useCallback } from 'react'
 import { useTabStore } from '@/components/FileTabs/useTabStore'
 import FileTabs from '../FileTabs/FileTabs'
+import DialogProvider from '../FileTabs/DialogProvider'
 
 import FileTab from '../FileTabs/FileTab'
 import Image from 'next/image'
@@ -93,31 +94,33 @@ const EditorWindow = () => {
   const allTabs = useTabStore(state => state.getAllTabs())
   
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden">  
-      <EditorProvider>
-        {/* Tab bar */}
-        <div className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0">
-          {allTabs.map(tab => (
-            <FileTab 
-              key={tab.id}
-              id={tab.id} 
-              name={tab.name} 
-              path={tab.path} 
-              extension={tab.extension}
-              isActive={activeTab?.id === tab.id}
-              isDirty={tab.isDirty}
-              onActivate={handleActivate}
-              onClose={handleClose}
-            />
-          ))}
-        </div>
-        
-        {/* Editor */}
-        <div className="flex-1 overflow-hidden">
-          <EditorWindowContent />
-        </div>
-      </EditorProvider>
-    </div>
+    <DialogProvider>
+      <div className="h-full w-full flex flex-col overflow-hidden">  
+        <EditorProvider>
+          {/* Tab bar */}
+          <div className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0">
+            {allTabs.map(tab => (
+              <FileTab 
+                key={tab.id}
+                id={tab.id} 
+                name={tab.name} 
+                path={tab.path} 
+                extension={tab.extension}
+                isActive={activeTab?.id === tab.id}
+                isDirty={tab.isDirty}
+                onActivate={handleActivate}
+                onClose={handleClose}
+              />
+            ))}
+          </div>
+          
+          {/* Editor */}
+          <div className="flex-1 overflow-hidden">
+            <EditorWindowContent />
+          </div>
+        </EditorProvider>
+      </div>
+    </DialogProvider>
   )
 }
 

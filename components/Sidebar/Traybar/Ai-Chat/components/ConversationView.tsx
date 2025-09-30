@@ -1,37 +1,25 @@
-"use client";
-
 import React from 'react';
-import { useChatStore } from './components/chatStore';
-import { useChatWebSocket } from './hooks/useChatWebSocket';
-import ConversationHistory from './components/ConversationHistory';
-import Appbar from './Appbar';
-import Footer from './Footer';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import UserMessage from './components/UserMessage';
-import AIMessage from './components/AIMessage';
-import ToolMessage from './components/ToolMessage';
+import { ArrowLeft } from 'lucide-react';
+import { useChatStore, Message } from './chatStore';
+import UserMessage from './UserMessage';
+import AIMessage from './AIMessage';
+import ToolMessage from './ToolMessage';
+import Footer from '../Footer';
 
-function AIChat() {
-  const { 
-    showConversationHistory, 
-    setShowConversationHistory,
-    setCurrentConversation,
-    clearMessages,
-    messages
-  } = useChatStore();
-  const { sendMessage } = useChatWebSocket();
+interface ConversationViewProps {
+  onBackToHistory: () => void;
+  onSendMessage: (content: string) => void;
+}
 
-  const handleNewConversation = () => {
-    setCurrentConversation(null);
-    clearMessages();
-    setShowConversationHistory(false);
-  };
+const ConversationView: React.FC<ConversationViewProps> = ({ 
+  onBackToHistory, 
+  onSendMessage 
+}) => {
+  const { messages, isConnected, isLoading, currentConversationId } = useChatStore();
 
-  const handleSendMessage = (content: string) => {
-    sendMessage(content);
-  };
-
-  const renderMessage = (message: any) => {
+  const renderMessage = (message: Message) => {
     switch (message.type) {
       case 'human':
         return <UserMessage key={message.id} message={message} />;
@@ -62,10 +50,30 @@ function AIChat() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <Appbar />
-      
-      <div className='flex-1 overflow-hidden'>
+    <div className="flex flex-col h-full bg-background">
+      {/* Header with Back Button */}
+      <div className="p-4 border-b">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={onBackToHistory}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+          <div>
+            <h2 className="text-sm font-medium">AI Conversation</h2>
+            <p className="text-xs text-muted-foreground">
+              {currentConversationId ? `ID: ${currentConversationId.slice(0, 8)}...` : 'New conversation'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full w-full">
           <div className="w-full">
             {messages.length === 0 ? (
@@ -112,19 +120,12 @@ function AIChat() {
         </ScrollArea>
       </div>
 
-      {/* Conversation History Cards - Show above footer when toggled
-      {showConversationHistory && (
-        <div className="border-t bg-background">
-          <ConversationHistory onNewConversation={handleNewConversation} />
-        </div>
-      )} */}
-
-      <div className='mb-6 mx-3 shadow-md'>
-        <Footer onSendMessage={handleSendMessage} />
+      {/* Footer */}
+      <div className="mb-6 mx-3 shadow-md">
+        <Footer onSendMessage={onSendMessage} />
       </div>
     </div>
   );
-}
+};
 
-export default AIChat;
-
+export default ConversationView;

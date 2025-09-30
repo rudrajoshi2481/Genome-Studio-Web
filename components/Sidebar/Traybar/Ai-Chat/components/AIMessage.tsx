@@ -5,10 +5,10 @@ import { Bot } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { AIMessage as AIMessageType } from './chatStore'
+import { Message } from './chatStore'
 
 interface AIMessageProps {
-  message: AIMessageType
+  message: Message
 }
 
 function AIMessage({ message }: AIMessageProps) {
@@ -34,10 +34,10 @@ function AIMessage({ message }: AIMessageProps) {
             </Badge>
           )}
           <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-            {message.timestamp.toLocaleTimeString([], { 
+            {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { 
               hour: '2-digit', 
               minute: '2-digit' 
-            })}
+            }) : ''}
           </span>
         </div>
 

@@ -11,7 +11,7 @@ interface FileTabProps {
   isActive?: boolean
   isDirty?: boolean
   onActivate?: (id: string) => void
-  onClose?: (id: string) => void
+  onClose?: (id: string, forceClose?: boolean) => void
 }
 
 function FileTab({
@@ -52,7 +52,9 @@ function FileTab({
 
   const handleActivate = (e: React.MouseEvent) => {
     e.stopPropagation()
-    onActivate?.(id)
+    if (onActivate) {
+      onActivate(id)
+    }
   }
 
   const handleClose = (e: React.MouseEvent) => {

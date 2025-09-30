@@ -25,6 +25,7 @@ const UnsavedChangesDialog: React.FC<UnsavedChangesDialogProps> = ({
   onSave,
   onConfirm
 }) => {
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>

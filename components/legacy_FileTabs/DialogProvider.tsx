@@ -15,7 +15,7 @@ const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
     closeUnsavedChangesDialog 
   } = useDialogStore()
   
-  const { saveTab, forceRemoveTab } = useTabStore()
+  const { removeTab, saveTab } = useTabStore()
   
   const handleSaveAndClose = () => {
     if (pendingTabToClose) {
@@ -28,7 +28,8 @@ const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
   
   const handleConfirmClose = () => {
     if (pendingTabToClose) {
-      // Force remove the tab without checking dirty state
+      // Use the store's forceRemoveTab method
+      const { forceRemoveTab } = useTabStore.getState()
       forceRemoveTab(pendingTabToClose)
     }
     closeUnsavedChangesDialog()

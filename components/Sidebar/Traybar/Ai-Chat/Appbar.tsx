@@ -16,17 +16,6 @@ function Appbar() {
           </div>
 
 <div>
-  <Tooltip>
-  <TooltipTrigger asChild>
-    <Button variant="ghost" size="sm">
-      <Plus />
-    </Button>
-  </TooltipTrigger>
-  <TooltipContent>
-    <p>Create New Conversation</p>
-  </TooltipContent>
-</Tooltip>
-     
 </div>
     </div>
   )

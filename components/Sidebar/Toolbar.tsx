@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Folder, LucideIcon, Workflow,KanbanSquare } from 'lucide-react'
+import { Folder, LucideIcon, Workflow,KanbanSquare, PackageSearch, Warehouse } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
@@ -19,6 +19,7 @@ import FileExplorerComponent from './FileExplorer/FileExplorer'
 import { FileExplorer_New } from './FileExplorer_New'
 import Nodebar from './Nodebar/Nodebar'
 import Settings from '../settings/Settings'
+import PackageManager from './PackageManager/PackageManager'
 
 /**
  * ToolbarItem represents an item in the sidebar toolbar
@@ -68,6 +69,18 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       icon: Workflow,
       type: "sidebar",
       component: () => <Nodebar />
+    },
+    {
+      name: "Package Manager",
+      icon: PackageSearch,
+      type: "sidebar",
+      component: () =>  <PackageManager />
+    },
+    {
+      name: "Storage Bucket",
+      icon: Warehouse,
+      type: "sidebar",
+      component: () => <>Directly mount storage bucket to any folder Google Drive / S3 Bucket etc...</>
     },
     // {
     //   name: "Git",

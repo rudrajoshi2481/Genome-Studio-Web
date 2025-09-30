@@ -2,10 +2,10 @@ import React from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { User } from 'lucide-react'
-import { HumanMessage } from './chatStore'
+import { Message } from './chatStore'
 
 interface UserMessageProps {
-  message: HumanMessage
+  message: Message
 }
 
 function UserMessage({ message }: UserMessageProps) {
@@ -24,10 +24,10 @@ function UserMessage({ message }: UserMessageProps) {
         {/* Header with name and timestamp */}
         <div className="flex items-center gap-2 mb-2 flex-wrap justify-end">
           <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-            {message.timestamp.toLocaleTimeString([], { 
+            {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { 
               hour: '2-digit', 
               minute: '2-digit' 
-            })}
+            }) : ''}
           </span>
           <Badge variant="default" className="text-xs px-2 py-0.5 font-medium">
             You

@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Database, Globe, Plus, SendHorizontal, Settings } from 'lucide-react'
+import { Database, Globe, Plus, SendHorizontal, Settings, MessageSquare } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ChatFeaturesDialog from './ChatFeaturesDialog'
+import { useChatStore } from './components/chatStore'
 
 interface FooterProps {
   onSendMessage?: (message: string) => void;
@@ -14,6 +15,7 @@ function Footer({ onSendMessage }: FooterProps = {}) {
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState('gpt-4')
+  const { showConversationHistory, setShowConversationHistory } = useChatStore()
 
   const handleModelChange = (value: string) => {
     setSelectedModel(value)
@@ -35,6 +37,10 @@ function Footer({ onSendMessage }: FooterProps = {}) {
     }
   }
 
+  const toggleConversationHistory = () => {
+    setShowConversationHistory(!showConversationHistory)
+  }
+
   return (
     <div className=" rounded-xl border">
       <div className="relative flex items-center min-w-0 ">
@@ -53,6 +59,17 @@ function Footer({ onSendMessage }: FooterProps = {}) {
      <div className="flex items-center gap-2">
   {/* Icon Buttons */}
   <div className="flex items-center gap-1 overflow-hidden">
+    {/* Conversation History Toggle */}
+    <Button 
+      size="sm" 
+      variant="ghost" 
+      className="h-6 w-6 p-0" 
+      title="Show conversation history"
+      onClick={toggleConversationHistory}
+    >
+      <MessageSquare size={14} />
+    </Button>
+    
     {/* Chat Features Dialog */}
     <ChatFeaturesDialog>
       <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Configure data sources and features">

@@ -60,11 +60,13 @@ const getFileExtension = (filePath: string): string => {
 const mapToObject = (map: Map<string, TabFile> | Record<string, TabFile>): Record<string, TabFile> => {
   const obj: Record<string, TabFile> = {};
   
+  // Check if map is actually a Map
   if (map instanceof Map) {
     map.forEach((value, key) => {
       obj[key] = value;
     });
   } else if (typeof map === 'object' && map !== null) {
+    // Handle case where map is already an object
     Object.keys(map).forEach(key => {
       obj[key] = map[key];
     });
@@ -76,14 +78,17 @@ const mapToObject = (map: Map<string, TabFile> | Record<string, TabFile>): Recor
 const objectToMap = (obj: Record<string, TabFile> | null | undefined): Map<string, TabFile> => {
   const map = new Map<string, TabFile>();
   
+  // Handle null/undefined or non-object cases
   if (!obj || typeof obj !== 'object') {
     return map;
   }
   
+  // Handle case where obj might already be a Map
   if (obj instanceof Map) {
     return obj;
   }
   
+  // Convert object to Map
   Object.entries(obj).forEach(([key, value]) => {
     if (value) {
       map.set(key, value);
@@ -211,13 +216,16 @@ export const useTabStore = create<TabState>()(
       },
       
       closeTab: (tabId) => {
+        // Alias for removeTab for better semantic clarity
         return get().removeTab(tabId)
       },
       
       activateTab: (tabId) => {
         const state = get();
         
+        // Ensure tabs is a Map
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in activateTab');
           return false;
         }
         
@@ -230,7 +238,9 @@ export const useTabStore = create<TabState>()(
       getActiveTab: () => {
         const state = get();
         if (!state.activeTabId) return null;
+        // Ensure tabs is a Map before calling get
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in getActiveTab');
           return null;
         }
         return state.tabs.get(state.activeTabId) || null;
@@ -238,7 +248,9 @@ export const useTabStore = create<TabState>()(
       
       getTab: (tabId) => {
         const state = get();
+        // Ensure tabs is a Map before calling get
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in getTab');
           return null;
         }
         return state.tabs.get(tabId) || null;
@@ -247,7 +259,9 @@ export const useTabStore = create<TabState>()(
       getAllTabs: () => {
         const state = get();
         
+        // Ensure tabs is a Map
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in getAllTabs');
           return [];
         }
         
@@ -257,19 +271,27 @@ export const useTabStore = create<TabState>()(
       updateTabContent: (tabId, content) => {
         const state = get();
         
+        // Ensure tabs is a Map
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in updateTabContent');
           return false;
         }
         
         const tab = state.tabs.get(tabId);
         if (!tab) return false;
 
+        // Check if content has actually changed
         const wasModified = tab.content !== content;
         
+        // Only mark as dirty if this is a user-initiated content change
+        // For initial content loading, we don't want to mark as dirty
+        // This will be handled by a separate setTabDirty method later
         const newTab = {
           ...tab,
           content,
           isModified: wasModified,
+          // Keep the current dirty state - don't automatically mark as dirty
+          // This ensures files loaded from the server aren't marked dirty
           isDirty: tab.isDirty || false
         };
         
@@ -283,7 +305,9 @@ export const useTabStore = create<TabState>()(
       setTabDirty: (tabId, isDirty = true) => {
         const state = get();
         
+        // Ensure tabs is a Map
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in setTabDirty');
           return false;
         }
         
@@ -305,7 +329,9 @@ export const useTabStore = create<TabState>()(
       saveTab: (tabId) => {
         const state = get();
         
+        // Ensure tabs is a Map
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in saveTab');
           return false;
         }
         
@@ -327,7 +353,9 @@ export const useTabStore = create<TabState>()(
       closeAllTabs: () => {
         const state = get();
         
+        // Ensure tabs is a Map
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in closeAllTabs');
           set({ tabs: new Map<string, TabFile>(), tabOrder: [], activeTabId: null });
           return true;
         }
@@ -367,7 +395,9 @@ export const useTabStore = create<TabState>()(
       findTabs: (pattern) => {
         const state = get();
         
+        // Ensure tabs is a Map
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in findTabs');
           return [];
         }
         
@@ -381,7 +411,9 @@ export const useTabStore = create<TabState>()(
       getStats: () => {
         const state = get();
         
+        // Ensure tabs is a Map
         if (!(state.tabs instanceof Map)) {
+          console.warn('tabs is not a Map in getStats');
           return {
             totalTabs: 0,
             dirtyTabs: 0,
@@ -406,14 +438,17 @@ export const useTabStore = create<TabState>()(
         }));
       },
       
+      // Update tab with new properties
       updateTab: (tabId, updatedTab) => {
         const { tabs, tabOrder } = get();
         const tab = tabs.get(tabId);
         
         if (!tab) return false;
         
+        // Create updated tab by merging existing tab with updates
         const newTab = { ...tab, ...updatedTab };
         
+        // Update the tab in the map
         const newTabs = new Map(tabs);
         newTabs.set(tabId, newTab);
         
@@ -432,7 +467,9 @@ export const useTabStore = create<TabState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+          // Fix for rehydration - convert tabs object to Map
           if (state.tabs && typeof state.tabs === 'object' && !(state.tabs instanceof Map)) {
+            console.log('Converting tabs object to Map during rehydration');
             const tabsObject = state.tabs as unknown as Record<string, TabFile>;
             state.tabs = objectToMap(tabsObject);
           }
