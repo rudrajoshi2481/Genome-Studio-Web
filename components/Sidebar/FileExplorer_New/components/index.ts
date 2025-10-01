@@ -10,3 +10,5 @@ export { CreateDialog } from './CreateDialog';
 export { UploadDialog } from './UploadDialog';
 export { DeleteConfirmDialog } from './DeleteConfirmDialog';
 export { RenameDialog } from './RenameDialog';
+export { AddWorkspaceFolderDialog } from './AddWorkspaceFolderDialog';
+export { WorkspaceFoldersManager } from './WorkspaceFoldersManager';

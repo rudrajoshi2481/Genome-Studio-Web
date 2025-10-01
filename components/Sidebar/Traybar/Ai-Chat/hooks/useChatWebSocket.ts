@@ -93,7 +93,7 @@ export const useChatWebSocket = () => {
           });
           break;
         case 'stream_chunk':
-          const { currentStreamingMessageId: streamingId2, messages } = useChatStore.getState();
+          const { currentStreamingMessageId: streamingId2, messages: currentMessages } = useChatStore.getState();
           if (!streamingId2) {
             // Create new streaming message
             const messageId = addMessage({
@@ -106,7 +106,7 @@ export const useChatWebSocket = () => {
             setStreamingMessage(messageId);
           } else {
             // Accumulate chunks - get current content and append new chunk
-            const currentMessage = messages.find(m => m.id === streamingId2);
+            const currentMessage = currentMessages.find(m => m.id === streamingId2);
             const newContent = (currentMessage?.content || '') + message.content;
             updateStreamingMessage(newContent, false);
           }
@@ -130,23 +130,68 @@ export const useChatWebSocket = () => {
           // Don't add separate message for tool execution start
           break;
         case 'tool_start':
-          // Add a single clean tool message
-          addMessage({
+          // Add tool message with running status
+          const toolMessageId = addMessage({
             type: 'tool',
             role: 'system',
             content: message.content || `🔧 Executing: ${message.tool_name}`,
             toolName: message.tool_name,
+            isRunning: true,
             metadata: {
               toolName: message.tool_name,
               toolArgs: message.tool_args || {},
               toolIndex: message.tool_index,
               totalTools: message.total_tools,
-              iteration: message.iteration
+              iteration: message.iteration,
+              toolMessageId: message.tool_message_id
             }
           });
           break;
+        case 'tool_output_stream':
+          // Stream command output in real-time
+          const streamState = useChatStore.getState();
+          const streamingToolMsg = streamState.messages.find(m => 
+            m.type === 'tool' && 
+            m.metadata?.toolMessageId === message.tool_message_id
+          );
+          if (streamingToolMsg) {
+            // Get current streamed output (not the full content)
+            const currentStreamedOutput = streamingToolMsg.result || '';
+            const newStreamedOutput = currentStreamedOutput 
+              ? `${currentStreamedOutput}\n${message.output}` 
+              : message.output;
+            
+            // Build formatted content with code block
+            const formattedContent = `**Output:**\n\`\`\`\n${newStreamedOutput}\n\`\`\``;
+            
+            useChatStore.setState({
+              messages: streamState.messages.map(m => 
+                m.id === streamingToolMsg.id 
+                  ? { ...m, content: formattedContent, result: newStreamedOutput }
+                  : m
+              )
+            });
+          }
+          break;
+        case 'tool_result':
         case 'tool_execution_complete':
-          // Don't add separate completion message - let the AI response handle it
+          // Update tool message to show completion
+          const storeState = useChatStore.getState();
+          const toolMsg = storeState.messages.find(m => 
+            m.type === 'tool' && 
+            m.isRunning && 
+            m.metadata?.toolMessageId === message.tool_message_id
+          );
+          if (toolMsg) {
+            // Keep the formatted content as is (already has code block)
+            useChatStore.setState({
+              messages: storeState.messages.map(m => 
+                m.id === toolMsg.id 
+                  ? { ...m, isRunning: false }
+                  : m
+              )
+            });
+          }
           break;
         case 'ai_followup':
           addMessage({

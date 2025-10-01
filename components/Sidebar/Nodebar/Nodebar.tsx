@@ -146,6 +146,128 @@ function Nodebar() {
           <RefreshCcw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
         </button>
       </div>
+
+      {/* Data Type Nodes Section */}
+      <div className="border-b border-gray-200 bg-gray-50">
+        <div className="p-2">
+          <h4 className="text-xs font-semibold text-gray-600 mb-2">DATA TYPES</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {/* String Node */}
+            <div
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                  type: 'dataType',
+                  dataType: 'string',
+                  label: 'String'
+                }));
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              className="p-2 bg-green-100 border border-green-300 rounded cursor-move hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-sm">📝</span>
+                <span className="text-xs font-medium">String</span>
+              </div>
+            </div>
+
+            {/* Integer Node */}
+            <div
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                  type: 'dataType',
+                  dataType: 'int',
+                  label: 'Integer'
+                }));
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              className="p-2 bg-blue-100 border border-blue-300 rounded cursor-move hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-sm">🔢</span>
+                <span className="text-xs font-medium">Integer</span>
+              </div>
+            </div>
+
+            {/* Float Node */}
+            <div
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                  type: 'dataType',
+                  dataType: 'float',
+                  label: 'Float'
+                }));
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              className="p-2 bg-cyan-100 border border-cyan-300 rounded cursor-move hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-sm">🔢</span>
+                <span className="text-xs font-medium">Float</span>
+              </div>
+            </div>
+
+            {/* Boolean Node */}
+            <div
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                  type: 'dataType',
+                  dataType: 'bool',
+                  label: 'Boolean'
+                }));
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              className="p-2 bg-purple-100 border border-purple-300 rounded cursor-move hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-sm">✓</span>
+                <span className="text-xs font-medium">Boolean</span>
+              </div>
+            </div>
+
+            {/* List Node */}
+            <div
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                  type: 'dataType',
+                  dataType: 'list',
+                  label: 'List'
+                }));
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              className="p-2 bg-orange-100 border border-orange-300 rounded cursor-move hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-sm">📋</span>
+                <span className="text-xs font-medium">List</span>
+              </div>
+            </div>
+
+            {/* Dictionary Node */}
+            <div
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                  type: 'dataType',
+                  dataType: 'dict',
+                  label: 'Dictionary'
+                }));
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              className="p-2 bg-pink-100 border border-pink-300 rounded cursor-move hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-sm">📚</span>
+                <span className="text-xs font-medium">Dict</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
       {/* Nodebar content */}
       <div className="flex-1 overflow-y-auto p-2">

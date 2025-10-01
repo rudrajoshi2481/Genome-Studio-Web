@@ -222,18 +222,38 @@ export const convertToReactFlowEdges = (edges: FlowEdge[]): Edge[] => {
 export const convertToFlowNodes = (nodes: Node[]): FlowNode[] => {
   if (!nodes || !Array.isArray(nodes)) return [];
   
-  return nodes.map(node => ({
-    id: node.id,
-    type: node.type || 'default',
-    position: node.position,
-    data: {
-      ...node.data,
-      title: node.data.title || node.data.label || node.id
-    },
-    draggable: node.draggable !== false,
-    selectable: node.selectable !== false,
-    deletable: node.deletable !== false
-  }));
+  return nodes.map(node => {
+    // Handle dataType nodes
+    if (node.type === 'dataType') {
+      return {
+        id: node.id,
+        type: 'dataType',
+        position: node.position,
+        data: {
+          dataType: node.data.dataType,
+          value: node.data.value,
+          label: node.data.label
+        },
+        draggable: node.draggable !== false,
+        selectable: node.selectable !== false,
+        deletable: node.deletable !== false
+      };
+    }
+    
+    // Handle customNode and other types
+    return {
+      id: node.id,
+      type: node.type || 'default',
+      position: node.position,
+      data: {
+        ...node.data,
+        title: node.data.title || node.data.label || node.id
+      },
+      draggable: node.draggable !== false,
+      selectable: node.selectable !== false,
+      deletable: node.deletable !== false
+    };
+  });
 };
 
 /**
@@ -244,28 +264,48 @@ export const convertToFlowNodes = (nodes: Node[]): FlowNode[] => {
 export const convertFlowNodesToReactFlow = (nodes: FlowNode[]): Node[] => {
   if (!nodes || !Array.isArray(nodes)) return [];
   
-  return nodes.map(node => ({
-    id: node.id,
-    // Use customNode type for nodes with inputs/outputs, otherwise use the original type
-    type: node.data.inputs || node.data.outputs ? 'customNode' : (node.type || 'customNode'),
-    position: node.position,
-    data: {
-      ...node.data,
-      // Ensure required fields for CustomNode
-      title: node.data.title || node.id,
-      description: node.data.description || '',
-      inputs: node.data.inputs || [],
-      outputs: node.data.outputs || [],
-      language: node.data.language || 'python',
-      function_name: node.data.function_name || 'function',
-      source_code: node.data.source_code || node.data.source?.join('\n') || '',
-      // Add onNodeDelete handler placeholder (will be added by Canvas component)
-      onNodeDelete: undefined
-    },
-    draggable: node.draggable !== false,
-    selectable: node.selectable !== false,
-    deletable: node.deletable !== false
-  }));
+  return nodes.map(node => {
+    // Check if this is a dataType node
+    if (node.type === 'dataType') {
+      return {
+        id: node.id,
+        type: 'dataType',
+        position: node.position,
+        data: {
+          dataType: node.data.dataType,
+          value: node.data.value,
+          label: node.data.label
+        },
+        draggable: node.draggable !== false,
+        selectable: node.selectable !== false,
+        deletable: node.deletable !== false
+      };
+    }
+    
+    // Handle customNode type
+    return {
+      id: node.id,
+      // Use customNode type for nodes with inputs/outputs, otherwise use the original type
+      type: node.data.inputs || node.data.outputs ? 'customNode' : (node.type || 'customNode'),
+      position: node.position,
+      data: {
+        ...node.data,
+        // Ensure required fields for CustomNode
+        title: node.data.title || node.id,
+        description: node.data.description || '',
+        inputs: node.data.inputs || [],
+        outputs: node.data.outputs || [],
+        language: node.data.language || 'python',
+        function_name: node.data.function_name || 'function',
+        source_code: node.data.source_code || node.data.source?.join('\n') || '',
+        // Add onNodeDelete handler placeholder (will be added by Canvas component)
+        onNodeDelete: undefined
+      },
+      draggable: node.draggable !== false,
+      selectable: node.selectable !== false,
+      deletable: node.deletable !== false
+    };
+  });
 };
 
 /**

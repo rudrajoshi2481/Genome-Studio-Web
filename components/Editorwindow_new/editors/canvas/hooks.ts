@@ -6,6 +6,26 @@ import { useEditorContext } from '../../context/EditorContext';
 import { generateUniqueNodeId } from './utils';
 import { NodeData } from './types';
 
+// Helper function to get default value for data types
+const getDefaultValueForType = (dataType: string): any => {
+  switch (dataType) {
+    case 'string':
+      return '';
+    case 'int':
+      return 0;
+    case 'float':
+      return 0.0;
+    case 'bool':
+      return false;
+    case 'list':
+      return '[]';
+    case 'dict':
+      return '{}';
+    default:
+      return '';
+  }
+};
+
 // Custom hooks for Canvas functionality
 export const useCanvasHandlers = (
   tabId: string,
@@ -20,12 +40,40 @@ export const useCanvasHandlers = (
   const { setDirty } = useEditorContext();
   const { updateTab } = useTabStore();
 
-  // Handle node changes with delete functionality
+  // Handle node changes with delete functionality and dimension changes
   const handleNodesChange = useCallback((changes: any) => {
+    // Check if any dimension changes occurred
+    const hasDimensionChange = changes.some((change: any) => 
+      change.type === 'dimensions' && change.dimensions
+    );
+    
+    // If there are dimension changes, update the nodes with the new dimensions
+    if (hasDimensionChange) {
+      changes.forEach((change: any) => {
+        if (change.type === 'dimensions' && change.dimensions) {
+          setNodes((nds) =>
+            nds.map((node) => {
+              if (node.id === change.id) {
+                return {
+                  ...node,
+                  style: {
+                    ...node.style,
+                    width: change.dimensions.width,
+                    height: change.dimensions.height,
+                  },
+                };
+              }
+              return node;
+            })
+          );
+        }
+      });
+    }
+    
     onNodesChange(changes);
     setDirty(tabId, true);
     updateTab(tabId, { isDirty: true });
-  }, [onNodesChange, tabId, setDirty, updateTab]);
+  }, [onNodesChange, tabId, setDirty, updateTab, setNodes]);
 
   // Handle edge changes
   const handleEdgesChange = useCallback((changes: any) => {
@@ -78,23 +126,43 @@ export const useCanvasHandlers = (
 
       // Create a new node with guaranteed unique ID
       const uniqueId = generateUniqueNodeId();
-      const newNode = {
-        id: uniqueId,
-        type: 'customNode',
-        position,
-        data: {
-          title: nodeData.title || nodeData.name || 'New Node',
-          description: nodeData.description || '',
-          inputs: nodeData.inputs || [],
-          outputs: nodeData.outputs || [],
-          language: nodeData.language || 'python',
-          function_name: nodeData.function_name || 'function',
-          source_code: nodeData.source || nodeData.source_code || '',
-          tags: nodeData.tags || [],
-          // Store the original node ID for reference if needed
-          originalId: nodeData.id || nodeData.node_id
-        }
-      };
+      
+      // Check if this is a data type node
+      let newNode;
+      if (nodeData.type === 'dataType') {
+        // Create a data type node
+        newNode = {
+          id: uniqueId,
+          type: 'dataType',
+          position,
+          data: {
+            dataType: nodeData.dataType,
+            value: getDefaultValueForType(nodeData.dataType),
+            label: nodeData.label || nodeData.dataType
+          }
+        };
+        toast.success(`Added ${nodeData.label || nodeData.dataType} node to canvas`);
+      } else {
+        // Create a custom code node
+        newNode = {
+          id: uniqueId,
+          type: 'customNode',
+          position,
+          data: {
+            title: nodeData.title || nodeData.name || 'New Node',
+            description: nodeData.description || '',
+            inputs: nodeData.inputs || [],
+            outputs: nodeData.outputs || [],
+            language: nodeData.language || 'python',
+            function_name: nodeData.function_name || 'function',
+            source_code: nodeData.source || nodeData.source_code || '',
+            tags: nodeData.tags || [],
+            // Store the original node ID for reference if needed
+            originalId: nodeData.id || nodeData.node_id
+          }
+        };
+        toast.success(`Added ${nodeData.title || nodeData.name || 'node'} to canvas`);
+      }
 
       // Add the new node to the flow
       setNodes((nds) => nds.concat(newNode));
@@ -103,7 +171,6 @@ export const useCanvasHandlers = (
       setDirty(tabId, true);
       updateTab(tabId, { isDirty: true });
       
-      toast.success(`Added ${nodeData.title || nodeData.name || 'node'} to canvas`);
       console.log('✅ Canvas: Node added successfully', newNode);
     },
     [setNodes, setDirty, tabId, updateTab]

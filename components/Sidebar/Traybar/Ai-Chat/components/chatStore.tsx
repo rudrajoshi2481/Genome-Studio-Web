@@ -8,6 +8,8 @@ export interface Message {
   timestamp?: string
   isStreaming?: boolean
   isComplete?: boolean
+  isRunning?: boolean
+  result?: any
   conversationId?: string
   model?: string
   toolName?: string
@@ -22,6 +24,7 @@ export interface Message {
     toolIndex?: number
     totalTools?: number
     iteration?: number
+    toolMessageId?: string
     toolResults?: Array<{
       status?: string
       filepath?: string

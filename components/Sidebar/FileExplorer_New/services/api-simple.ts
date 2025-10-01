@@ -69,13 +69,72 @@ export class FileExplorerApiService {
     }
   }
   // Get file tree
-  async getFileTree(rootPath: string, forceRefresh: boolean = false): Promise<FileTreeResponse> {
+  async getFileTree(rootPath: string, forceRefresh: boolean = false, maxDepth: number = 3): Promise<FileTreeResponse> {
     const params = new URLSearchParams({
       directory: rootPath,
-      max_depth: '3',
+      max_depth: maxDepth.toString(),
       force_refresh: forceRefresh.toString()
     });
     return makeRequest(`${buildUrl('/tree')}?${params}`);
+  }
+
+  // Load children for a specific directory (lazy loading)
+  async loadDirectoryChildren(directoryPath: string): Promise<FileNode[]> {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔍 LAZY LOADING SUBDIRECTORY');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📂 Directory Path:', directoryPath);
+    
+    const params = new URLSearchParams({
+      directory: directoryPath,
+      max_depth: '1', // Only load immediate children
+      force_refresh: 'false'
+    });
+    
+    const url = `${buildUrl('/tree')}?${params}`;
+    console.log('🌐 API URL:', url);
+    console.log('📋 Request Params:', {
+      directory: directoryPath,
+      max_depth: 1,
+      force_refresh: false
+    });
+    
+    const startTime = performance.now();
+    
+    try {
+      console.log('⏳ Fetching from backend...');
+      const response = await makeRequest(url);
+      const endTime = performance.now();
+      const duration = (endTime - startTime).toFixed(2);
+      
+      console.log(`✅ Response received in ${duration}ms`);
+      console.log('📦 Full Response:', response);
+      
+      const children = response.tree?.children || [];
+      console.log(`📊 Children Count: ${children.length}`);
+      
+      if (children.length > 0) {
+        console.log('📁 Children Details:');
+        children.forEach((child: any, index: number) => {
+          const icon = child.is_dir ? '📁' : '📄';
+          console.log(`  ${index + 1}. ${icon} ${child.name} (${child.path})`);
+        });
+      } else {
+        console.log('⚠️  No children found (empty directory)');
+      }
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      return children;
+    } catch (error) {
+      const endTime = performance.now();
+      const duration = (endTime - startTime).toFixed(2);
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error(`❌ FAILED after ${duration}ms`);
+      console.error('💥 Error Details:', error);
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      throw error;
+    }
   }
 
   // Get file content

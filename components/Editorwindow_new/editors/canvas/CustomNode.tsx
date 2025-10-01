@@ -309,7 +309,13 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       </div>
       
       {/* Node content */}
-      <div className="p-3 select-text">
+      <div className="p-3 select-text" onMouseDown={(e) => {
+        // Allow text selection by stopping propagation when selecting text
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) {
+          e.stopPropagation();
+        }
+      }}>
         {/* Description */}
         {nodeData.description && (
           <div 
@@ -526,12 +532,31 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
             </div>
             
             {logsOpen && (
-              <div className="max-h-48 overflow-y-auto bg-muted/50 rounded text-xs">
+              <div 
+                className="max-h-48 overflow-y-auto bg-muted/50 rounded text-xs"
+                onMouseDown={(e) => e.stopPropagation()}
+                onMouseMove={(e) => {
+                  // Prevent dragging when selecting text in logs
+                  const selection = window.getSelection();
+                  if (selection && selection.toString().length > 0) {
+                    e.stopPropagation();
+                  }
+                }}
+              >
                 {executionLogs.map((log: LogEntry, index: number) => (
                   <pre 
                     key={index} 
-                    className="text-sm p-1 border-b border-border select-text text-wrap"
+                    className="text-sm p-1 border-b border-border select-text text-wrap cursor-text hover:bg-muted/70"
                     onMouseDown={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => {
+                      // Select entire log message on double click
+                      e.stopPropagation();
+                      const selection = window.getSelection();
+                      const range = document.createRange();
+                      range.selectNodeContents(e.currentTarget);
+                      selection?.removeAllRanges();
+                      selection?.addRange(range);
+                    }}
                   >
                     {log.message}
                   </pre>

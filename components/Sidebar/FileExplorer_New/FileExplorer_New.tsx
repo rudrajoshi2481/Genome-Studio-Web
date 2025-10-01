@@ -19,6 +19,7 @@ import {
   X,
   Folder
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { FileIconComponent } from './utils/fileIcons';
 import { FileNode, SearchFilters } from './types';
 import { useFileExplorerStore } from './store/fileExplorerStore';
@@ -30,6 +31,7 @@ import { UploadDialog } from './components/UploadDialog';
 import { CreateDialog } from './components/CreateDialog';
 import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
 import { RenameDialog } from './components/RenameDialog';
+import { WorkspaceFoldersManager } from './components/WorkspaceFoldersManager';
 import {
   Dialog,
   DialogContent,
@@ -324,22 +326,74 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
   // Handle copy path
   const handleCopyPath = useCallback(async (node: FileNode) => {
     try {
+      // Check if clipboard API is available
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard API not available');
+      }
+
+      // Try modern clipboard API first
       await navigator.clipboard.writeText(node.path);
       console.log(`✅ Path copied to clipboard: ${node.path}`);
-      // You could add a toast notification here if available
+      toast.success(`Path copied: ${node.path}`, {
+        description: 'Path has been copied to clipboard',
+        duration: 2000,
+      });
     } catch (error) {
-      console.error('Failed to copy path to clipboard:', error);
-      // Fallback for older browsers
+      console.error('Clipboard API failed:', error);
+      
+      // Fallback method for macOS and older browsers
       try {
         const textArea = document.createElement('textarea');
         textArea.value = node.path;
+        textArea.style.position = 'fixed';
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.width = '2em';
+        textArea.style.height = '2em';
+        textArea.style.padding = '0';
+        textArea.style.border = 'none';
+        textArea.style.outline = 'none';
+        textArea.style.boxShadow = 'none';
+        textArea.style.background = 'transparent';
+        textArea.setAttribute('readonly', '');
+        
         document.body.appendChild(textArea);
+        
+        // Focus and select for macOS
+        textArea.focus();
         textArea.select();
-        document.execCommand('copy');
+        
+        // For iOS/macOS - set selection range
+        textArea.setSelectionRange(0, textArea.value.length);
+        
+        // Try execCommand
+        const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
-        console.log(`✅ Path copied to clipboard (fallback): ${node.path}`);
+        
+        if (successful) {
+          console.log(`✅ Path copied to clipboard (fallback): ${node.path}`);
+          toast.success(`Path copied: ${node.path}`, {
+            description: 'Path has been copied to clipboard',
+            duration: 2000,
+          });
+        } else {
+          throw new Error('execCommand failed');
+        }
       } catch (fallbackError) {
         console.error('Fallback copy also failed:', fallbackError);
+        
+        // Final fallback - show path in a prompt for manual copy
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isMac = userAgent.includes('mac');
+        const copyKey = isMac ? 'Cmd+C' : 'Ctrl+C';
+        
+        toast.error('Copy Path', {
+          description: `Please copy manually: ${node.path}`,
+          duration: 5000,
+        });
+        
+        // Show alert with path for manual copy
+        alert(`Copy this path:\n\n${node.path}\n\nPress ${copyKey} to copy`);
       }
     }
   }, []);
@@ -481,16 +535,16 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
   return (
     <div 
       ref={containerRef}
-      className={`flex flex-col h-full bg-white dark:bg-gray-800 ${className}`}
+      className={cn("flex flex-col h-screen bg-white dark:bg-gray-800", className)}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
       {/* Modern Header with Shadcn Components */}
       <TooltipProvider>
-        <div className="flex items-center justify-between p-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold tracking-tight">
-              File Explorer
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs font-semibold tracking-tight text-foreground/80">
+              FILES
             </h2>
             
             {/* WebSocket status indicator */}
@@ -512,7 +566,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
             </div> */}
           </div>
           
-          <div className="flex items-center ">
+          <div className="flex items-center gap-0.5">
             {/* Primary action buttons */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -521,13 +575,13 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                   size="sm"
                   onClick={() => refreshFileTree(true)}
                   disabled={isLoading}
-                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                  className="h-7 w-7 p-0 hover:bg-accent"
                 >
-                  <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+                  <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p>Refresh file tree</p>
+                <p className="text-xs">Refresh</p>
               </TooltipContent>
             </Tooltip>
             
@@ -537,13 +591,13 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowCreateDialog({ type: 'file', parentPath: activePath || rootPath })}
-                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                  className="h-7 w-7 p-0 hover:bg-accent"
                 >
-                  <FilePlus className="h-4 w-4" />
+                  <FilePlus className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p>New file</p>
+                <p className="text-xs">New file</p>
               </TooltipContent>
             </Tooltip>
             
@@ -553,13 +607,13 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowCreateDialog({ type: 'directory', parentPath: activePath || rootPath })}
-                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                  className="h-7 w-7 p-0 hover:bg-accent"
                 >
-                  <FolderPlus className="h-4 w-4" />
+                  <FolderPlus className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p>New folder</p>
+                <p className="text-xs">New folder</p>
               </TooltipContent>
             </Tooltip>
             
@@ -572,17 +626,17 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                     const targetPath = activePath || rootPath;
                     setShowUploadDialog({ targetPath });
                   }}
-                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                  className="h-7 w-7 p-0 hover:bg-accent"
                 >
-                  <Upload className="h-4 w-4" />
+                  <Upload className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p>Upload files</p>
+                <p className="text-xs">Upload</p>
               </TooltipContent>
             </Tooltip>
             
-            <Separator orientation="vertical" className="h-6 mx-1" />
+            <Separator orientation="vertical" className="h-5 mx-0.5" />
             
             {/* More actions dropdown */}
             <DropdownMenu>
@@ -590,7 +644,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground"
+                  className="h-7 w-7 p-0 hover:bg-accent"
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
@@ -621,13 +675,23 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
       </TooltipProvider>
 
       {/* Search bar */}
-      <div className="p-3 border-b bg-muted/30">
+      <div className="px-3 py-2 border-b border-border/50">
         <SearchBar
           onSearch={handleSearch}
           isSearching={isSearching}
           className=""
         />
       </div>
+
+      {/* Workspace Folders Manager */}
+      <WorkspaceFoldersManager 
+        onFoldersChange={() => refreshFileTree(true)}
+        onFolderSelect={(folderPath) => {
+          console.log('🔄 Switching root path to:', folderPath);
+          setRootPath(folderPath);
+          refreshFileTree(true);
+        }}
+      />
 
       {/* Error display */}
       {error && (
@@ -649,7 +713,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
       )}
 
       {/* File tree content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto min-h-0">
         {isLoading && !fileTree ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="w-8 h-8 mb-3 animate-spin" />
@@ -657,7 +721,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
             <p className="text-xs text-muted-foreground/70 mt-1">Please wait while we fetch your files</p>
           </div>
         ) : (
-          <div className="p-2 space-y-1">
+          <div className="p-2 pb-16 space-y-1">
             {renderContent()}
           </div>
         )}

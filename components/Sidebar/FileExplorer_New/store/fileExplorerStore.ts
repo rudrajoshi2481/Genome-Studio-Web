@@ -77,6 +77,7 @@ interface FileExplorerStore extends FileExplorerState {
   refreshFileTree: (force?: boolean) => Promise<void>;
   initializeTree: (rootNode: FileNode) => void;
   toggleNode: (path: string) => void;
+  loadNodeChildren: (path: string) => Promise<void>;
   selectNode: (path: string, multiSelect?: boolean) => void;
   setActivePath: (path: string) => void;
   isNodeExpanded: (path: string) => boolean;
@@ -330,10 +331,14 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     const state = get();
     console.log('🌳 Initializing tree with root node:', rootNode.path);
     
-    // Clear existing state
+    // Save expanded paths before clearing
+    const savedExpandedPaths = [...state.expandedPaths];
+    console.log('💾 Saving expanded paths during tree init:', savedExpandedPaths);
+    
+    // Clear existing state but preserve expanded paths
     state.nodes.clear();
     state.selectedPaths = [];
-    state.expandedPaths = [];
+    // DON'T clear expandedPaths - keep them for refresh
     
     // Build tree recursively and populate hash map (inspired by original FileExplorer)
     const buildTreeFromNode = (node: FileNode, parentPath: string | null): void => {
@@ -362,8 +367,16 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     
     buildTreeFromNode(rootNode, null);
     
-    // Set initial expanded paths
-    state.expandedPaths.push(rootNode.path);
+    // Restore expanded paths or set initial if empty
+    if (savedExpandedPaths.length > 0) {
+      // Restore saved expanded paths
+      state.expandedPaths = savedExpandedPaths;
+      console.log('✓ Restored expanded paths:', savedExpandedPaths);
+    } else {
+      // First load - expand root by default
+      state.expandedPaths = [rootNode.path];
+      console.log('✓ Set initial expanded path:', rootNode.path);
+    }
     
     // Update state
     set({ 
@@ -372,6 +385,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     });
     
     console.log(`🌳 Tree initialized with ${state.nodes.size} nodes`);
+    console.log(`📂 Expanded paths after init: ${state.expandedPaths.length} folders`);
   },
 
   toggleNode: (path: string) => {
@@ -385,12 +399,154 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     } else {
       console.log(`📂 Expanding node: ${path}`);
       newExpandedPaths.push(path);
+      
+      // Lazy load children if not already loaded or if it's a directory that might have more
+      const node = state.nodes.get(path);
+      if (node?.is_dir) {
+        // Always try to load if children is undefined, null, or empty array
+        const shouldLoad = !node.children || node.children.length === 0;
+        if (shouldLoad) {
+          console.log(`🔍 Lazy loading children for: ${path} (has ${node.children?.length || 0} children)`);
+          get().loadNodeChildren(path);
+        } else {
+          console.log(`✓ Node already has ${node.children.length} children loaded`);
+        }
+      }
     }
     
     set({ 
       expandedPaths: newExpandedPaths,
       lastTreeUpdate: Date.now()
     });
+  },
+
+  loadNodeChildren: async (path: string) => {
+    console.log('');
+    console.log('╔════════════════════════════════════════════════════════════════════╗');
+    console.log('║          STORE: PROCESSING LAZY LOADED CHILDREN                    ║');
+    console.log('╚════════════════════════════════════════════════════════════════════╝');
+    console.log('📂 Target Path:', path);
+    
+    try {
+      const state = get();
+      const nodesBefore = state.nodes.size;
+      
+      console.log('📊 Store State Before:');
+      console.log('  - Total nodes in map:', nodesBefore);
+      console.log('  - Expanded paths:', state.expandedPaths.length);
+      
+      const node = state.nodes.get(path);
+      
+      if (!node) {
+        console.error('❌ ERROR: Node not found in store');
+        console.error('   Path:', path);
+        console.error('   Available nodes:', Array.from(state.nodes.keys()).filter(k => k.includes('routes')));
+        return;
+      }
+      
+      if (!node.is_dir) {
+        console.error('❌ ERROR: Node is not a directory');
+        console.error('   Path:', path);
+        console.error('   Node type:', node.is_dir ? 'directory' : 'file');
+        return;
+      }
+      
+      console.log('✓ Node found in store');
+      console.log('  - Current children:', node.children?.length || 0);
+      
+      // Call API to fetch children
+      console.log('');
+      console.log('⏳ Calling API to fetch children...');
+      const children = await fileExplorerApi.loadDirectoryChildren(path);
+      
+      console.log('');
+      console.log('🔧 UPDATING TREE STRUCTURE');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`📝 Received ${children.length} children from API`);
+      
+      // Create a NEW node object with children (don't mutate)
+      const updatedNode = { ...node, children };
+      console.log('✓ Created new node object with children array');
+      
+      // Add children to nodes map recursively
+      let addedCount = 0;
+      const newNodesMap = new Map(state.nodes);
+      
+      const addToNodesMap = (items: FileNode[], level = 0) => {
+        items.forEach((child: FileNode) => {
+          const indent = '  '.repeat(level);
+          const icon = child.is_dir ? '📁' : '📄';
+          console.log(`${indent}➕ ${icon} ${child.name}`);
+          console.log(`${indent}   Path: ${child.path}`);
+          newNodesMap.set(child.path, child);
+          addedCount++;
+          
+          if (child.children && child.children.length > 0) {
+            console.log(`${indent}   └─ Has ${child.children.length} nested children`);
+            addToNodesMap(child.children, level + 1);
+          }
+        });
+      };
+      
+      console.log('');
+      console.log('📋 Adding children to nodes map:');
+      addToNodesMap(children);
+      
+      // Update the parent node in the map with the new node object
+      newNodesMap.set(path, updatedNode);
+      
+      const nodesAfter = newNodesMap.size;
+      
+      console.log('');
+      console.log('📊 Store State After:');
+      console.log('  - Nodes added:', addedCount);
+      console.log('  - Total nodes before:', nodesBefore);
+      console.log('  - Total nodes after:', nodesAfter);
+      console.log('  - Net increase:', nodesAfter - nodesBefore);
+      
+      // Recursively update the tree structure
+      const updateTreeNode = (treeNode: FileNode): FileNode => {
+        if (treeNode.path === path) {
+          return updatedNode;
+        }
+        if (treeNode.children) {
+          return {
+            ...treeNode,
+            children: treeNode.children.map(updateTreeNode)
+          };
+        }
+        return treeNode;
+      };
+      
+      const newFileTree = state.fileTree ? updateTreeNode(state.fileTree) : null;
+      
+      // Force update the tree with new objects
+      console.log('');
+      console.log('🔄 Triggering React re-render with new tree structure...');
+      set({
+        fileTree: newFileTree,
+        nodes: newNodesMap,
+        lastTreeUpdate: Date.now()
+      });
+      
+      console.log('');
+      console.log('╔════════════════════════════════════════════════════════════════════╗');
+      console.log('║          ✅ LAZY LOADING COMPLETED SUCCESSFULLY                    ║');
+      console.log('╚════════════════════════════════════════════════════════════════════╝');
+      console.log(`✓ ${children.length} children loaded for: ${path}`);
+      console.log(`✓ Tree updated with ${addedCount} new nodes`);
+      console.log('');
+      
+    } catch (error) {
+      console.log('');
+      console.log('╔════════════════════════════════════════════════════════════════════╗');
+      console.log('║          ❌ LAZY LOADING FAILED                                    ║');
+      console.log('╚════════════════════════════════════════════════════════════════════╝');
+      console.error('💥 Error:', error);
+      console.error('📂 Path:', path);
+      console.log('');
+      toast.error(`Failed to load folder contents`);
+    }
   },
 
   selectNode: (path: string, multiSelect = false) => {
@@ -759,27 +915,74 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
   },
 
   refreshFileTree: async (force?: boolean) => {
+    console.log('');
+    console.log('╔════════════════════════════════════════════════════════════════════╗');
+    console.log('║                    REFRESH FILE TREE                               ║');
+    console.log('╚════════════════════════════════════════════════════════════════════╝');
     console.log('🔄 Refreshing file tree from server...', { force });
+    
+    const state = get();
+    
+    // Save expanded paths before refresh
+    const savedExpandedPaths = [...state.expandedPaths];
+    console.log('');
+    console.log('📊 STATE BEFORE REFRESH:');
+    console.log('  - Expanded paths count:', savedExpandedPaths.length);
+    console.log('  - Expanded paths:', savedExpandedPaths);
+    console.log('  - Total nodes:', state.nodes.size);
+    console.log('  - Root path:', state.rootPath);
+    
     set({ isLoading: true, error: null });
     
     try {
-      // Clear existing tree state to ensure fresh data
-      console.log('🧹 Clearing existing tree state...');
+      // Clear existing tree state but keep expanded paths
+      console.log('');
+      console.log('🧹 CLEARING TREE STATE (PRESERVING EXPANDED PATHS)');
+      console.log('  - Keeping expanded paths:', savedExpandedPaths);
+      
       set({
         fileTree: null,
         nodes: new Map(),
         selectedPaths: [],
-        expandedPaths: [],
+        // Keep expanded paths so folders stay open after refresh
+        expandedPaths: savedExpandedPaths,
         lastProcessedEvents: new Set(), // Clear processed events on refresh
         lastTreeUpdate: Date.now()
       });
       
+      const stateAfterClear = get();
+      console.log('');
+      console.log('📊 STATE AFTER CLEARING:');
+      console.log('  - Expanded paths count:', stateAfterClear.expandedPaths.length);
+      console.log('  - Expanded paths:', stateAfterClear.expandedPaths);
+      console.log('  - Are they same?', JSON.stringify(savedExpandedPaths) === JSON.stringify(stateAfterClear.expandedPaths));
+      
       // Force fresh load from server
+      console.log('');
+      console.log('⏳ Loading fresh tree from server...');
       await get().loadFileTree(true);
       
-      console.log('✅ File tree refreshed successfully from server');
+      const stateAfterLoad = get();
+      console.log('');
+      console.log('📊 STATE AFTER LOADING:');
+      console.log('  - Expanded paths count:', stateAfterLoad.expandedPaths.length);
+      console.log('  - Expanded paths:', stateAfterLoad.expandedPaths);
+      console.log('  - Total nodes:', stateAfterLoad.nodes.size);
+      console.log('  - Are expanded paths preserved?', JSON.stringify(savedExpandedPaths) === JSON.stringify(stateAfterLoad.expandedPaths));
+      
+      console.log('');
+      console.log('╔════════════════════════════════════════════════════════════════════╗');
+      console.log('║              ✅ REFRESH COMPLETED SUCCESSFULLY                     ║');
+      console.log('╚════════════════════════════════════════════════════════════════════╝');
+      console.log('✓ Expanded paths preserved:', stateAfterLoad.expandedPaths.length, 'folders');
+      console.log('');
     } catch (error) {
-      console.error('❌ Error refreshing file tree:', error);
+      console.log('');
+      console.log('╔════════════════════════════════════════════════════════════════════╗');
+      console.log('║              ❌ REFRESH FAILED                                     ║');
+      console.log('╚════════════════════════════════════════════════════════════════════╝');
+      console.error('💥 Error:', error);
+      console.log('');
       set({ error: error instanceof Error ? error.message : 'Failed to refresh file tree' });
     } finally {
       set({ isLoading: false, lastTreeUpdate: Date.now() });

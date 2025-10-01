@@ -74,6 +74,11 @@ export function getServerConfig(): ServerConfig {
  * Get the API base URL (including protocol, host, port, and base path)
  */
 export function getApiBaseUrl(): string {
+  // In browser, use relative URL to leverage Next.js proxy and avoid CORS
+  if (typeof window !== 'undefined') {
+    return defaultConfig.api.baseUrl; // Returns '/api/v1'
+  }
+  // In server-side, use full URL
   const { protocol, host, port, baseUrl } = defaultConfig.api;
   return `${protocol}://${host}:${port}${baseUrl}`;
 }
