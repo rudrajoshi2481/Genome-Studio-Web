@@ -9,6 +9,8 @@ const publicPaths = [
   '/forgot-password',
   '/reset-password',
   '/api/auth',
+  '/api/v1/token',   
+  '/api/v1/register',
 ];
 
 /**

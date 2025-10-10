@@ -164,15 +164,19 @@ function Toolbar({
       if (onExecutionStatusChange) {
         onExecutionStatusChange(status);
       }
-
       if (status.status === 'running') {
         setTimeout(() => pollExecutionStatus(execId), 1000);
       } else {
         setIsExecuting(false);
         if (status.status === 'completed') {
-          toast.success(`Workflow completed successfully in ${status.duration_seconds?.toFixed(2)}s`);
+          toast.success('Workflow execution completed!');
+          // Reload the file to get updated node data with execution results
+          if (onRefresh) {
+            console.log('Toolbar: Reloading file to get execution results');
+            onRefresh();
+          }
         } else if (status.status === 'failed') {
-          toast.error(`Workflow failed: ${status.error_message || 'Unknown error'}`);
+          toast.error(`Workflow execution failed: ${status.error_message || 'Unknown error'}`);
         }
       }
     } catch (error) {

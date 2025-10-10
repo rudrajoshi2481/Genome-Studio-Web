@@ -237,11 +237,12 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
       ...node,
       data: {
         ...node.data,
+        filePath: filePath, // Ensure filePath is always present
         onNodeDelete: handleNodeDelete,
         onExecutionComplete: handleExecutionComplete
       }
     }));
-  }, [nodes, handleNodeDelete, handleExecutionComplete]);
+  }, [nodes, filePath, handleNodeDelete, handleExecutionComplete]);
 
   // Load file content on mount
   useEffect(() => {
@@ -259,8 +260,9 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
 
   // Workflow execution handlers - moved before early returns to maintain hook order
   const handleRun = useCallback(() => {
-    console.log('▶️ Canvas: Running workflow');
-    toast.info('Running workflow...');
+    console.log('▶️ Canvas: Running workflow - delegating to Toolbar');
+    // The actual execution logic is in Toolbar component
+    // This is just a placeholder - Toolbar handles the real execution
   }, []);
 
   const handleStop = useCallback(() => {

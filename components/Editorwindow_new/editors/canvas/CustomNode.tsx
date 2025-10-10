@@ -5,6 +5,7 @@ import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals } from
 import { cn } from "@/lib/utils" // Import cn from shadcn utils if available, or define it
 import { workflowManagerAPI } from '@/services/WorkflowManagerAPI';
 import { toast } from 'sonner';
+import { RichOutputViewer } from './RichOutputViewer';
 
 // Define NodeIO interface
 export interface NodeIO {
@@ -82,15 +83,18 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     width: 280, 
     height: 100 
   });
-  const [logsOpen, setLogsOpen] = useState(true);
+  const [logsOpen, setLogsOpen] = useState(false); // Logs collapsed by default
+  const [outputsOpen, setOutputsOpen] = useState(true); // Outputs open by default
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
+  const [richOutputs, setRichOutputs] = useState<Record<string, any>>({});
   
-  // Extract logs from node data if they exist in the file
+  // Extract logs and rich outputs from node data if they exist in the file
   useLayoutEffect(() => {
-    console.log(`[CustomNode ${id}] Loading logs from nodeData:`, nodeData);
+    console.log(`[CustomNode ${id}] Loading logs and outputs from nodeData:`, nodeData);
     
     let logsToLoad: LogEntry[] = [];
+    let outputsToLoad: Record<string, any> = {};
     
     // Primary location: node.logs (updated backend saves here)
     if (nodeData.logs && Array.isArray(nodeData.logs)) {
@@ -110,12 +114,30 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       console.log(`[CustomNode ${id}] No logs found in any location`);
     }
     
+    // Load rich HTML outputs
+    if (nodeData.output_html && typeof nodeData.output_html === 'object') {
+      console.log(`[CustomNode ${id}] Found output_html in nodeData:`, nodeData.output_html);
+      outputsToLoad = nodeData.output_html;
+    }
+    else if (nodeData.lastExecution && nodeData.lastExecution.output_html && typeof nodeData.lastExecution.output_html === 'object') {
+      console.log(`[CustomNode ${id}] Found output_html in lastExecution:`, nodeData.lastExecution.output_html);
+      outputsToLoad = nodeData.lastExecution.output_html;
+    }
+    
     if (logsToLoad.length > 0) {
       console.log(`[CustomNode ${id}] Setting execution logs:`, logsToLoad);
       setExecutionLogs(logsToLoad);
     } else {
       console.log(`[CustomNode ${id}] No logs to load, clearing execution logs`);
       setExecutionLogs([]);
+    }
+    
+    if (Object.keys(outputsToLoad).length > 0) {
+      console.log(`[CustomNode ${id}] Setting rich outputs:`, outputsToLoad);
+      setRichOutputs(outputsToLoad);
+    } else {
+      console.log(`[CustomNode ${id}] No rich outputs to load`);
+      setRichOutputs({});
     }
   }, [nodeData, id]);
 
@@ -502,18 +524,53 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           )}
         </button>
         
-        {/* Logs section */}
-        {executionLogs && executionLogs.length > 0 && (
+        {/* Rich Output section - Show first for Python/R nodes with outputs */}
+        {richOutputs && Object.keys(richOutputs).length > 0 && (nodeData.language === 'python' || nodeData.language === 'r') && (
           <div className="mt-2">
             <div 
-              className="w-full text-xs font-medium text-muted-foreground py-1 px-0 flex items-center gap-1 cursor-pointer"
+              className="w-full text-xs font-semibold text-foreground py-1 px-0 flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
               onClick={() => {
-                setLogsOpen(!logsOpen);
-                // Give time for the animation to complete before resizing
+                setOutputsOpen(!outputsOpen);
                 setTimeout(() => updateNodeInternals(id), 300);
               }}
             >
-              Execution Logs ({executionLogs.length})
+              <svg 
+                className={cn(
+                  "h-3 w-3 transition-transform",
+                  outputsOpen ? "rotate-90" : ""
+                )}
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+              Output ({Object.keys(richOutputs).length})
+            </div>
+            
+            {outputsOpen && (
+              <div 
+                className="mt-1 bg-background rounded border border-border shadow-sm"
+                style={{ maxHeight: '400px', overflowY: 'auto' }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <RichOutputViewer outputs={richOutputs} className="p-2" />
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Debug Logs section - Collapsed by default, only show if there are logs */}
+        {executionLogs && executionLogs.length > 0 && (
+          <div className="mt-2">
+            <div 
+              className="w-full text-xs font-medium text-muted-foreground py-1 px-0 flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
+              onClick={() => {
+                setLogsOpen(!logsOpen);
+                setTimeout(() => updateNodeInternals(id), 300);
+              }}
+            >
               <svg 
                 className={cn(
                   "h-3 w-3 transition-transform",
@@ -529,14 +586,14 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
               >
                 <polyline points="9 18 15 12 9 6"></polyline>
               </svg>
+              Debug Logs ({executionLogs.length})
             </div>
             
             {logsOpen && (
               <div 
-                className="max-h-48 overflow-y-auto bg-muted/50 rounded text-xs"
+                className="max-h-48 overflow-y-auto bg-muted/30 rounded text-xs border border-border"
                 onMouseDown={(e) => e.stopPropagation()}
                 onMouseMove={(e) => {
-                  // Prevent dragging when selecting text in logs
                   const selection = window.getSelection();
                   if (selection && selection.toString().length > 0) {
                     e.stopPropagation();
@@ -546,10 +603,9 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                 {executionLogs.map((log: LogEntry, index: number) => (
                   <pre 
                     key={index} 
-                    className="text-sm p-1 border-b border-border select-text text-wrap cursor-text hover:bg-muted/70"
+                    className="text-xs p-2 border-b border-border/50 select-text text-wrap cursor-text hover:bg-muted/50 font-mono"
                     onMouseDown={(e) => e.stopPropagation()}
                     onDoubleClick={(e) => {
-                      // Select entire log message on double click
                       e.stopPropagation();
                       const selection = window.getSelection();
                       const range = document.createRange();
