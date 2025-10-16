@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   allowedDevOrigins: ['*'],
   images: {
-    domains: ['150.250.96.50', 'localhost'],
+    domains: ['150.250.96.50', 'localhost',"10.0.0.44"],
     remotePatterns: [
       {
         protocol: 'http',
@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/v1/:path*',
-        destination: 'http://150.250.96.50:8000/api/v1/:path*',
+        destination: 'http://10.0.0.44:8000/api/v1/:path*',
       },
     ];
   },

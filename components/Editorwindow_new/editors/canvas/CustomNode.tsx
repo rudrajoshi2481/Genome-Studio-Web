@@ -55,6 +55,9 @@ export interface NodeData extends Record<string, any> {
   executionStatus?: NodeExecutionStatus;
   // File path for execution
   filePath?: string;
+  // Node dimensions
+  width?: number;
+  height?: number;
 }
 
 // Format duration in milliseconds to a compact string (e.g., "2.5s" or "1.2m")
@@ -80,64 +83,70 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   const updateNodeInternals = useUpdateNodeInternals();
   const nodeRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ 
-    width: 280, 
-    height: 100 
+    width: nodeData.width || 280, 
+    height: nodeData.height || 100 
   });
-  const [logsOpen, setLogsOpen] = useState(false); // Logs collapsed by default
   const [outputsOpen, setOutputsOpen] = useState(true); // Outputs open by default
   const [isExecuting, setIsExecuting] = useState(false);
-  const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
-  const [richOutputs, setRichOutputs] = useState<Record<string, any>>({});
+  const [unifiedOutputs, setUnifiedOutputs] = useState<any[]>([]);
   
-  // Extract logs and rich outputs from node data if they exist in the file
+  // Extract unified outputs from node data (combines logs + rich outputs + errors in execution order)
   useLayoutEffect(() => {
-    console.log(`[CustomNode ${id}] Loading logs and outputs from nodeData:`, nodeData);
+    console.log(`[CustomNode ${id}] Loading unified outputs from nodeData:`, nodeData);
     
-    let logsToLoad: LogEntry[] = [];
-    let outputsToLoad: Record<string, any> = {};
+    let outputsToLoad: any[] = [];
     
-    // Primary location: node.logs (updated backend saves here)
-    if (nodeData.logs && Array.isArray(nodeData.logs)) {
-      console.log(`[CustomNode ${id}] Found logs in nodeData.logs:`, nodeData.logs);
-      logsToLoad = nodeData.logs;
-    } 
-    // Fallback locations for backward compatibility
-    else if (nodeData.execution_result && nodeData.execution_result.logs && Array.isArray(nodeData.execution_result.logs)) {
-      console.log(`[CustomNode ${id}] Found logs in nodeData.execution_result.logs:`, nodeData.execution_result.logs);
-      logsToLoad = nodeData.execution_result.logs;
-    } 
-    else if (nodeData.lastExecution && nodeData.lastExecution.logs && Array.isArray(nodeData.lastExecution.logs)) {
-      console.log(`[CustomNode ${id}] Found logs in nodeData.lastExecution.logs:`, nodeData.lastExecution.logs);
-      logsToLoad = nodeData.lastExecution.logs;
-    } 
+    // Primary location: node.unified_outputs (new format)
+    if (nodeData.unified_outputs && Array.isArray(nodeData.unified_outputs)) {
+      console.log(`[CustomNode ${id}] Found unified_outputs in nodeData:`, nodeData.unified_outputs);
+      outputsToLoad = nodeData.unified_outputs;
+    }
+    // Fallback: combine logs and output_html manually for backward compatibility
     else {
-      console.log(`[CustomNode ${id}] No logs found in any location`);
+      console.log(`[CustomNode ${id}] No unified_outputs, falling back to separate logs + output_html`);
+      const logs = nodeData.logs || nodeData.lastExecution?.logs || [];
+      const richOutputs = nodeData.output_html || nodeData.lastExecution?.output_html || {};
+      
+      // Add logs as text outputs
+      logs.forEach((log: any, index: number) => {
+        outputsToLoad.push({
+          type: 'text',
+          content: log.message,
+          order: index
+        });
+      });
+      
+      // Add rich outputs
+      Object.entries(richOutputs).forEach(([varName, output], index) => {
+        outputsToLoad.push({
+          type: 'rich',
+          var_name: varName,
+          content: output,
+          order: logs.length + index
+        });
+      });
     }
     
-    // Load rich HTML outputs
-    if (nodeData.output_html && typeof nodeData.output_html === 'object') {
-      console.log(`[CustomNode ${id}] Found output_html in nodeData:`, nodeData.output_html);
-      outputsToLoad = nodeData.output_html;
-    }
-    else if (nodeData.lastExecution && nodeData.lastExecution.output_html && typeof nodeData.lastExecution.output_html === 'object') {
-      console.log(`[CustomNode ${id}] Found output_html in lastExecution:`, nodeData.lastExecution.output_html);
-      outputsToLoad = nodeData.lastExecution.output_html;
+    // Add error message to outputs if node failed
+    if ((nodeData.status === 'failed' || nodeData.lastExecution?.status === 'error') && 
+        (nodeData.error_message || nodeData.lastExecution?.error_message)) {
+      const errorMessage = nodeData.error_message || nodeData.lastExecution?.error_message;
+      const errorTraceback = nodeData.error_traceback || nodeData.lastExecution?.error_traceback;
+      
+      outputsToLoad.push({
+        type: 'error',
+        content: errorMessage,
+        traceback: errorTraceback,
+        order: outputsToLoad.length
+      });
     }
     
-    if (logsToLoad.length > 0) {
-      console.log(`[CustomNode ${id}] Setting execution logs:`, logsToLoad);
-      setExecutionLogs(logsToLoad);
+    if (outputsToLoad.length > 0) {
+      console.log(`[CustomNode ${id}] Setting unified outputs:`, outputsToLoad);
+      setUnifiedOutputs(outputsToLoad);
     } else {
-      console.log(`[CustomNode ${id}] No logs to load, clearing execution logs`);
-      setExecutionLogs([]);
-    }
-    
-    if (Object.keys(outputsToLoad).length > 0) {
-      console.log(`[CustomNode ${id}] Setting rich outputs:`, outputsToLoad);
-      setRichOutputs(outputsToLoad);
-    } else {
-      console.log(`[CustomNode ${id}] No rich outputs to load`);
-      setRichOutputs({});
+      console.log(`[CustomNode ${id}] No outputs to load`);
+      setUnifiedOutputs([]);
     }
   }, [nodeData, id]);
 
@@ -151,7 +160,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       });
       updateNodeInternals(id);
     }
-  }, [id, nodeData.inputs?.length, nodeData.outputs?.length, updateNodeInternals, logsOpen]);
+  }, [id, nodeData.inputs?.length, nodeData.outputs?.length, updateNodeInternals]);
 
   // Handle single node execution
   const handleRunNode = async () => {
@@ -182,13 +191,8 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
 
       console.log('📥 CustomNode: Received response from backend:', JSON.stringify(result, null, 2));
 
-      // Update logs with execution results
-      if (result.logs && Array.isArray(result.logs)) {
-        console.log(`📝 CustomNode: Updating logs with ${result.logs.length} entries`);
-        setExecutionLogs(result.logs);
-      } else {
-        console.warn('⚠️ CustomNode: No logs received or logs not in expected format');
-      }
+      // Logs are now part of unified_outputs, no need to set them separately
+      console.log(`📝 CustomNode: Execution complete, outputs will be loaded from file`);
       
       if (result.status === 'completed') {
         console.log('✅ CustomNode: Node execution completed successfully');
@@ -241,17 +245,15 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     const descriptionHeight = nodeData.description ? Math.min(60, nodeData.description.length / 2) : 0; // Dynamic based on description length
     const functionNameHeight = 30; // Function name section
     const runButtonHeight = 45; // Run button section
-    const logsButtonHeight = nodeData.logs?.length ? 30 : 0; // Logs accordion button if logs exist
+    const outputsButtonHeight = unifiedOutputs.length ? 30 : 0; // Outputs accordion button if outputs exist
     
-    // Calculate height for logs content when expanded
-    const logsContentHeight = logsOpen && nodeData.logs?.length ? 
-      // Base height (accordion header) + content height (based on number of logs, max 200px)
-      30 + Math.min(200, nodeData.logs.length * 20) : 0;
+    // Calculate height for outputs content when expanded (simplified - no need to calculate exact height)
+    const outputsContentHeight = 0; // Will be handled by overflow-y-auto
     
     // Calculate base height from component parts
     const baseHeight = headerHeight + contentPadding + descriptionHeight + 
-                      functionNameHeight + runButtonHeight + logsButtonHeight + 
-                      logsContentHeight;
+                      functionNameHeight + runButtonHeight + outputsButtonHeight + 
+                      outputsContentHeight;
     
     // Calculate height for input and output ports
     const inputsHeight = (nodeData.inputs?.length || 0) * 32; // 32px per input port
@@ -264,7 +266,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     const minimumHeight = 180;
     
     return Math.max(minimumHeight, baseHeight + inputsHeight + outputsHeight + dividerHeight);
-  }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, nodeData.logs?.length, logsOpen]);
+  }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, unifiedOutputs.length]);
 
   return (
     <div
@@ -285,6 +287,20 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         minWidth={209}
         minHeight={240}
         isVisible={selected}
+        onResize={(event, params) => {
+          // Update local dimensions state
+          setDimensions({
+            width: params.width,
+            height: params.height
+          });
+          // Update node data with new dimensions
+          if (nodeData) {
+            nodeData.width = params.width;
+            nodeData.height = params.height;
+          }
+          // Update handle positions
+          updateNodeInternals(id);
+        }}
         handleStyle={{
           width: 12,
           height: 12,
@@ -298,10 +314,6 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         lineStyle={{
           borderColor: "#f1f1f1",
           opacity: 0.8,
-        }}
-        onResize={(_, params) => {
-          setDimensions({ width: params.width, height: params.height });
-          updateNodeInternals(id);
         }}
       />
 
@@ -524,103 +536,121 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           )}
         </button>
         
-        {/* Rich Output section - Show first for Python/R nodes with outputs */}
-        {richOutputs && Object.keys(richOutputs).length > 0 && (nodeData.language === 'python' || nodeData.language === 'r') && (
-          <div className="mt-2">
-            <div 
-              className="w-full text-xs font-semibold text-foreground py-1 px-0 flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
-              onClick={() => {
-                setOutputsOpen(!outputsOpen);
-                setTimeout(() => updateNodeInternals(id), 300);
-              }}
-            >
-              <svg 
-                className={cn(
-                  "h-3 w-3 transition-transform",
-                  outputsOpen ? "rotate-90" : ""
-                )}
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-                strokeWidth="2"
+        {/* Unified Output section - Shows logs, rich outputs, and errors in execution order */}
+        {unifiedOutputs && unifiedOutputs.length > 0 && (() => {
+          // Filter outputs to count only what will be displayed
+          const internalVars = ['plt', 'np', 'pd', 'idx', 'fig_name', 'rich_output', 'sys', 'os', 'math', 'random'];
+          const displayCount = unifiedOutputs.filter(output => {
+            if (output.type === 'text') return true;
+            if (output.type === 'error') return true;
+            if (output.type === 'rich') {
+              if (output.var_name && internalVars.includes(output.var_name)) return false;
+              if (output.content?.text && output.content.text.includes('module') && output.content.text.includes('from')) return false;
+              return true;
+            }
+            return false;
+          }).length;
+          
+          return (
+            <div className="mt-2">
+              <div 
+                className="w-full text-xs font-semibold text-foreground py-1 px-0 flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
+                onClick={() => {
+                  setOutputsOpen(!outputsOpen);
+                  setTimeout(() => updateNodeInternals(id), 300);
+                }}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-              Output ({Object.keys(richOutputs).length})
-            </div>
+                <svg 
+                  className={cn(
+                    "h-3 w-3 transition-transform",
+                    outputsOpen ? "rotate-90" : ""
+                  )}
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                Output ({displayCount})
+              </div>
             
             {outputsOpen && (
               <div 
-                className="mt-1 bg-background rounded border border-border shadow-sm"
-                style={{ maxHeight: '400px', overflowY: 'auto' }}
+                className="mt-2 overflow-y-auto space-y-1"
+                style={{ maxHeight: '2000px' }}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <RichOutputViewer outputs={richOutputs} className="p-2" />
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Debug Logs section - Collapsed by default, only show if there are logs */}
-        {executionLogs && executionLogs.length > 0 && (
-          <div className="mt-2">
-            <div 
-              className="w-full text-xs font-medium text-muted-foreground py-1 px-0 flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
-              onClick={() => {
-                setLogsOpen(!logsOpen);
-                setTimeout(() => updateNodeInternals(id), 300);
-              }}
-            >
-              <svg 
-                className={cn(
-                  "h-3 w-3 transition-transform",
-                  logsOpen ? "rotate-90" : ""
-                )}
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-              Debug Logs ({executionLogs.length})
-            </div>
-            
-            {logsOpen && (
-              <div 
-                className="max-h-48 overflow-y-auto bg-muted/30 rounded text-xs border border-border"
-                onMouseDown={(e) => e.stopPropagation()}
-                onMouseMove={(e) => {
-                  const selection = window.getSelection();
-                  if (selection && selection.toString().length > 0) {
-                    e.stopPropagation();
+                {unifiedOutputs.map((output, index) => {
+                  console.log(`[CustomNode ${id}] Rendering output ${index}:`, output.type, output.var_name);
+                  
+                  if (output.type === 'text') {
+                    // Render text output (print statements)
+                    return (
+                      <pre 
+                        key={index}
+                        className="text-xs p-1 select-text text-wrap font-mono text-foreground"
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {output.content}
+                      </pre>
+                    );
+                  } else if (output.type === 'error') {
+                    // Render error output
+                    return (
+                      <div key={index} className="p-2 bg-red-50 border border-red-200 rounded text-xs">
+                        <div className="font-semibold text-red-800 mb-1 flex items-center gap-1">
+                          <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                          </svg>
+                          Error
+                        </div>
+                        <pre className="text-red-700 whitespace-pre-wrap font-mono text-xs select-text">
+                          {output.content}
+                        </pre>
+                        {output.traceback && (
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-red-600 hover:text-red-800 font-medium">
+                              Show Traceback
+                            </summary>
+                            <pre className="mt-1 text-red-600 whitespace-pre-wrap font-mono text-xs select-text max-h-40 overflow-y-auto">
+                              {output.traceback}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    );
+                  } else if (output.type === 'rich') {
+                    // Filter out internal variables
+                    const internalVars = ['plt', 'np', 'pd', 'idx', 'fig_name', 'rich_output', 'sys', 'os', 'math', 'random'];
+                    if (output.var_name && internalVars.includes(output.var_name)) {
+                      return null;
+                    }
+                    
+                    // Skip module representations
+                    if (output.content?.text && output.content.text.includes('module') && output.content.text.includes('from')) {
+                      return null;
+                    }
+                    
+                    // Render rich output (plots, dataframes, etc.)
+                    const htmlContent = typeof output.content === 'string' ? output.content : output.content?.html;
+                    if (!htmlContent) return null;
+                    
+                    return (
+                      <div key={index} className="rich-output-content">
+                        <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+                      </div>
+                    );
                   }
-                }}
-              >
-                {executionLogs.map((log: LogEntry, index: number) => (
-                  <pre 
-                    key={index} 
-                    className="text-xs p-2 border-b border-border/50 select-text text-wrap cursor-text hover:bg-muted/50 font-mono"
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onDoubleClick={(e) => {
-                      e.stopPropagation();
-                      const selection = window.getSelection();
-                      const range = document.createRange();
-                      range.selectNodeContents(e.currentTarget);
-                      selection?.removeAllRanges();
-                      selection?.addRange(range);
-                    }}
-                  >
-                    {log.message}
-                  </pre>
-                ))}
+                  return null;
+                })}
               </div>
             )}
           </div>
-        )}
+        );
+        })()}
       </div>
     </div>
   );

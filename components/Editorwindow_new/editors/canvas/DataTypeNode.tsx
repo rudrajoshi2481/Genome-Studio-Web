@@ -34,7 +34,32 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
   );
   const [label, setLabel] = useState<string>(nodeData.label || nodeData.dataType);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
+  const [labelError, setLabelError] = useState<string>('');
   const labelInputRef = useRef<HTMLInputElement>(null);
+
+  // Validate variable name
+  const isValidVariableName = (name: string): { valid: boolean; error: string } => {
+    if (!name || name.trim() === '') {
+      return { valid: false, error: 'Variable name cannot be empty' };
+    }
+    
+    // Check if starts with a number
+    if (/^\d/.test(name)) {
+      return { valid: false, error: 'Cannot start with a number' };
+    }
+    
+    // Check for spaces
+    if (/\s/.test(name)) {
+      return { valid: false, error: 'Cannot contain spaces' };
+    }
+    
+    // Check for special characters (only alphanumeric and underscore allowed)
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+      return { valid: false, error: 'Only letters, numbers, and underscores allowed' };
+    }
+    
+    return { valid: true, error: '' };
+  };
 
   // Sync value with node data when it changes externally
   useEffect(() => {
@@ -116,6 +141,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
     setValue(newValue);
     
     // Update the node data in ReactFlow
+    // This will trigger onNodesChange which sets the dirty flag
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === id) {
@@ -130,6 +156,12 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return node;
       })
     );
+    
+    // Manually trigger dirty flag if setDirty is available in node data
+    if (nodeData.setDirty && nodeData.tabId && nodeData.updateTab) {
+      nodeData.setDirty(nodeData.tabId, true);
+      nodeData.updateTab(nodeData.tabId, { isDirty: true });
+    }
   };
 
   // Handle label change
@@ -137,6 +169,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
     setLabel(newLabel);
     
     // Update the node data in ReactFlow
+    // This will trigger onNodesChange which sets the dirty flag
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === id) {
@@ -151,15 +184,35 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return node;
       })
     );
+    
+    // Manually trigger dirty flag if setDirty is available in node data
+    if (nodeData.setDirty && nodeData.tabId && nodeData.updateTab) {
+      nodeData.setDirty(nodeData.tabId, true);
+      nodeData.updateTab(nodeData.tabId, { isDirty: true });
+    }
   };
 
   // Handle label blur
   const handleLabelBlur = () => {
+    const validation = isValidVariableName(label);
+    
+    if (!validation.valid) {
+      // If validation fails, show error and revert to previous valid label
+      setLabelError(validation.error);
+      setLabel(nodeData.label || nodeData.dataType);
+      setIsEditingLabel(false);
+      
+      // Clear error after 3 seconds
+      setTimeout(() => setLabelError(''), 3000);
+      return;
+    }
+    
+    setLabelError('');
     setIsEditingLabel(false);
-    if (!label.trim()) {
-      const defaultLabel = nodeData.dataType;
-      setLabel(defaultLabel);
-      handleLabelChange(defaultLabel);
+    
+    if (label !== nodeData.label) {
+      // If label has changed and is valid, save it
+      handleLabelChange(label);
     }
   };
 
@@ -290,11 +343,19 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
                   onKeyDown={(e) => {
                     e.stopPropagation();
                     if (e.key === 'Enter') {
-                      handleLabelChange(label);
-                      setIsEditingLabel(false);
+                      const validation = isValidVariableName(label);
+                      if (validation.valid) {
+                        handleLabelChange(label);
+                        setIsEditingLabel(false);
+                        setLabelError('');
+                      } else {
+                        setLabelError(validation.error);
+                        setTimeout(() => setLabelError(''), 3000);
+                      }
                     } else if (e.key === 'Escape') {
                       setLabel(nodeData.label || nodeData.dataType);
                       setIsEditingLabel(false);
+                      setLabelError('');
                     }
                   }}
                   className="text-xs font-medium text-gray-800 bg-white/80 border border-gray-300 rounded px-1 py-0.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -311,6 +372,13 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
             </div>
           </div>
         </div>
+
+        {/* Error Message */}
+        {labelError && (
+          <div className="px-3 py-1 bg-red-50 border-t border-red-200">
+            <p className="text-xs text-red-600">{labelError}</p>
+          </div>
+        )}
 
         {/* Content */}
         <div className="px-3 py-3 bg-white">

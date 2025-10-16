@@ -1,11 +1,13 @@
 "use client"
 import React, { useState } from 'react'
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { PlayIcon, XIcon, Loader2, PlusIcon } from "lucide-react"
+import { PlayIcon, XIcon, Loader2, PlusIcon, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useNodeStore } from './nodeStore'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import TagInput from './TagInput'
+import { CopyToChatGPT } from './CopyToChatGPT'
+import CustomizeDialog from './CustomizeDialog'
 import { toast } from "sonner"
 import {
   Dialog,
@@ -166,20 +168,17 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       setNodeLanguage((nodeToEdit.language || 'python').charAt(0).toUpperCase() + (nodeToEdit.language || 'python').slice(1) as 'Python' | 'R');
       setCode(nodeToEdit.source_code || '');
       
-      // Set tags if available
+      // Set tags directly if available
       if (Array.isArray(nodeToEdit.tags)) {
-        // Reset tags first
-        const currentTags = [...tags];
-        currentTags.forEach(tag => removeTag(tag));
-        
-        // Then add new tags
-        nodeToEdit.tags.forEach((tag: string) => addTag(tag));
+        setTags(nodeToEdit.tags);
+      } else {
+        setTags([]);
       }
     } else {
       setIsEditMode(false);
       setEditNodeId(null);
     }
-  }, [nodeToEdit]);
+  }, [nodeToEdit, setNodeName, setDescription, setNodeLanguage, setCode, setTags]);
   
   // Reset form when dialog closes
   const handleDialogOpenChange = (open: boolean) => {
@@ -524,70 +523,88 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
   }
   
   return (
-    <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
-      {!hideCreateButton && !isEditMode && (
-        <DialogTrigger asChild>
-          <Button className="m-5">
-            Create Custom Node
-          </Button>
-        </DialogTrigger>
-      )}
-      
-      <LargeDialogContent>
-        <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle>{isEditMode ? 'Edit Custom Node' : 'Create Custom Node'}</DialogTitle>
-          <DialogDescription>
+    <>
+      {/* Create/Edit Node Dialog */}
+      <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
+        {!hideCreateButton && !isEditMode && (
+          <div className="flex items-center gap-2 m-5">
+            <DialogTrigger asChild>
+              <Button>
+                Create Custom Node
+              </Button>
+            </DialogTrigger>
+            
+            {/* Customize Button */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon" title="Customize">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <CustomizeDialog />
+            </Dialog>
+          </div>
+        )}
+        
+        <LargeDialogContent>
+        <DialogHeader className="px-6 py-3 border-b shrink-0">
+          <DialogTitle className="text-lg">{isEditMode ? 'Edit Custom Node' : 'Create Custom Node'}</DialogTitle>
+          <DialogDescription className="text-sm">
             {isEditMode ? 'Edit your custom node properties and code.' : 'Create a custom node with Python or R code.'}
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-0">
           <ResizablePanelGroup direction="horizontal" className="h-full">
             {/* Sidebar */}
-            <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="bg-muted/10">
-              <div className="p-4 h-full overflow-y-auto">
-                <h3 className="font-medium mb-3">Properties</h3>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Node Name</label>
-                    <input 
-                      type="text" 
-                      className="w-full px-3 py-2 border rounded-md text-sm" 
-                      placeholder="Enter name..." 
-                      value={nodeName}
-                      onChange={(e) => setNodeName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Description</label>
-                    <Textarea 
-                      className="w-full px-3 py-2 border rounded-md text-sm" 
-                      placeholder="Enter description..." 
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Language</label>
-                    <select 
-                      className="w-full px-3 py-2 border rounded-md text-sm"
-                      value={nodeLanguage}
-                      onChange={(e) => setNodeLanguage(e.target.value as 'Python' | 'R' | 'Bash')}
-                    >
-                      <option>Python</option>
-                      <option>R</option>
-                      <option>Bash</option>
-                    </select>
-                  </div>
+            <ResizablePanel defaultSize={30} minSize={25} maxSize={40}>
+              <div className="h-full flex flex-col border-r">
+                <div className="px-4 py-2.5 border-b">
+                  <h3 className="font-semibold text-sm">Properties</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Node Name</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" 
+                        placeholder="Enter name..." 
+                        value={nodeName}
+                        onChange={(e) => setNodeName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Description</label>
+                      <Textarea 
+                        className="w-full min-h-[80px] resize-none" 
+                        placeholder="Enter description..." 
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Language</label>
+                      <select 
+                        className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                        value={nodeLanguage}
+                        onChange={(e) => setNodeLanguage(e.target.value as 'Python' | 'R' | 'Bash')}
+                      >
+                        <option>Python</option>
+                        <option>R</option>
+                        <option>Bash</option>
+                      </select>
+                    </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Tags</label>
-                    <TagInput
-                      tags={tags}
-                      onAddTag={addTag}
-                      onRemoveTag={removeTag}
-                      placeholder="Add a tag..."
-                    />
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Tags</label>
+                      <TagInput
+                        tags={tags}
+                        onAddTag={addTag}
+                        onRemoveTag={removeTag}
+                        placeholder="Add a tag..."
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -596,35 +613,51 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             <ResizableHandle withHandle />
             
             {/* Main content area */}
-            <ResizablePanel defaultSize={75} className="overflow-hidden">
-              <div className="h-full">
+            <ResizablePanel defaultSize={70}>
+              <div className="h-full flex flex-col">
                 <ResizablePanelGroup direction="vertical" className="h-full">
                   {/* Code Editor Section */}
-                  <ResizablePanel defaultSize={60} minSize={30} className="overflow-hidden">
-                    <div className="p-4 h-full overflow-hidden flex flex-col">
-                      <h3 className="font-medium mb-2 px-2">Node Code</h3>
-                      <div className="flex-1 border rounded-md overflow-hidden">
+                  <ResizablePanel defaultSize={60} minSize={30}>
+                    <div className="h-full flex flex-col">
+                      <div className="px-4 py-1.5 border-b flex items-center justify-between shrink-0">
+                        <h3 className="font-semibold text-sm">Node Code</h3>
+                        <div className="flex items-center gap-2">
+                          <CopyToChatGPT
+                            code={code}
+                            language={nodeLanguage}
+                            nodeName={nodeName}
+                            description={description}
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={handleTestCode}
+                            disabled={testLoading}
+                            className="h-8"
+                          >
+                            {testLoading ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                Testing...
+                              </>
+                            ) : (
+                              <>
+                                <PlayIcon className="w-3.5 h-3.5 mr-1.5" />
+                                Test Node
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-hidden">
                         <SimpleCodeEditor 
                           value={code} 
                           onChange={setCode} 
                           extension={nodeLanguage.toLowerCase()} 
                         />
-                      </div>
-                      <div className="flex justify-end mt-2">
-                        <Button 
-                          variant="outline" 
-                          onClick={handleTestCode}
-                          disabled={testLoading}
-                        >
-                          <div className="flex items-center gap-2">
-                            {testLoading ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <PlayIcon className="w-4 h-4" />
-                            )}
-                            Test Node
-                          </div>
-                        </Button>
                       </div>
                     </div>
                   </ResizablePanel>
@@ -632,10 +665,12 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                   <ResizableHandle withHandle />
                   
                   {/* Node Connections Section */}
-                  <ResizablePanel defaultSize={40} minSize={20} className="overflow-hidden">
-                    <div className="p-4 h-full overflow-hidden flex flex-col">
-                      <h3 className="font-medium px-2">Node Connections</h3>
-                      <div className="flex-1 border bg-background overflow-auto p-6">
+                  <ResizablePanel defaultSize={40} minSize={20}>
+                    <div className="h-full flex flex-col">
+                      <div className="px-4 py-2.5 border-b shrink-0">
+                        <h3 className="font-semibold text-sm">Node Connections</h3>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-6">
                         {testResult && testResult.node && (
                           <div className="space-y-6 pt-6">
                             
@@ -759,35 +794,51 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           </ResizablePanelGroup>
         </div>
         
-        <DialogFooter className="px-6 py-4 border-t">
-          <DialogClose asChild>
-            <button 
-              className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-md text-sm font-medium"
-              onClick={resetNode}
-            >
-              Cancel
-            </button>
-          </DialogClose>
-          <Button 
-            className="ml-2" 
-            onClick={handleSaveNode} 
-            disabled={isSaving || !!saveError || !nodeName}
-            variant={saveSuccess ? "secondary" : "default"}
-          >
-            <div className="flex items-center gap-2">
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <span>{isEditMode ? (saveSuccess ? 'Updated!' : 'Update Node') : (saveSuccess ? 'Saved!' : 'Save Node')}</span>
+        <DialogFooter className="px-6 py-3 border-t shrink-0 bg-background">
+          <div className="flex items-center justify-between w-full gap-4">
+            <div className="flex items-center gap-2 flex-1">
+              {saveError && (
+                <div className="text-sm text-destructive flex items-center gap-2">
+                  <span className="text-xs">{saveError}</span>
+                </div>
+              )}
+              {saveSuccess && (
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <span className="text-xs">✓ {isEditMode ? 'Node updated successfully!' : 'Node saved successfully!'}</span>
+                </div>
               )}
             </div>
-          </Button>
+            <div className="flex gap-2">
+              <DialogClose asChild>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={resetNode}
+                >
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button 
+                size="sm"
+                onClick={handleSaveNode} 
+                disabled={isSaving || !!saveError || !nodeName}
+                variant={saveSuccess ? "secondary" : "default"}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <span>{isEditMode ? (saveSuccess ? 'Updated!' : 'Update Node') : (saveSuccess ? 'Saved!' : 'Save Node')}</span>
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogFooter>
       </LargeDialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   )
 }
 

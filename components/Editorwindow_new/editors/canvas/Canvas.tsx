@@ -48,6 +48,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [executionStatus, setExecutionStatus] = useState<WorkflowExecutionStatus | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // Flag to prevent dirty on initial load
   
   const { updateContent, setDirty, setSaved, registerSaveCallback, unregisterSaveCallback } = useEditorContext();
   const { updateTab } = useTabStore();
@@ -61,8 +62,10 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
       setIsLoading(true);
       setError(null);
       
-      console.log('📂 Canvas: Loading file content for:', filePath);
+      const timestamp = new Date().toISOString();
+      console.log(`📂 Canvas [${timestamp}]: Loading file content for:`, filePath);
       const fileContent = await editorAPI.getFileContent(filePath);
+      console.log(`📂 Canvas [${timestamp}]: File content received, length:`, fileContent.content?.length);
       
       // Parse workflow content using the new file parser
       if (fileContent.content) {
@@ -85,6 +88,14 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
           }));
           
           console.log('✅ Canvas: Loaded flow format - nodes:', nodesWithFilePath.length, 'edges:', reactFlowEdges.length);
+          
+          // Log execution status of nodes
+          nodesWithFilePath.forEach(node => {
+            if (node.data.status || node.data.unified_outputs) {
+              console.log(`  📊 Node ${node.id}: status=${node.data.status}, outputs=${node.data.unified_outputs?.length || 0}`);
+            }
+          });
+          
           setNodes(nodesWithFilePath);
           setEdges(reactFlowEdges);
         } else {
@@ -117,6 +128,16 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
       updateContent(tabId, fileContent.content, fileContent.version);
       setSaved(tabId, fileContent.version || 1);
       
+      // Clear dirty flag after loading (in case ReactFlow triggers changes)
+      setDirty(tabId, false);
+      updateTab(tabId, { isDirty: false });
+      
+      // Mark that initial load is complete after a short delay
+      // This allows ReactFlow to finish its initialization
+      setTimeout(() => {
+        setIsInitialLoad(false);
+      }, 100);
+      
       console.log('✅ Canvas: File content loaded successfully');
     } catch (error) {
       console.error('❌ Canvas: Error loading file content:', error);
@@ -124,7 +145,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [filePath, tabId, updateContent, setSaved]);
+  }, [filePath, tabId, updateContent, setSaved, setDirty, updateTab]);
 
   // Handle edge connections
   const onConnect = useCallback((params: Connection) => {
@@ -139,9 +160,13 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
       }
     };
     setEdges((eds) => addEdge(newEdge, eds));
-    setDirty(tabId, true);
-    updateTab(tabId, { isDirty: true });
-  }, [setEdges, setDirty, tabId, updateTab]);
+    
+    // Only set dirty if not during initial load
+    if (!isInitialLoad) {
+      setDirty(tabId, true);
+      updateTab(tabId, { isDirty: true });
+    }
+  }, [setEdges, setDirty, tabId, updateTab, isInitialLoad]);
 
   // Save file content using proper flow format
   const saveFileContent = useCallback(async () => {
@@ -195,11 +220,15 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
       
       toast.success('Workflow saved successfully');
       console.log('✅ Canvas: File saved successfully');
+      
+      // Auto-refresh canvas after save to reload any updated data
+      setIsInitialLoad(true); // Prevent dirty flag during refresh
+      await loadFileContent();
     } catch (error) {
       console.error('❌ Canvas: Error saving file:', error);
       setError('Failed to save file');
     }
-  }, [filePath, tabId, nodes, edges, reactFlowInstance, updateContent, setSaved, setDirty, updateTab]);
+  }, [filePath, tabId, nodes, edges, reactFlowInstance, updateContent, setSaved, setDirty, updateTab, loadFileContent]);
 
   // Use canvas handlers hook
   const {
@@ -217,7 +246,8 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
     setEdges,
     onNodesChange,
     onEdgesChange,
-    saveFileContent
+    saveFileContent,
+    isInitialLoad
   );
 
   // Wrap the onDrop handler to provide ReactFlow instance
@@ -239,10 +269,14 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
         ...node.data,
         filePath: filePath, // Ensure filePath is always present
         onNodeDelete: handleNodeDelete,
-        onExecutionComplete: handleExecutionComplete
+        onExecutionComplete: handleExecutionComplete,
+        // Add dirty flag setters for DataTypeNode and other nodes that need to mark changes
+        setDirty: setDirty,
+        updateTab: updateTab,
+        tabId: tabId
       }
     }));
-  }, [nodes, filePath, handleNodeDelete, handleExecutionComplete]);
+  }, [nodes, filePath, handleNodeDelete, handleExecutionComplete, setDirty, updateTab, tabId]);
 
   // Load file content on mount
   useEffect(() => {
@@ -251,9 +285,11 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
 
   // Register save callback
   useEffect(() => {
+    console.log('📝 Canvas: Registering save callback for tabId:', tabId);
     registerSaveCallback(tabId, saveFileContent);
     
     return () => {
+      console.log('📝 Canvas: Unregistering save callback for tabId:', tabId);
       unregisterSaveCallback(tabId);
     };
   }, [tabId, registerSaveCallback, unregisterSaveCallback, saveFileContent]);
@@ -287,6 +323,11 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
         delete cleanedData.execution_count;
         delete cleanedData.execution_timing;
         delete cleanedData.executionStatus;
+        delete cleanedData.output_html;           // Clear rich HTML outputs
+        delete cleanedData.unified_outputs;       // Clear unified output stream
+        delete cleanedData.execution_order;       // Clear execution order number
+        delete cleanedData.error_message;         // Clear error messages
+        delete cleanedData.error_traceback;       // Clear error tracebacks
 
         return {
           ...node,

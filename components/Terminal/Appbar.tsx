@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { TerminalIcon, X as CloseIcon, Pencil, Trash2, Pin, PinOff } from 'lucide-react'
+import { TerminalIcon, X as CloseIcon, Pencil, Trash2, Pin, PinOff, ChevronDown, Zap, Box, XCircle, ArrowRight, Layers } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { useTerminalStore } from './store/terminal-store'
@@ -14,6 +14,15 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
@@ -24,9 +33,10 @@ function Appbar() {
   const [newTabName, setNewTabName] = useState('');
   const [pinnedTabs, setPinnedTabs] = useState<Set<string>>(new Set());
   
-  const handleCreateNewTab = () => {
-    createTab();
-    toast.success(`New terminal created`);
+  const handleCreateNewTab = (type: 'tmux' | 'simple' = 'tmux') => {
+    const terminalName = type === 'tmux' ? 'Tmux Terminal' : 'Bash Terminal';
+    createTab(terminalName, type);
+    toast.success(`${terminalName} created`);
   };
   
   const handleRename = () => {
@@ -75,11 +85,35 @@ function Appbar() {
       }
     }
   };
+
+  // Close all tabs to the right of the specified tab
+  const handleCloseTabsToRight = (tabId: string) => {
+    const tabIndex = tabs.findIndex(t => t.id === tabId);
+    if (tabIndex === -1 || tabIndex === tabs.length - 1) return;
+    
+    const tabsToClose = tabs.slice(tabIndex + 1);
+    tabsToClose.forEach(tab => closeTab(tab.id));
+    toast.success(`Closed ${tabsToClose.length} tab(s) to the right`);
+  };
+
+  // Close all other tabs except the specified one
+  const handleCloseOtherTabs = (tabId: string) => {
+    const otherTabs = tabs.filter(t => t.id !== tabId);
+    otherTabs.forEach(tab => closeTab(tab.id));
+    toast.success(`Closed ${otherTabs.length} other tab(s)`);
+  };
+
+  // Close all tabs
+  const handleCloseAllTabs = () => {
+    const tabCount = tabs.length;
+    tabs.forEach(tab => closeTab(tab.id));
+    toast.success(`Closed all ${tabCount} tab(s)`);
+  };
   
   return (
     <>
       <div className='flex justify-between border-b w-full p-1 pr-3'>
-        <div>
+        <div className="flex-1 min-w-0 relative">
           <div className="flex items-center space-x-1 overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => {
               const isPinned = pinnedTabs.has(tab.id);
@@ -142,37 +176,98 @@ function Appbar() {
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem
-                    variant="destructive"
-                    onClick={() => {
-                      closeTab(tab.id);
-                      toast.info(`Closed terminal tab: ${tab.name}`);
-                    }}
+                    onClick={() => closeTab(tab.id)}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Close
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => handleCloseOtherTabs(tab.id)}
+                    disabled={tabs.length <= 1}
+                  >
+                    <Layers className="mr-2 h-4 w-4" />
+                    Close Others
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => handleCloseTabsToRight(tab.id)}
+                    disabled={tabs.findIndex(t => t.id === tab.id) === tabs.length - 1}
+                  >
+                    <ArrowRight className="mr-2 h-4 w-4" />
+                    Close to the Right
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={handleCloseAllTabs}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Close All
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
               );
             })}
           </div>
+          {/* Gradient fade indicator for overflow */}
+          <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background to-transparent pointer-events-none" />
         </div>
         <div className='flex items-center gap-2'>
-          <div>
+          <div className="flex items-center">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button 
-                  variant='ghost' 
-                  size='icon'
-                  onClick={handleCreateNewTab}
+                  variant="outline" 
+                  size="sm"
+                  className="rounded-r-none border-r-0"
+                  onClick={() => handleCreateNewTab('simple')}
                 >
-                  <TerminalIcon />
+                  <TerminalIcon className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>New Terminal</p>
+                <p>New Bash Terminal</p>
               </TooltipContent>
             </Tooltip>
+            
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="rounded-l-none px-2"
+                    >
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>More Options</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>New Terminal</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={() => handleCreateNewTab('tmux')}>
+                    <Zap className="h-4 w-4 mr-2" />
+                    <div className="flex flex-col">
+                      <span>Tmux Terminal</span>
+                      <span className="text-xs text-muted-foreground">Persistent session</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleCreateNewTab('simple')}>
+                    <Box className="h-4 w-4 mr-2" />
+                    <div className="flex flex-col">
+                      <span>Bash Terminal</span>
+                      <span className="text-xs text-muted-foreground">Non-persistent</span>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <Separator orientation="vertical" />
           <TerminalStyleStats />

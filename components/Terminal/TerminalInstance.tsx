@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useAuthStore } from '@/lib/stores/auth-store'
+import { useTerminalStore } from './store/terminal-store'
 import TerminalSessionManager from './services/TerminalSessionManager';
 // import CompactSystemStats from './SystemStats/CompactSystemStats';
 import 'xterm/css/xterm.css'
@@ -49,6 +50,11 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
   const [error, setError] = useState<string | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
   const { token } = useAuthStore()
+  const { tabs } = useTerminalStore()
+  
+  // Get current tab info
+  const currentTab = tabs.find(tab => tab.id === tabId)
+  const terminalType = currentTab?.type || 'tmux'
   
   // Track container dimensions dynamically
   const containerDimensions = useDimensions(terminalRef);
@@ -108,7 +114,7 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
 
         // Connect WebSocket if we have a token and not already connected
         if (token && !session.isConnected) {
-          const connected = await sessionManager.connectWebSocket(tabId, token, host, port);
+          const connected = await sessionManager.connectWebSocket(tabId, token, host, port, terminalType);
           if (isMounted) {
             setConnected(connected);
             if (!connected) {

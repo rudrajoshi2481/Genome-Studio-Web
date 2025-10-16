@@ -216,3 +216,179 @@ export const updateCustomNode = async (token: string, nodeId: string | number, n
     throw error;
   }
 };
+
+/**
+ * Duplicate a custom node
+ * @param token JWT authentication token
+ * @param nodeId ID of the node to duplicate
+ * @returns The newly created duplicate node
+ */
+export const duplicateCustomNode = async (token: string, nodeId: string | number): Promise<CustomNode> => {
+  try {
+    console.log(`Duplicating custom node: ${nodeId}`);
+    
+    if (!token) {
+      console.error('No authentication token provided');
+      throw new Error('Authentication token is required');
+    }
+    
+    const fullUrl = `${API_URL}/workflow-manager/custom-nodes/${nodeId}/duplicate`;
+    console.log(`Making POST request to: ${fullUrl}`);
+    
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    });
+
+    console.log('API response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error duplicating node:', response.status, errorText);
+      throw new Error(`Failed to duplicate node: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Duplicate node response:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in duplicateCustomNode:', error);
+    throw error;
+  }
+};
+
+/**
+ * Toggle favorite status for a custom node
+ * @param token JWT authentication token
+ * @param nodeId ID of the node to toggle favorite
+ * @returns Updated favorite status
+ */
+export const toggleFavoriteNode = async (token: string, nodeId: string): Promise<{ is_favorited: boolean; favorite_nodes: string[] }> => {
+  try {
+    console.log(`Toggling favorite for node: ${nodeId}`);
+    
+    if (!token) {
+      console.error('No authentication token provided');
+      throw new Error('Authentication token is required');
+    }
+    
+    const fullUrl = `${API_URL}/workflow-manager/custom-nodes/${nodeId}/favorite`;
+    console.log(`Making POST request to: ${fullUrl}`);
+    
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    });
+
+    console.log('API response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error toggling favorite:', response.status, errorText);
+      throw new Error(`Failed to toggle favorite: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Toggle favorite response:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in toggleFavoriteNode:', error);
+    throw error;
+  }
+};
+
+/**
+ * Bulk upload multiple custom nodes
+ * @param token JWT authentication token
+ * @param nodesData Array of node data objects
+ * @returns Upload result with created and failed counts
+ */
+export const bulkUploadNodes = async (token: string, nodesData: any[]): Promise<any> => {
+  try {
+    console.log(`Bulk uploading ${nodesData.length} nodes`);
+    
+    if (!token) {
+      console.error('No authentication token provided');
+      throw new Error('Authentication token is required');
+    }
+    
+    const fullUrl = `${API_URL}/workflow-manager/custom-nodes/bulk-upload`;
+    console.log(`Making POST request to: ${fullUrl}`);
+    
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      },
+      body: JSON.stringify(nodesData)
+    });
+
+    console.log('API response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error uploading nodes:', response.status, errorText);
+      throw new Error(`Failed to upload nodes: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Bulk upload response:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in bulkUploadNodes:', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch user's favorite node IDs
+ * @param token JWT authentication token
+ * @returns Array of favorite node IDs
+ */
+export const getFavoriteNodes = async (token: string): Promise<string[]> => {
+  try {
+    console.log('Fetching favorite nodes');
+    
+    if (!token) {
+      console.error('No authentication token provided');
+      throw new Error('Authentication token is required');
+    }
+    
+    const fullUrl = `${API_URL}/workflow-manager/custom-nodes/favorites/list`;
+    console.log(`Making GET request to: ${fullUrl}`);
+    
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    });
+
+    console.log('API response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error fetching favorites:', response.status, errorText);
+      throw new Error(`Failed to fetch favorites: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Favorites response:', data);
+    return data.favorite_nodes || [];
+  } catch (error) {
+    console.error('Error in getFavoriteNodes:', error);
+    throw error;
+  }
+};

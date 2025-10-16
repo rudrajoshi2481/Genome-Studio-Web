@@ -93,10 +93,11 @@ function SimpleCodeEditor({ value, onChange, extension = '', readOnly = false }:
       ]
     })
 
-    // Create editor view
+    // Create editor view with proper styling
     const view = new EditorView({
       state,
-      parent: editorRef.current
+      parent: editorRef.current,
+      root: editorRef.current.getRootNode() as Document | ShadowRoot
     })
 
     viewRef.current = view
@@ -117,8 +118,8 @@ function SimpleCodeEditor({ value, onChange, extension = '', readOnly = false }:
   }, [value])
 
   return (
-    <div className="w-full h-full">
-      <div ref={editorRef} className="h-full" />
+    <div className="w-full h-full overflow-auto">
+      <div ref={editorRef} className="h-full min-h-full" style={{ minHeight: '100%' }} />
     </div>
   )
 }

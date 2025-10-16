@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Save, Play, Square, RotateCcw, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Download, Save, Play, Square, RotateCcw, CheckCircle, AlertCircle, RefreshCw, Network, GitBranch, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -164,17 +164,20 @@ function Toolbar({
       if (onExecutionStatusChange) {
         onExecutionStatusChange(status);
       }
+      
+      // Reload the file to get updated node data with execution results
+      // This happens during execution so completed nodes show results immediately
+      if (onRefresh) {
+        console.log('Toolbar: Reloading file to get latest execution results');
+        onRefresh();
+      }
+      
       if (status.status === 'running') {
         setTimeout(() => pollExecutionStatus(execId), 1000);
       } else {
         setIsExecuting(false);
         if (status.status === 'completed') {
           toast.success('Workflow execution completed!');
-          // Reload the file to get updated node data with execution results
-          if (onRefresh) {
-            console.log('Toolbar: Reloading file to get execution results');
-            onRefresh();
-          }
         } else if (status.status === 'failed') {
           toast.error(`Workflow execution failed: ${status.error_message || 'Unknown error'}`);
         }
@@ -195,7 +198,7 @@ function Toolbar({
 
   return (
     <TooltipProvider>
-      <div className="flex items-center px-4 py-2 bg-background border-b border-border shadow-sm">
+      <div className="flex items-center px-4 py-0 bg-background border-b border-border shadow-sm">
         {/* File Operations (Left) */}
         <div className="flex items-center gap-2">
           <Tooltip>
@@ -236,7 +239,7 @@ function Toolbar({
                 disabled={isExecuting}
                 className="gap-1"
               >
-                <Play className="h-4 w-4" />
+                <Play className="h-2 w-2" />
                 {isExecuting ? 'Running' : 'Run'}
               </Button>
             </TooltipTrigger>
@@ -312,16 +315,38 @@ function Toolbar({
         </div>
 
         {/* Flow Info (Right) */}
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span>{nodes.length} nodes</span>
-          <Separator orientation="vertical" className="h-4" />
-          <span>{edges.length} connections</span>
-          {filePath && (
-            <>
-              <Separator orientation="vertical" className="h-4" />
-              <span className="font-mono text-xs truncate max-w-xs">{filePath}</span>
-            </>
-          )}
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Network className="h-4 w-4" />
+                <span>{nodes.length}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>{nodes.length} nodes</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <GitBranch className="h-4 w-4" />
+                <span>{edges.length}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>{edges.length} connections</TooltipContent>
+          </Tooltip>
+
+          {/* {filePath && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <FileText className="h-4 w-4" />
+                  <span className="font-mono text-xs truncate max-w-[200px]">{filePath.split('/').pop()}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{filePath}</TooltipContent>
+            </Tooltip>
+          )} */}
         </div>
       </div>
     </TooltipProvider>

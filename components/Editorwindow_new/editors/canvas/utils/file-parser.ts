@@ -111,9 +111,61 @@ export const cleanJsonContent = (content: string): string => {
       return '{}';
     }
     
-    // Verify it's valid JSON by parsing and stringifying
-    const parsed = JSON.parse(cleanedContent);
-    return JSON.stringify(parsed);
+    // Try to parse first - if it fails due to control characters, we'll fix them
+    try {
+      const parsed = JSON.parse(cleanedContent);
+      return JSON.stringify(parsed);
+    } catch (parseError) {
+      // If parsing fails due to control characters, try to fix them
+      console.warn('Initial JSON parse failed, attempting to fix control characters...', parseError);
+      
+      // More aggressive approach: escape ALL control characters in string values
+      // This handles cases where strings contain literal newlines, tabs, etc.
+      let inString = false;
+      let escaped = false;
+      let result = '';
+      
+      for (let i = 0; i < cleanedContent.length; i++) {
+        const char = cleanedContent[i];
+        const charCode = char.charCodeAt(0);
+        
+        // Track if we're inside a string
+        if (char === '"' && !escaped) {
+          inString = !inString;
+          result += char;
+          continue;
+        }
+        
+        // Track escape sequences
+        if (char === '\\' && !escaped) {
+          escaped = true;
+          result += char;
+          continue;
+        }
+        
+        // If we're in a string and encounter a control character, escape it
+        if (inString && !escaped && charCode < 32) {
+          switch (char) {
+            case '\n': result += '\\n'; break;
+            case '\r': result += '\\r'; break;
+            case '\t': result += '\\t'; break;
+            case '\f': result += '\\f'; break;
+            case '\b': result += '\\b'; break;
+            default:
+              // For other control characters, use unicode escape
+              result += '\\u' + ('0000' + charCode.toString(16)).slice(-4);
+          }
+        } else {
+          result += char;
+        }
+        
+        escaped = false;
+      }
+      
+      // Try parsing the fixed content
+      const parsed = JSON.parse(result);
+      return JSON.stringify(parsed);
+    }
   } catch (error) {
     console.error('Error cleaning JSON content:', error);
     throw new Error(`Invalid JSON content: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -98,8 +98,7 @@ class TerminalSessionManager {
           selectionForeground: '#000000',
           selectionInactiveBackground: 'rgba(59, 130, 246, 0.3)'
         },
-        rows: 24,
-        cols: 80,
+        // Don't set fixed rows/cols - let fitAddon calculate based on container
         allowTransparency: true,
         allowProposedApi: true,
         // Enable text selection
@@ -173,22 +172,25 @@ class TerminalSessionManager {
   }
 
   /**
-   * Resize terminal session
+   * Resize terminal session - uses fitAddon for automatic container-based sizing
    */
   resizeTerminal(tabId: string, rows: number, cols: number): void {
     const session = this.sessions.get(tabId);
-    if (!session) return;
+    if (!session || !session.isAttached) return;
 
-    // Only resize if dimensions actually changed
-    if (session.lastDimensions.rows !== rows || session.lastDimensions.cols !== cols) {
-      session.terminal.resize(cols, rows);
-      session.lastDimensions = { rows, cols };
+    // Use fitAddon for automatic sizing based on container
+    session.fitAddon.fit();
+    
+    // Update stored dimensions with actual values after fit
+    session.lastDimensions = {
+      rows: session.terminal.rows,
+      cols: session.terminal.cols
+    };
 
-      // Send resize to WebSocket if connected
-      if (session.websocket?.readyState === WebSocket.OPEN) {
-        const resizeMessage = `\x1b[8;${rows};${cols}t`;
-        session.websocket.send(resizeMessage);
-      }
+    // Send resize to WebSocket if connected
+    if (session.websocket?.readyState === WebSocket.OPEN) {
+      const resizeMessage = `\x1b[8;${session.terminal.rows};${session.terminal.cols}t`;
+      session.websocket.send(resizeMessage);
     }
   }
 
@@ -217,7 +219,7 @@ class TerminalSessionManager {
   /**
    * Connect WebSocket for a session
    */
-  async connectWebSocket(tabId: string, token: string, host: string, port: string): Promise<boolean> {
+  async connectWebSocket(tabId: string, token: string, host: string, port: string, terminalType: string = 'tmux'): Promise<boolean> {
     const session = this.sessions.get(tabId);
     if (!session) return false;
 
@@ -236,8 +238,18 @@ class TerminalSessionManager {
     }
 
     try {
+      // Fit terminal to get current dimensions before connecting
+      if (session.isAttached) {
+        session.fitAddon.fit();
+        session.lastDimensions = {
+          rows: session.terminal.rows,
+          cols: session.terminal.cols
+        };
+      }
+      
       const { rows, cols } = session.lastDimensions;
-      const wsUrl = `ws://${host}:${port}/api/v1/terminal/ws?token=${encodeURIComponent(token)}&rows=${rows}&cols=${cols}`;
+      // Include tab_id and terminal_type in WebSocket URL for unique terminal instances
+      const wsUrl = `ws://${host}:${port}/api/v1/terminal/ws?token=${encodeURIComponent(token)}&rows=${rows}&cols=${cols}&tab_id=${encodeURIComponent(tabId)}&terminal_type=${encodeURIComponent(terminalType)}`;
       
       const ws = new WebSocket(wsUrl);
       

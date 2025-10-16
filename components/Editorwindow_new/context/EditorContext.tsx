@@ -344,16 +344,22 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   }, [saveCallbacks])
 
   const saveTab = useCallback(async (tabId: string): Promise<boolean> => {
+    console.log('💾 EditorContext: saveTab called for tabId:', tabId)
+    console.log('💾 EditorContext: Available save callbacks:', Array.from(saveCallbacks.keys()))
+    
     const saveCallback = saveCallbacks.get(tabId)
     if (saveCallback) {
+      console.log('💾 EditorContext: Found save callback, executing...')
       try {
         await saveCallback()
+        console.log('✅ EditorContext: Save callback completed successfully')
         return true
       } catch (error) {
-        console.error('Error saving tab:', error)
+        console.error('❌ EditorContext: Error saving tab:', error)
         return false
       }
     }
+    console.warn('⚠️ EditorContext: No save callback found for tabId:', tabId)
     return false
   }, [saveCallbacks])
 

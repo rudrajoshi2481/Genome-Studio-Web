@@ -230,7 +230,12 @@ export class FileExplorerApiService {
 
   // Upload file
   async uploadFile(file: File, targetPath: string): Promise<void> {
-    const filePath = `${targetPath}/${file.name}`;
+    // Check if file has a relative path (from folder upload)
+    const relativePath = (file as any).webkitRelativePath;
+    const filePath = relativePath 
+      ? `${targetPath}/${relativePath}` 
+      : `${targetPath}/${file.name}`;
+    
     const params = new URLSearchParams({
       file_path: filePath,
       root_path: this.getCurrentRootPath(),

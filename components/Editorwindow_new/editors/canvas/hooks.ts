@@ -35,7 +35,8 @@ export const useCanvasHandlers = (
   setEdges: (edges: Edge[] | ((edges: Edge[]) => Edge[])) => void,
   onNodesChange: (changes: any) => void,
   onEdgesChange: (changes: any) => void,
-  saveFileContent: () => Promise<void>
+  saveFileContent: () => Promise<void>,
+  isInitialLoad: boolean = false
 ) => {
   const { setDirty } = useEditorContext();
   const { updateTab } = useTabStore();
@@ -61,6 +62,11 @@ export const useCanvasHandlers = (
                     width: change.dimensions.width,
                     height: change.dimensions.height,
                   },
+                  data: {
+                    ...node.data,
+                    width: change.dimensions.width,
+                    height: change.dimensions.height,
+                  },
                 };
               }
               return node;
@@ -71,16 +77,24 @@ export const useCanvasHandlers = (
     }
     
     onNodesChange(changes);
-    setDirty(tabId, true);
-    updateTab(tabId, { isDirty: true });
-  }, [onNodesChange, tabId, setDirty, updateTab, setNodes]);
+    
+    // Only set dirty if not during initial load
+    if (!isInitialLoad) {
+      setDirty(tabId, true);
+      updateTab(tabId, { isDirty: true });
+    }
+  }, [onNodesChange, tabId, setDirty, updateTab, setNodes, isInitialLoad]);
 
   // Handle edge changes
   const handleEdgesChange = useCallback((changes: any) => {
     onEdgesChange(changes);
-    setDirty(tabId, true);
-    updateTab(tabId, { isDirty: true });
-  }, [onEdgesChange, tabId, setDirty, updateTab]);
+    
+    // Only set dirty if not during initial load
+    if (!isInitialLoad) {
+      setDirty(tabId, true);
+      updateTab(tabId, { isDirty: true });
+    }
+  }, [onEdgesChange, tabId, setDirty, updateTab, isInitialLoad]);
 
   // Handle node deletion
   const handleNodeDelete = useCallback((nodeId: string) => {

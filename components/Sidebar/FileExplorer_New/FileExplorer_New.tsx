@@ -129,6 +129,38 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Helper function to get the parent directory path
+  // If a file is selected, returns its parent directory
+  // If a directory is selected, returns that directory
+  // If nothing is selected, returns root path
+  const getTargetDirectoryPath = useCallback((path?: string): string => {
+    if (!path) return rootPath;
+    
+    // Check if the path is a file by looking at the fileTree
+    const findNode = (node: FileNode | null, targetPath: string): FileNode | null => {
+      if (!node) return null;
+      if (node.path === targetPath) return node;
+      if (node.children) {
+        for (const child of node.children) {
+          const found = findNode(child, targetPath);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const node = findNode(fileTree, path);
+    
+    // If it's a file, return its parent directory
+    if (node && !node.is_dir) {
+      const lastSlashIndex = path.lastIndexOf('/');
+      return lastSlashIndex > 0 ? path.substring(0, lastSlashIndex) : rootPath;
+    }
+    
+    // If it's a directory or node not found, return the path itself
+    return path;
+  }, [fileTree, rootPath]);
+
   // Initialize component
   useEffect(() => {
     // Load initial file tree with force refresh
@@ -254,10 +286,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         }
         break;
       case 'create_file':
-        setShowCreateDialog({ type: 'file', parentPath: node.is_dir ? node.path : node.path.substring(0, node.path.lastIndexOf('/')) });
+        setShowCreateDialog({ type: 'file', parentPath: getTargetDirectoryPath(node.path) });
         break;
       case 'create_directory':
-        setShowCreateDialog({ type: 'directory', parentPath: node.is_dir ? node.path : node.path.substring(0, node.path.lastIndexOf('/')) });
+        setShowCreateDialog({ type: 'directory', parentPath: getTargetDirectoryPath(node.path) });
         break;
       case 'rename':
         setShowRenameDialog({
@@ -272,9 +304,8 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         });
         break;
       case 'upload':
-        const targetPath = activePath || rootPath;
         setShowUploadDialog({
-          targetPath: node.is_dir ? node.path : node.path.substring(0, node.path.lastIndexOf('/'))
+          targetPath: getTargetDirectoryPath(node.path)
         });
         break;
       case 'duplicate':
@@ -296,7 +327,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         handleCopyPath(node);
         break;
     }
-  }, [activePath, rootPath, cutItems, copyItems, handleFileOpen, openFileInEditor]);
+  }, [getTargetDirectoryPath, cutItems, copyItems, handleFileOpen, openFileInEditor]);
 
   // Handle download
   const handleDownload = useCallback(async (node: FileNode) => {
@@ -590,7 +621,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowCreateDialog({ type: 'file', parentPath: activePath || rootPath })}
+                  onClick={() => setShowCreateDialog({ 
+                    type: 'file', 
+                    parentPath: getTargetDirectoryPath(activePath || rootPath)
+                  })}
                   className="h-7 w-7 p-0 hover:bg-accent"
                 >
                   <FilePlus className="h-3.5 w-3.5" />
@@ -606,7 +640,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowCreateDialog({ type: 'directory', parentPath: activePath || rootPath })}
+                  onClick={() => setShowCreateDialog({ 
+                    type: 'directory', 
+                    parentPath: getTargetDirectoryPath(activePath || rootPath)
+                  })}
                   className="h-7 w-7 p-0 hover:bg-accent"
                 >
                   <FolderPlus className="h-3.5 w-3.5" />
@@ -623,7 +660,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    const targetPath = activePath || rootPath;
+                    const targetPath = getTargetDirectoryPath(activePath || rootPath);
                     setShowUploadDialog({ targetPath });
                   }}
                   className="h-7 w-7 p-0 hover:bg-accent"

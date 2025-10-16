@@ -60,8 +60,12 @@ class WebSocketService {
         };
         
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          reject(error);
+          // Silently handle WebSocket errors - they're usually connection issues
+          // that will be handled by the reconnection logic
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('WebSocket connection issue (will retry):', error);
+          }
+          // Don't reject here - let onclose handle reconnection
         };
       } catch (error) {
         reject(error);
@@ -71,7 +75,9 @@ class WebSocketService {
 
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('WebSocket: Max reconnection attempts reached');
+      }
       return;
     }
 
@@ -79,8 +85,15 @@ class WebSocketService {
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
     
     setTimeout(() => {
-      console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-      this.connect().catch(console.error);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`WebSocket: Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      }
+      this.connect().catch((error) => {
+        // Silently handle reconnection failures
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('WebSocket reconnection failed:', error);
+        }
+      });
     }, delay);
   }
 
@@ -88,7 +101,10 @@ class WebSocketService {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     } else {
-      console.error('WebSocket is not connected');
+      // Silently handle - WebSocket will reconnect automatically
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('WebSocket: Cannot send message, not connected (will reconnect)');
+      }
     }
   }
 

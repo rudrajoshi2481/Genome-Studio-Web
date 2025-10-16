@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 
+// Define terminal type
+export type TerminalType = 'tmux' | 'simple';
+
 // Define the terminal tab interface
 export interface TerminalTab {
   id: string;
@@ -9,6 +12,7 @@ export interface TerminalTab {
   active: boolean;
   cwd?: string; // Current working directory
   createdAt: string;
+  type: TerminalType; // Terminal type: tmux (persistent) or simple (non-persistent)
 }
 
 // Define the terminal store state
@@ -17,7 +21,7 @@ interface TerminalState {
   activeTabId: string | null;
   
   // Actions
-  createTab: (name?: string) => string; // Returns the new tab ID
+  createTab: (name?: string, type?: TerminalType) => string; // Returns the new tab ID
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   renameTab: (tabId: string, newName: string) => void;
@@ -31,7 +35,7 @@ export const useTerminalStore = create<TerminalState>()(
       tabs: [],
       activeTabId: null,
       
-      createTab: (name = 'Terminal') => {
+      createTab: (name = 'Terminal', type: TerminalType = 'tmux') => {
         const newTabId = uuidv4();
         const newTab: TerminalTab = {
           id: newTabId,
@@ -39,6 +43,7 @@ export const useTerminalStore = create<TerminalState>()(
           active: true,
           cwd: '/home',
           createdAt: new Date().toISOString(),
+          type: type,
         };
         
         set((state) => {

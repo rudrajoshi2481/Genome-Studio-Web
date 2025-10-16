@@ -1,10 +1,8 @@
 import React, { memo, useCallback } from 'react'
 import { useTabStore } from '@/components/FileTabs/useTabStore'
-import FileTabs from '../FileTabs/FileTabs'
+import { useDialogStore } from '@/components/FileTabs/useDialogStore'
 import DialogProvider from '../FileTabs/DialogProvider'
-
 import FileTab from '../FileTabs/FileTab'
-import Image from 'next/image'
 import { EditorProvider } from './context/EditorContext'
 import EditorFactory from './components/EditorFactory'
 
@@ -76,7 +74,8 @@ EditorWindowContent.displayName = 'EditorWindowContent'
  */
 const EditorWindow = () => {
   // Get tab store methods
-  const { getActiveTab, removeTab, activateTab } = useTabStore()
+  const { getActiveTab, removeTab, activateTab, getTab } = useTabStore()
+  const { openUnsavedChangesDialog } = useDialogStore()
   
   // Get active tab
   const activeTab = getActiveTab()
@@ -87,16 +86,25 @@ const EditorWindow = () => {
   }, [activateTab])
   
   const handleClose = useCallback((tabId: string) => {
-    removeTab(tabId)
-  }, [removeTab])
+    const success = removeTab(tabId)
+    
+    // If removeTab returns false, it means the tab is dirty
+    // Open the unsaved changes dialog
+    if (!success) {
+      const tab = getTab(tabId)
+      if (tab) {
+        openUnsavedChangesDialog(tabId, tab.name)
+      }
+    }
+  }, [removeTab, getTab, openUnsavedChangesDialog])
   
   // Get all tabs
   const allTabs = useTabStore(state => state.getAllTabs())
   
   return (
-    <DialogProvider>
-      <div className="h-full w-full flex flex-col overflow-hidden">  
-        <EditorProvider>
+    <EditorProvider>
+      <DialogProvider>
+        <div className="h-full w-full flex flex-col overflow-hidden">  
           {/* Tab bar */}
           <div className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0">
             {allTabs.map(tab => (
@@ -118,9 +126,9 @@ const EditorWindow = () => {
           <div className="flex-1 overflow-hidden">
             <EditorWindowContent />
           </div>
-        </EditorProvider>
-      </div>
-    </DialogProvider>
+        </div>
+      </DialogProvider>
+    </EditorProvider>
   )
 }
 

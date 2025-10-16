@@ -34,6 +34,9 @@ interface TabState {
   setTabDirty: (tabId: string, isDirty: boolean) => boolean;
   saveTab: (tabId: string) => boolean;
   closeAllTabs: () => boolean;
+  closeTabsToRight: (tabId: string) => boolean;
+  closeTabsToLeft: (tabId: string) => boolean;
+  closeOtherTabs: (tabId: string) => boolean;
   moveTab: (tabId: string, newIndex: number) => boolean;
   findTabs: (pattern: string) => TabFile[];
   getActiveTab: () => TabFile | null;
@@ -343,6 +346,104 @@ export const useTabStore = create<TabState>()(
           tabs: new Map(),
           tabOrder: [],
           activeTabId: null
+        });
+        
+        return true;
+      },
+
+      closeTabsToRight: (tabId) => {
+        const state = get();
+        
+        if (!(state.tabs instanceof Map)) {
+          return false;
+        }
+        
+        const currentIndex = state.tabOrder.indexOf(tabId);
+        if (currentIndex === -1) return false;
+        
+        const tabsToClose = state.tabOrder.slice(currentIndex + 1);
+        const dirtyTabs = tabsToClose.filter(id => state.tabs.get(id)?.isDirty);
+        
+        if (dirtyTabs.length > 0 && !state.options.autoSave) {
+          const shouldClose = confirm(`${dirtyTabs.length} tab(s) have unsaved changes. Close anyway?`);
+          if (!shouldClose) return false;
+        }
+        
+        const newTabs = new Map(state.tabs);
+        tabsToClose.forEach(id => newTabs.delete(id));
+        
+        const newTabOrder = state.tabOrder.slice(0, currentIndex + 1);
+        
+        set({
+          tabs: newTabs,
+          tabOrder: newTabOrder
+        });
+        
+        return true;
+      },
+
+      closeTabsToLeft: (tabId) => {
+        const state = get();
+        
+        if (!(state.tabs instanceof Map)) {
+          return false;
+        }
+        
+        const currentIndex = state.tabOrder.indexOf(tabId);
+        if (currentIndex === -1) return false;
+        
+        const tabsToClose = state.tabOrder.slice(0, currentIndex);
+        const dirtyTabs = tabsToClose.filter(id => state.tabs.get(id)?.isDirty);
+        
+        if (dirtyTabs.length > 0 && !state.options.autoSave) {
+          const shouldClose = confirm(`${dirtyTabs.length} tab(s) have unsaved changes. Close anyway?`);
+          if (!shouldClose) return false;
+        }
+        
+        const newTabs = new Map(state.tabs);
+        tabsToClose.forEach(id => newTabs.delete(id));
+        
+        const newTabOrder = state.tabOrder.slice(currentIndex);
+        
+        let newActiveTabId = state.activeTabId;
+        if (tabsToClose.includes(state.activeTabId || '')) {
+          newActiveTabId = tabId;
+        }
+        
+        set({
+          tabs: newTabs,
+          tabOrder: newTabOrder,
+          activeTabId: newActiveTabId
+        });
+        
+        return true;
+      },
+
+      closeOtherTabs: (tabId) => {
+        const state = get();
+        
+        if (!(state.tabs instanceof Map)) {
+          return false;
+        }
+        
+        const tab = state.tabs.get(tabId);
+        if (!tab) return false;
+        
+        const tabsToClose = state.tabOrder.filter(id => id !== tabId);
+        const dirtyTabs = tabsToClose.filter(id => state.tabs.get(id)?.isDirty);
+        
+        if (dirtyTabs.length > 0 && !state.options.autoSave) {
+          const shouldClose = confirm(`${dirtyTabs.length} tab(s) have unsaved changes. Close anyway?`);
+          if (!shouldClose) return false;
+        }
+        
+        const newTabs = new Map();
+        newTabs.set(tabId, tab);
+        
+        set({
+          tabs: newTabs,
+          tabOrder: [tabId],
+          activeTabId: tabId
         });
         
         return true;

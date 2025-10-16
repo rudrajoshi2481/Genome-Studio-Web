@@ -236,14 +236,11 @@ export default function Settings() {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-4xl min-w-[50vw] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <SettingsIcon className="h-5 w-5" />
-            Settings
-          </DialogTitle>
-          <DialogDescription>
-            Manage your account settings and preferences
+      <DialogContent className="max-w-3xl max-h-[85vh] min-w-[65vw] p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <DialogTitle className="text-xl font-semibold">Settings</DialogTitle>
+          <DialogDescription className="text-sm">
+            Manage your account and preferences
           </DialogDescription>
         </DialogHeader>
 
@@ -255,83 +252,76 @@ export default function Settings() {
             </div>
           </div>
         ) : !isAuthenticated || !user ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Not Signed In</h3>
-              <p className="text-muted-foreground mb-4">
-                Please sign in to access your account settings
-              </p>
-              <Button onClick={() => setIsOpen(false)}>Close</Button>
-            </CardContent>
-          </Card>
+          <div className="px-6 py-12 text-center">
+            <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Not Signed In</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Please sign in to access your account settings
+            </p>
+            <Button onClick={() => setIsOpen(false)} variant="outline">Close</Button>
+          </div>
         ) : (
           <Tabs defaultValue="account" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="account">
+            <TabsList className="mx-6 mt-4 grid w-auto inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1">
+              <TabsTrigger value="account" className="rounded-md px-3">
                 <User className="h-4 w-4 mr-2" />
                 Account
               </TabsTrigger>
               {user.is_admin && (
-                <TabsTrigger value="admin">
+                <TabsTrigger value="admin" className="rounded-md px-3">
                   <Users className="h-4 w-4 mr-2" />
-                  User Management
+                  Admin
                 </TabsTrigger>
               )}
             </TabsList>
 
-            <TabsContent value="account" className="space-y-6 mt-6">
-              {/* Account Information Card */}
-              <Card>
-              <CardHeader>
+            <TabsContent value="account" className="px-6 pb-6 mt-6 space-y-6 overflow-y-auto max-h-[calc(85vh-180px)]">
+              {/* Profile Section */}
+              <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Account Information</CardTitle>
-                    <CardDescription>
-                      Update your personal details and profile picture
-                    </CardDescription>
+                    <h3 className="text-lg font-semibold">Profile</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Manage your personal information
+                    </p>
                   </div>
                   {!isEditing ? (
-                    <Button onClick={() => setIsEditing(true)} size="sm">
-                      Edit
+                    <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
+                      Edit Profile
                     </Button>
                   ) : (
                     <div className="flex gap-2">
+                      <Button
+                        onClick={handleCancel}
+                        disabled={isSaving}
+                        variant="ghost"
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
                       <Button
                         onClick={handleSave}
                         disabled={isSaving}
                         size="sm"
                       >
-                        <Save className="h-4 w-4 mr-2" />
-                        {isSaving ? 'Saving...' : 'Save'}
-                      </Button>
-                      <Button
-                        onClick={handleCancel}
-                        disabled={isSaving}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Cancel
+                        {isSaving ? 'Saving...' : 'Save Changes'}
                       </Button>
                     </div>
                   )}
                 </div>
-              </CardHeader>
 
-              <CardContent className="space-y-6">
                 {/* Avatar Section */}
-                <div className="flex items-start gap-6 p-4 bg-muted/30 rounded-lg">
-                  <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
+                <div className="flex items-center gap-6">
+                  <Avatar className="h-20 w-20">
                     <AvatarImage src={formData.avatar} alt="Profile picture" />
-                    <AvatarFallback className="text-xl font-semibold">{getInitials()}</AvatarFallback>
+                    <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
                   </Avatar>
 
-                  <div className="flex-1 space-y-3">
+                  <div className="flex-1 space-y-2">
                     <div>
-                      <h4 className="font-semibold text-sm">Profile Picture</h4>
+                      <p className="text-sm font-medium">Profile Picture</p>
                       <p className="text-xs text-muted-foreground">
-                        JPG, PNG or GIF. Max 5MB.
+                        JPG, PNG or GIF. Max 5MB
                       </p>
                     </div>
                     {isEditing && (
@@ -348,17 +338,16 @@ export default function Settings() {
                           size="sm"
                           onClick={() => document.getElementById('avatar-upload')?.click()}
                         >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Photo
+                          <Upload className="h-3.5 w-3.5 mr-2" />
+                          Upload
                         </Button>
                         {formData.avatar && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-destructive"
                             onClick={() => handleChange('avatar', '')}
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
                             Remove
                           </Button>
                         )}
@@ -370,127 +359,113 @@ export default function Settings() {
                 <Separator />
 
                 {/* Form Fields */}
-                <div className="grid grid-cols-2 gap-6">
-                  {/* Username (Read-only) */}
-                  <div className="space-y-2">
-                    <Label htmlFor="username" className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Username
-                    </Label>
-                    <Input
-                      id="username"
-                      value={user.username}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Username cannot be changed
-                    </p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-sm">Username</Label>
+                      <Input
+                        id="username"
+                        value={user.username}
+                        disabled
+                        className="bg-muted/50"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="role" className="text-sm">Role</Label>
+                      <Input
+                        id="role"
+                        value={user.is_admin ? 'Admin' : 'User'}
+                        disabled
+                        className="bg-muted/50"
+                      />
+                    </div>
                   </div>
 
-                  {/* Role (Read-only) */}
-                  <div className="space-y-2">
-                    <Label htmlFor="role" className="flex items-center gap-2">
-                      <Shield className="h-4 w-4" />
-                      Role
-                    </Label>
-                    <Input
-                      id="role"
-                      value={user.is_admin ? 'Admin' : 'User'}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {user.is_admin ? 'You have admin privileges' : 'Standard user account'}
-                    </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="full_name" className="text-sm">Full Name</Label>
+                      <Input
+                        id="full_name"
+                        value={formData.full_name}
+                        onChange={(e) => handleChange('full_name', e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Enter your full name"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleChange('email', e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="your.email@example.com"
+                      />
+                    </div>
                   </div>
 
-                  {/* Full Name */}
                   <div className="space-y-2">
-                    <Label htmlFor="full_name">
-                      Full Name
-                    </Label>
-                    <Input
-                      id="full_name"
-                      value={formData.full_name}
-                      onChange={(e) => handleChange('full_name', e.target.value)}
+                    <Label htmlFor="bio" className="text-sm">Bio</Label>
+                    <Textarea
+                      id="bio"
+                      value={formData.bio}
+                      onChange={(e) => handleChange('bio', e.target.value)}
                       disabled={!isEditing}
-                      placeholder="Enter your full name"
+                      placeholder="Tell us about yourself..."
+                      className="min-h-[100px] resize-none"
+                      maxLength={500}
                     />
-                  </div>
-
-                  {/* Email */}
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      Email
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleChange('email', e.target.value)}
-                      disabled={!isEditing}
-                      placeholder="your.email@example.com"
-                    />
-                  </div>
-                </div>
-
-                {/* Bio - Full Width */}
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="bio" className="text-sm font-semibold">Bio</Label>
-                  <Textarea
-                    id="bio"
-                    value={formData.bio}
-                    onChange={(e) => handleChange('bio', e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Tell us about yourself..."
-                    className="min-h-[120px] resize-none"
-                    maxLength={500}
-                  />
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs text-muted-foreground">
-                      Brief description for your profile
-                    </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground text-right">
                       {formData.bio.length} / 500
                     </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Account Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold">Account Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <dl className="grid grid-cols-3 gap-6 text-sm">
+              {/* Account Details */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Account Details</h3>
+                  <p className="text-sm text-muted-foreground">
+                    View your account information
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg">
                   <div className="space-y-1">
-                    <dt className="text-xs text-muted-foreground uppercase tracking-wide">Account ID</dt>
-                    <dd className="font-mono text-base font-semibold">{user.id}</dd>
+                    <p className="text-xs text-muted-foreground">Account ID</p>
+                    <p className="font-mono text-sm font-medium">{user.id}</p>
                   </div>
                   <div className="space-y-1">
-                    <dt className="text-xs text-muted-foreground uppercase tracking-wide">Member Since</dt>
-                    <dd className="text-base font-medium">{new Date(user.created_at || '').toLocaleDateString()}</dd>
+                    <p className="text-xs text-muted-foreground">Member Since</p>
+                    <p className="text-sm font-medium">{new Date(user.created_at || '').toLocaleDateString()}</p>
                   </div>
                   {user.updated_at && (
                     <div className="space-y-1">
-                      <dt className="text-xs text-muted-foreground uppercase tracking-wide">Last Updated</dt>
-                      <dd className="text-base font-medium">{new Date(user.updated_at).toLocaleString()}</dd>
+                      <p className="text-xs text-muted-foreground">Last Updated</p>
+                      <p className="text-sm font-medium">{new Date(user.updated_at).toLocaleDateString()}</p>
                     </div>
                   )}
-                </dl>
+                </div>
+              </div>
+
+              {/* Danger Zone */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Danger Zone</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Irreversible actions
+                  </p>
+                </div>
                 
-                <Separator />
-                
-                {/* Logout Button */}
-                <div className="flex items-center justify-between p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+                <div className="flex items-center justify-between p-4 border border-destructive/50 rounded-lg">
                   <div>
-                    <h4 className="font-medium text-sm">Sign Out</h4>
+                    <p className="font-medium text-sm">Sign Out</p>
                     <p className="text-xs text-muted-foreground">
-                      Sign out of your current session
+                      End your current session
                     </p>
                   </div>
                   <Button
@@ -502,8 +477,7 @@ export default function Settings() {
                     Sign Out
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
             </TabsContent>
 
             {/* Admin Panel Tab */}

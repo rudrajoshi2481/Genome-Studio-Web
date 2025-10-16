@@ -68,6 +68,18 @@ interface FileExplorerState {
     items: string[];
     operation: 'cut' | 'copy' | null;
   };
+  // Upload progress tracking
+  uploadProgress: {
+    isUploading: boolean;
+    currentFile: string | null;
+    totalFiles: number;
+    completedFiles: number;
+    progress: number; // 0-100
+    speed: number; // bytes per second
+    startTime: number | null;
+    bytesUploaded: number;
+    totalBytes: number;
+  };
 }
 
 interface FileExplorerStore extends FileExplorerState {
@@ -271,6 +283,17 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     items: [],
     operation: null,
   },
+  uploadProgress: {
+    isUploading: false,
+    currentFile: null,
+    totalFiles: 0,
+    completedFiles: 0,
+    progress: 0,
+    speed: 0,
+    startTime: null,
+    bytesUploaded: 0,
+    totalBytes: 0,
+  },
 
   // Actions
   setRootPath: (path: string) => {
@@ -440,7 +463,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       if (!node) {
         console.error('❌ ERROR: Node not found in store');
         console.error('   Path:', path);
-        console.error('   Available nodes:', Array.from(state.nodes.keys()).filter(k => k.includes('routes')));
+        console.error('   Available nodes:', Array.from(state.nodes.keys()).filter((k:any) => k.includes('routes')));
         return;
       }
       
@@ -631,6 +654,18 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
         try {
           const message = JSON.parse(event.data);
           console.log('📡 Received WebSocket message:', message);
+          
+          // Handle tree_change messages (bulk operations, file watcher events)
+          if (message.type === 'tree_change') {
+            console.log('🌳 Tree change detected, refreshing...');
+            // Force refresh the tree to show changes
+            get().loadFileTree(undefined, true).then(() => {
+              console.log('✅ Tree refreshed after change');
+            }).catch((error: unknown) => {
+              console.error('❌ Failed to refresh tree:', error);
+            });
+            return;
+          }
           
           if (message.type === 'file_system_change') {
             const eventKey = `${message.change_type}:${message.path}:${message.timestamp}`;
@@ -1189,8 +1224,9 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     try {
       await fileExplorerApi.duplicateItem(sourcePath, destinationPath);
       
-      // Refresh tree to show duplicated item
-      await get().loadFileTree();
+      // Force refresh tree to show duplicated item (bypass cache)
+      console.log('🔄 Force refreshing tree after duplicate...');
+      await get().loadFileTree(undefined, true);
       set({ isLoading: false });
     } catch (error) {
       console.error('Duplicate item failed:', error);
@@ -1205,10 +1241,55 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     console.log('📤 Uploading files...', { files: files.length, targetPath });
     set({ isLoading: true, error: null });
     
+    // Calculate total bytes
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    const startTime = Date.now();
+    
+    // Initialize upload progress
+    set({
+      uploadProgress: {
+        isUploading: true,
+        currentFile: null,
+        totalFiles: files.length,
+        completedFiles: 0,
+        progress: 0,
+        speed: 0,
+        startTime,
+        bytesUploaded: 0,
+        totalBytes,
+      }
+    });
+    
     try {
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Update current file
+        set((state:any) => ({
+          uploadProgress: {
+            ...state.uploadProgress,
+            currentFile: file.name,
+          }
+        }));
         try {
           await fileExplorerApi.uploadFile(file, targetPath);
+          
+          // Update progress after successful upload
+          const bytesUploaded = files.slice(0, i + 1).reduce((sum, f) => sum + f.size, 0);
+          const elapsed = (Date.now() - startTime) / 1000; // seconds
+          const speed = elapsed > 0 ? bytesUploaded / elapsed : 0;
+          // Calculate progress based on number of files completed, not bytes
+          const progress = ((i + 1) / files.length) * 100;
+          
+          set((state:any) => ({
+            uploadProgress: {
+              ...state.uploadProgress,
+              completedFiles: i + 1,
+              bytesUploaded,
+              progress,
+              speed,
+            }
+          }));
         } catch (error: any) {
           // Handle file already exists (409 Conflict)
           if (error.message?.includes('409') || error.message?.includes('Conflict')) {
@@ -1260,15 +1341,52 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
         }
       }
       
+      // Show "Refreshing..." state
+      set((state:any) => ({
+        uploadProgress: {
+          ...state.uploadProgress,
+          currentFile: 'Refreshing file tree...',
+        }
+      }));
+      
       // Force refresh tree to show uploaded files (bypass cache)
       await get().loadFileTree(true);
-      set({ isLoading: false });
+      
+      // Small delay to show completion before hiding
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Reset upload progress
+      set({ 
+        isLoading: false,
+        uploadProgress: {
+          isUploading: false,
+          currentFile: null,
+          totalFiles: 0,
+          completedFiles: 0,
+          progress: 0,
+          speed: 0,
+          startTime: null,
+          bytesUploaded: 0,
+          totalBytes: 0,
+        }
+      });
       console.log('✅ Files uploaded and tree refreshed successfully');
     } catch (error) {
       console.error('❌ Upload files failed:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to upload files',
-        isLoading: false 
+        isLoading: false,
+        uploadProgress: {
+          isUploading: false,
+          currentFile: null,
+          totalFiles: 0,
+          completedFiles: 0,
+          progress: 0,
+          speed: 0,
+          startTime: null,
+          bytesUploaded: 0,
+          totalBytes: 0,
+        }
       });
     }
   },

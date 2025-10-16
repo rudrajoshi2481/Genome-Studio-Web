@@ -17,6 +17,8 @@ import {
 import { Pin, PinOff,GitCompareArrows,AtomIcon } from 'lucide-react'
 import FileExplorerComponent from './FileExplorer/FileExplorer'
 import { FileExplorer_New } from './FileExplorer_New'
+import { useFileExplorerStore } from './FileExplorer_New/store/fileExplorerStore'
+import { UploadProgressIndicator } from './FileExplorer_New/components/UploadProgressIndicator'
 import Nodebar from './Nodebar/Nodebar'
 import Settings from '../settings/Settings'
 import PackageManager from './PackageManager/PackageManager'
@@ -47,6 +49,9 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
   const { user, isAuthenticated, token, logout } = useAuthStore()
   const [activeItem, setActiveItem] = useState<string>("File Explorer")
   const [pinnedItems, setPinnedItems] = useState<Set<string>>(new Set())
+  
+  // Get upload progress from file explorer store
+  const uploadProgress = useFileExplorerStore((state) => state.uploadProgress)
 
 
 
@@ -200,6 +205,10 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
                 </div>
                 {isPinned && (
                   <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-background" />
+                )}
+                {/* Show upload progress indicator for File Explorer */}
+                {item.name === "File Explorer (New)" && uploadProgress.isUploading && (
+                  <UploadProgressIndicator {...uploadProgress} />
                 )}
               </Button>
             </ContextMenuTrigger>

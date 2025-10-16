@@ -1,7 +1,16 @@
 "use client"
 import React from 'react'
-import { X, FileText, FileCode, Palette, Globe, FileJson, FileType } from 'lucide-react'
+import { X, FileText, FileCode, Palette, Globe, FileJson, FileType, Copy, Trash2, XCircle, ChevronsRight, ChevronsLeft, Minimize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import { useTabStore } from './useTabStore'
+import { toast } from 'sonner'
 
 interface FileTabProps {
   id: string
@@ -12,6 +21,7 @@ interface FileTabProps {
   isDirty?: boolean
   onActivate?: (id: string) => void
   onClose?: (id: string) => void
+  onDelete?: (path: string) => void
 }
 
 function FileTab({
@@ -22,8 +32,10 @@ function FileTab({
   isActive = false,
   isDirty = false,
   onActivate,
-  onClose
+  onClose,
+  onDelete
 }: FileTabProps) {
+  const { closeTabsToRight, closeTabsToLeft, closeOtherTabs, closeAllTabs, tabOrder } = useTabStore();
 
   const getFileIcon = () => {
     const iconProps = { size: 14, className: "mr-1 flex-shrink-0" }
@@ -60,18 +72,54 @@ function FileTab({
     onClose?.(id)
   }
 
+  const handleCopyPath = () => {
+    navigator.clipboard.writeText(path)
+    toast.success('Path copied to clipboard')
+  }
+
+  const handleDelete = () => {
+    if (confirm(`Are you sure you want to delete "${name}"?`)) {
+      onDelete?.(path)
+      onClose?.(id)
+    }
+  }
+
+  const handleCloseOthers = () => {
+    closeOtherTabs(id)
+  }
+
+  const handleCloseToRight = () => {
+    closeTabsToRight(id)
+  }
+
+  const handleCloseToLeft = () => {
+    closeTabsToLeft(id)
+  }
+
+  const handleCloseAll = () => {
+    closeAllTabs()
+  }
+
+  // Check if there are tabs to the right or left
+  const currentIndex = tabOrder.indexOf(id)
+  const hasTabsToRight = currentIndex < tabOrder.length - 1
+  const hasTabsToLeft = currentIndex > 0
+  const hasOtherTabs = tabOrder.length > 1
+
   return (
-    <div 
-      className={cn(
-        'flex items-center h-9 px-3 py-1 text-sm cursor-pointer group',
-        'transition-colors duration-200',
-        isActive ? 'bg-gray-100' : 'hover:bg-gray-50',
-      )}
-      onClick={handleActivate}
-      data-tab-id={id}
-      title={path}
-      suppressHydrationWarning
-    >
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div 
+          className={cn(
+            'flex items-center h-9 px-3 py-1 text-sm cursor-pointer group',
+            'transition-colors duration-200',
+            isActive ? 'bg-gray-100' : 'hover:bg-gray-50',
+          )}
+          onClick={handleActivate}
+          data-tab-id={id}
+          title={path}
+          suppressHydrationWarning
+        >
       {getFileIcon()}
       <span className="whitespace-nowrap">{name}</span>
       {isDirty && (
@@ -82,15 +130,61 @@ function FileTab({
           •
         </span>
       )}
-      <button 
-        className="ml-2 opacity-0 group-hover:opacity-100 rounded p-0.5 hover:bg-gray-200 transition-all duration-150"
-        onClick={handleClose}
-        aria-label={`Close ${name} tab`}
-        type="button"
-      >
-        <X size={14} />
-      </button>
-    </div>
+          <button 
+            className="ml-2 opacity-0 group-hover:opacity-100 rounded p-0.5 hover:bg-gray-200 transition-all duration-150"
+            onClick={handleClose}
+            aria-label={`Close ${name} tab`}
+            type="button"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </ContextMenuTrigger>
+      
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem onClick={handleClose}>
+          <XCircle className="mr-2 h-4 w-4" />
+          Close
+        </ContextMenuItem>
+        
+        <ContextMenuItem onClick={handleCloseOthers} disabled={!hasOtherTabs}>
+          <Minimize2 className="mr-2 h-4 w-4" />
+          Close Others
+        </ContextMenuItem>
+        
+        <ContextMenuItem onClick={handleCloseToRight} disabled={!hasTabsToRight}>
+          <ChevronsRight className="mr-2 h-4 w-4" />
+          Close to the Right
+        </ContextMenuItem>
+        
+        <ContextMenuItem onClick={handleCloseToLeft} disabled={!hasTabsToLeft}>
+          <ChevronsLeft className="mr-2 h-4 w-4" />
+          Close to the Left
+        </ContextMenuItem>
+        
+        <ContextMenuItem onClick={handleCloseAll}>
+          <XCircle className="mr-2 h-4 w-4" />
+          Close All
+        </ContextMenuItem>
+        
+        <ContextMenuSeparator />
+        
+        <ContextMenuItem onClick={handleCopyPath}>
+          <Copy className="mr-2 h-4 w-4" />
+          Copy Path
+        </ContextMenuItem>
+        
+        {onDelete && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete File
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 

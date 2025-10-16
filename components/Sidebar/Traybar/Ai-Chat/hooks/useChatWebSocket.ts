@@ -22,7 +22,10 @@ export const useChatWebSocket = () => {
         await wsService.connect();
         setConnectionStatus(true);
       } catch (error) {
-        console.error('Failed to connect WebSocket:', error);
+        // Silently handle connection failures - will retry automatically
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('WebSocket connection attempt failed (will retry):', error);
+        }
         setConnectionStatus(false);
         // Retry connection after delay
         reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
