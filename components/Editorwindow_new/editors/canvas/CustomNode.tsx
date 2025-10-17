@@ -5,6 +5,7 @@ import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals } from
 import { cn } from "@/lib/utils" // Import cn from shadcn utils if available, or define it
 import { workflowManagerAPI } from '@/services/WorkflowManagerAPI';
 import { toast } from 'sonner';
+import TerminalOutput from '@/components/Sidebar/Nodebar/CustomNode/TerminalOutput';
 import { RichOutputViewer } from './RichOutputViewer';
 
 // Define NodeIO interface
@@ -247,8 +248,18 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     const runButtonHeight = 45; // Run button section
     const outputsButtonHeight = unifiedOutputs.length ? 30 : 0; // Outputs accordion button if outputs exist
     
-    // Calculate height for outputs content when expanded (simplified - no need to calculate exact height)
-    const outputsContentHeight = 0; // Will be handled by overflow-y-auto
+    // Calculate height for outputs content when expanded
+    // For bash nodes with terminal: 200px minimum, for others estimate based on output count
+    let outputsContentHeight = 0;
+    if (outputsOpen && unifiedOutputs.length > 0) {
+      if (nodeData.language === 'bash') {
+        // Terminal view has min-height of 200px
+        outputsContentHeight = 220; // 200px + padding
+      } else {
+        // Estimate ~20px per output line for text/rich outputs
+        outputsContentHeight = Math.min(unifiedOutputs.length * 20, 400);
+      }
+    }
     
     // Calculate base height from component parts
     const baseHeight = headerHeight + contentPadding + descriptionHeight + 
@@ -266,7 +277,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     const minimumHeight = 180;
     
     return Math.max(minimumHeight, baseHeight + inputsHeight + outputsHeight + dividerHeight);
-  }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, unifiedOutputs.length]);
+  }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, nodeData.language, unifiedOutputs.length, outputsOpen]);
 
   return (
     <div
@@ -278,7 +289,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       )}
       style={{ 
         width: dimensions.width, 
-        height: Math.max(dimensions.height, minHeight) + 20,
+        minHeight: minHeight,
         position: 'relative'
       }}
     >
@@ -557,7 +568,9 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                 className="w-full text-xs font-semibold text-foreground py-1 px-0 flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
                 onClick={() => {
                   setOutputsOpen(!outputsOpen);
-                  setTimeout(() => updateNodeInternals(id), 300);
+                  // Update node internals immediately and after animation
+                  updateNodeInternals(id);
+                  setTimeout(() => updateNodeInternals(id), 50);
                 }}
               >
                 <svg 
@@ -581,71 +594,96 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                 style={{ maxHeight: '2000px' }}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                {unifiedOutputs.map((output, index) => {
-                  console.log(`[CustomNode ${id}] Rendering output ${index}:`, output.type, output.var_name);
-                  
-                  if (output.type === 'text') {
-                    // Render text output (print statements)
+                {/* Use terminal view for bash nodes */}
+                {nodeData.language === 'bash' ? (
+                  (() => {
+                    // Convert unified outputs to log format for terminal
+                    const terminalLogs = unifiedOutputs
+                      .filter(output => output.type === 'text')
+                      .map((output, index) => ({
+                        timestamp: new Date().toISOString(),
+                        level: 'INFO',
+                        message: output.content,
+                        source: 'stdout'
+                      }));
+                    
+                    console.log('[CustomNode] Bash node terminal logs:', terminalLogs);
+                    
                     return (
-                      <pre 
-                        key={index}
-                        className="text-xs p-1 select-text text-wrap font-mono text-foreground"
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        {output.content}
-                      </pre>
+                      <TerminalOutput 
+                        logs={terminalLogs}
+                        isRunning={isExecuting}
+                      />
                     );
-                  } else if (output.type === 'error') {
-                    // Render error output
-                    return (
-                      <div key={index} className="p-2 bg-red-50 border border-red-200 rounded text-xs">
-                        <div className="font-semibold text-red-800 mb-1 flex items-center gap-1">
-                          <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="15" y1="9" x2="9" y2="15"></line>
-                            <line x1="9" y1="9" x2="15" y2="15"></line>
-                          </svg>
-                          Error
-                        </div>
-                        <pre className="text-red-700 whitespace-pre-wrap font-mono text-xs select-text">
+                  })()
+                ) : (
+                  /* Regular output for Python/R nodes */
+                  unifiedOutputs.map((output, index) => {
+                    console.log(`[CustomNode ${id}] Rendering output ${index}:`, output.type, output.var_name);
+                    
+                    if (output.type === 'text') {
+                      // Render text output (print statements)
+                      return (
+                        <pre 
+                          key={index}
+                          className="text-xs p-1 select-text text-wrap font-mono text-foreground"
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
                           {output.content}
                         </pre>
-                        {output.traceback && (
-                          <details className="mt-2">
-                            <summary className="cursor-pointer text-red-600 hover:text-red-800 font-medium">
-                              Show Traceback
-                            </summary>
-                            <pre className="mt-1 text-red-600 whitespace-pre-wrap font-mono text-xs select-text max-h-40 overflow-y-auto">
-                              {output.traceback}
-                            </pre>
-                          </details>
-                        )}
-                      </div>
-                    );
-                  } else if (output.type === 'rich') {
-                    // Filter out internal variables
-                    const internalVars = ['plt', 'np', 'pd', 'idx', 'fig_name', 'rich_output', 'sys', 'os', 'math', 'random'];
-                    if (output.var_name && internalVars.includes(output.var_name)) {
-                      return null;
+                      );
+                    } else if (output.type === 'error') {
+                      // Render error output
+                      return (
+                        <div key={index} className="p-2 bg-red-50 border border-red-200 rounded text-xs">
+                          <div className="font-semibold text-red-800 mb-1 flex items-center gap-1">
+                            <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <line x1="15" y1="9" x2="9" y2="15"></line>
+                              <line x1="9" y1="9" x2="15" y2="15"></line>
+                            </svg>
+                            Error
+                          </div>
+                          <pre className="text-red-700 whitespace-pre-wrap font-mono text-xs select-text">
+                            {output.content}
+                          </pre>
+                          {output.traceback && (
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-red-600 hover:text-red-800 font-medium">
+                                Show Traceback
+                              </summary>
+                              <pre className="mt-1 text-red-600 whitespace-pre-wrap font-mono text-xs select-text max-h-40 overflow-y-auto">
+                                {output.traceback}
+                              </pre>
+                            </details>
+                          )}
+                        </div>
+                      );
+                    } else if (output.type === 'rich') {
+                      // Filter out internal variables
+                      const internalVars = ['plt', 'np', 'pd', 'idx', 'fig_name', 'rich_output', 'sys', 'os', 'math', 'random'];
+                      if (output.var_name && internalVars.includes(output.var_name)) {
+                        return null;
+                      }
+                      
+                      // Skip module representations
+                      if (output.content?.text && output.content.text.includes('module') && output.content.text.includes('from')) {
+                        return null;
+                      }
+                      
+                      // Render rich output (plots, dataframes, etc.)
+                      const htmlContent = typeof output.content === 'string' ? output.content : output.content?.html;
+                      if (!htmlContent) return null;
+                      
+                      return (
+                        <div key={index} className="rich-output-content">
+                          <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+                        </div>
+                      );
                     }
-                    
-                    // Skip module representations
-                    if (output.content?.text && output.content.text.includes('module') && output.content.text.includes('from')) {
-                      return null;
-                    }
-                    
-                    // Render rich output (plots, dataframes, etc.)
-                    const htmlContent = typeof output.content === 'string' ? output.content : output.content?.html;
-                    if (!htmlContent) return null;
-                    
-                    return (
-                      <div key={index} className="rich-output-content">
-                        <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-                      </div>
-                    );
-                  }
-                  return null;
-                })}
+                    return null;
+                  })
+                )}
               </div>
             )}
           </div>
