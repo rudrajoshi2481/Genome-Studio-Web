@@ -1,12 +1,22 @@
 "use client"
 
 import React, { useMemo, useLayoutEffect, useRef, useState } from 'react';
-import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals } from 'reactflow';
+import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals, useReactFlow } from 'reactflow';
 import { cn } from "@/lib/utils" // Import cn from shadcn utils if available, or define it
 import { workflowManagerAPI } from '@/services/WorkflowManagerAPI';
 import { toast } from 'sonner';
 import TerminalOutput from '@/components/Sidebar/Nodebar/CustomNode/TerminalOutput';
 import { RichOutputViewer } from './RichOutputViewer';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Focus, Trash2, Copy, Save, Eye, Code, Lock, Unlock } from 'lucide-react';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { createCustomNode } from '@/lib/services/custom-node-service';
 
 // Define NodeIO interface
 export interface NodeIO {
@@ -82,6 +92,8 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   // Ensure data is properly typed
   const nodeData: NodeData = data as NodeData;
   const updateNodeInternals = useUpdateNodeInternals();
+  const { fitView, getNode } = useReactFlow();
+  const { token } = useAuthStore();
   const nodeRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ 
     width: nodeData.width || 280, 
@@ -90,6 +102,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   const [outputsOpen, setOutputsOpen] = useState(true); // Outputs open by default
   const [isExecuting, setIsExecuting] = useState(false);
   const [unifiedOutputs, setUnifiedOutputs] = useState<any[]>([]);
+  const [isLocked, setIsLocked] = useState(false); // Lock state: false = draggable, true = locked (no drag)
   
   // Extract unified outputs from node data (combines logs + rich outputs + errors in execution order)
   useLayoutEffect(() => {
@@ -225,6 +238,109 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       console.log('🏁 CustomNode: Node execution finished');
     }
   };
+  // Context menu handlers
+  const handleFocusNode = () => {
+    // Focus on this node by centering it in the viewport
+    const node = getNode(id);
+    if (node) {
+      fitView({
+        nodes: [node],
+        duration: 500,
+        padding: 0.5,
+        minZoom: 1,
+        maxZoom: 1.5,
+      });
+      toast.success(`Focused on "${nodeData.title}"`);
+    }
+  };
+
+  const handleDeleteNode = () => {
+    if (typeof nodeData.onNodeDelete === 'function') {
+      nodeData.onNodeDelete(id);
+      toast.success(`Deleted node "${nodeData.title}"`);
+    }
+  };
+
+  const handleDuplicateNode = () => {
+    const { setNodes } = useReactFlow();
+    
+    // Generate a unique ID for the duplicate
+    const duplicateId = `node_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    
+    // Get the current node to duplicate
+    const currentNode = getNode(id);
+    if (!currentNode) {
+      toast.error('Could not find node to duplicate');
+      return;
+    }
+    
+    // Create a duplicate node with offset position
+    const duplicateNode = {
+      ...currentNode,
+      id: duplicateId,
+      position: {
+        x: currentNode.position.x + 50,
+        y: currentNode.position.y + 50,
+      },
+      data: {
+        ...currentNode.data,
+        title: `${nodeData.title} (Copy)`,
+      },
+      selected: false,
+    };
+    
+    // Add the duplicate to the canvas
+    setNodes((nds) => [...nds, duplicateNode]);
+    
+    toast.success(`Duplicated "${nodeData.title}"`);
+  };
+
+  const handleToggleLock = () => {
+    setIsLocked(!isLocked);
+    toast.info(isLocked ? '🔓 Unlocked - Node is draggable' : '🔒 Locked - Text selection enabled');
+  };
+
+  const handleSaveToNodebar = async () => {
+    try {
+      if (!token) {
+        toast.error('Please log in to save nodes');
+        return;
+      }
+
+      // Prepare node data for saving
+      const nodeToSave = {
+        data: {
+          title: nodeData.title,
+          description: nodeData.description || '',
+          function_name: nodeData.function_name,
+          language: nodeData.language || 'python',
+          source: nodeData.source_code || '',
+          inputs: nodeData.inputs || [],
+          outputs: nodeData.outputs || [],
+        },
+        tags: nodeData.tags || [],
+        is_public: nodeData.is_public || false,
+        node_type: 'customNode',  // Mark as custom node
+      };
+
+      console.log('Saving node to nodebar:', nodeToSave);
+      
+      // Call API to create custom node
+      const savedNode = await createCustomNode(token, nodeToSave);
+      
+      console.log('Node saved successfully:', savedNode);
+      toast.success(`Saved "${nodeData.title}" to Nodebar!`);
+    } catch (error) {
+      console.error('Error saving node to nodebar:', error);
+      toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleViewCode = () => {
+    // TODO: Implement view code logic
+    toast.info(`Viewing code for "${nodeData.title}"`);
+  };
+
   // Calculate handle position based on index and total count
   const calculateHandlePosition = (index: number, total: number) => {
     // Fixed header height + padding
@@ -280,19 +396,28 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, nodeData.language, unifiedOutputs.length, outputsOpen]);
 
   return (
-    <div
-      ref={nodeRef}
-      className={cn(
-        "shadow-md rounded-md overflow-visible",
-        selected && "ring-2 ring-primary",
-        "bg-background "
-      )}
-      style={{ 
-        width: dimensions.width, 
-        minHeight: minHeight,
-        position: 'relative'
-      }}
-    >
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={nodeRef}
+          className={cn(
+            "shadow-md rounded-md overflow-visible",
+            selected && "ring-2 ring-primary",
+            "bg-background",
+            isLocked && "noDrag"  // Add noDrag when locked
+          )}
+          style={{ 
+            width: dimensions.width, 
+            minHeight: minHeight,
+            position: 'relative'
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setIsLocked(!isLocked);
+            toast.info(isLocked ? '🔓 Unlocked - Node is draggable' : '🔒 Locked - Text selection enabled');
+          }}
+          title={isLocked ? "Double-click to unlock (enable dragging)" : "Double-click to lock (enable text selection)"}
+        >
       {/* Node resizer */}
       <NodeResizer
         minWidth={209}
@@ -373,6 +498,16 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         
         {/* Floating status badges */}
         <div className="absolute -top-7 right-1 flex items-center gap-1 z-10">
+          {/* Lock indicator badge */}
+          {isLocked && (
+            <div className="px-2 py-0.5 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center gap-1 shadow-sm border border-blue-600">
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Locked
+            </div>
+          )}
+          
           {/* Execution order badge */}
           {nodeData.execution_order && (
             <div className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium flex items-center gap-1 shadow-sm border border-blue-200">
@@ -590,9 +725,11 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
             
             {outputsOpen && (
               <div 
-                className="mt-2 overflow-y-auto space-y-1"
-                style={{ maxHeight: '2000px' }}
-                onMouseDown={(e) => e.stopPropagation()}
+                className="mt-2 space-y-1 noDrag"
+                style={{ 
+                  maxHeight: '400px',
+                  overflowY: 'auto'
+                }}
               >
                 {/* Use terminal view for bash nodes */}
                 {nodeData.language === 'bash' ? (
@@ -626,8 +763,11 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                       return (
                         <pre 
                           key={index}
-                          className="text-xs p-1 select-text text-wrap font-mono text-foreground"
-                          onMouseDown={(e) => e.stopPropagation()}
+                          className="text-xs p-2 select-text whitespace-pre-wrap font-mono text-foreground bg-muted/30 rounded border border-border noDrag"
+                          style={{
+                            maxHeight: '300px',
+                            overflowY: 'auto'
+                          }}
                         >
                           {output.content}
                         </pre>
@@ -691,6 +831,46 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         })()}
       </div>
     </div>
+      </ContextMenuTrigger>
+      
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem onClick={handleFocusNode}>
+          <Focus className="mr-2 h-4 w-4" />
+          <span>Focus Node</span>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={handleViewCode}>
+          <Code className="mr-2 h-4 w-4" />
+          <span>View Code</span>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={handleToggleLock}>
+          {isLocked ? (
+            <>
+              <Unlock className="mr-2 h-4 w-4" />
+              <span>Unlock Node</span>
+            </>
+          ) : (
+            <>
+              <Lock className="mr-2 h-4 w-4" />
+              <span>Lock Node</span>
+            </>
+          )}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={handleDuplicateNode}>
+          <Copy className="mr-2 h-4 w-4" />
+          <span>Duplicate</span>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={handleSaveToNodebar}>
+          <Save className="mr-2 h-4 w-4" />
+          <span>Save to Nodebar</span>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={handleDeleteNode} className="text-destructive focus:text-destructive">
+          <Trash2 className="mr-2 h-4 w-4" />
+          <span>Delete</span>
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 };
 

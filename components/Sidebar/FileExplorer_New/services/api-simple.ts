@@ -217,15 +217,128 @@ export class FileExplorerApiService {
     });
   }
 
-  // Search files
+  // Get workspace folders
+  async getWorkspaceFolders(): Promise<Array<{path: string, alias: string}>> {
+    try {
+      const response = await makeRequest(buildUrl('/workspace/folders'));
+      return response.folders || [];
+    } catch (error) {
+      console.error('Failed to get workspace folders:', error);
+      return [];
+    }
+  }
+
+  // Search files (simple search) - searches across all workspace folders
   async searchFiles(query: string, rootPath: string, filters?: SearchFilters): Promise<SearchResult[]> {
-    const params = new URLSearchParams({
-      directory: rootPath,
-      query: query,
-      max_results: '100'
+    if (!query.trim()) {
+      return [];
+    }
+
+    // Use advanced search if filters are provided
+    if (filters && (filters.include_content || filters.file_types?.length || filters.regex || filters.case_sensitive)) {
+      return this.advancedSearchFiles(query, rootPath, filters);
+    }
+
+    // Get all workspace folders
+    const workspaceFolders = await this.getWorkspaceFolders();
+    
+    // If no workspace folders, search in rootPath only
+    if (workspaceFolders.length === 0) {
+      const params = new URLSearchParams({
+        directory: rootPath,
+        query: query,
+        max_results: (filters?.max_results || 100).toString()
+      });
+      const response = await makeRequest(`${buildUrl('/search')}?${params}`);
+      return response.results || [];
+    }
+
+    // Search in all workspace folders in parallel
+    const searchPromises = workspaceFolders.map(async (folder) => {
+      try {
+        const params = new URLSearchParams({
+          directory: folder.path,
+          query: query,
+          max_results: (filters?.max_results || 100).toString()
+        });
+        const response = await makeRequest(`${buildUrl('/search')}?${params}`);
+        return response.results || [];
+      } catch (error) {
+        console.error(`Failed to search in ${folder.path}:`, error);
+        return [];
+      }
     });
-    const response = await makeRequest(`${buildUrl('/search')}?${params}`);
-    return response.results || [];
+
+    // Wait for all searches to complete
+    const allResults = await Promise.all(searchPromises);
+    
+    // Flatten and deduplicate results
+    const combinedResults = allResults.flat();
+    const uniqueResults = Array.from(
+      new Map(combinedResults.map(item => [item.path, item])).values()
+    );
+    
+    // Limit to max_results
+    const maxResults = filters?.max_results || 100;
+    return uniqueResults.slice(0, maxResults);
+  }
+
+  // Advanced search with filters - searches across all workspace folders
+  async advancedSearchFiles(query: string, rootPath: string, filters: SearchFilters): Promise<SearchResult[]> {
+    // Get all workspace folders
+    const workspaceFolders = await this.getWorkspaceFolders();
+    
+    // If no workspace folders, search in rootPath only
+    if (workspaceFolders.length === 0) {
+      const response = await makeRequest(buildUrl('/advanced-search'), {
+        method: 'POST',
+        body: JSON.stringify({
+          directory: rootPath,
+          query: query,
+          search_content: filters.include_content || false,
+          file_types: filters.file_types || [],
+          regex: filters.regex || false,
+          case_sensitive: filters.case_sensitive || false,
+          max_results: filters.max_results || 100
+        })
+      });
+      return response.results || [];
+    }
+
+    // Search in all workspace folders in parallel
+    const searchPromises = workspaceFolders.map(async (folder) => {
+      try {
+        const response = await makeRequest(buildUrl('/advanced-search'), {
+          method: 'POST',
+          body: JSON.stringify({
+            directory: folder.path,
+            query: query,
+            search_content: filters.include_content || false,
+            file_types: filters.file_types || [],
+            regex: filters.regex || false,
+            case_sensitive: filters.case_sensitive || false,
+            max_results: filters.max_results || 100
+          })
+        });
+        return response.results || [];
+      } catch (error) {
+        console.error(`Failed to search in ${folder.path}:`, error);
+        return [];
+      }
+    });
+
+    // Wait for all searches to complete
+    const allResults = await Promise.all(searchPromises);
+    
+    // Flatten and deduplicate results
+    const combinedResults = allResults.flat();
+    const uniqueResults = Array.from(
+      new Map(combinedResults.map(item => [item.path, item])).values()
+    );
+    
+    // Limit to max_results
+    const maxResults = filters.max_results || 100;
+    return uniqueResults.slice(0, maxResults);
   }
 
   // Upload file

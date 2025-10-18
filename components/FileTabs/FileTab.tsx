@@ -1,6 +1,6 @@
 "use client"
 import React from 'react'
-import { X, FileText, FileCode, Palette, Globe, FileJson, FileType, Copy, Trash2, XCircle, ChevronsRight, ChevronsLeft, Minimize2 } from 'lucide-react'
+import { X, FileText, FileCode, Palette, Globe, FileJson, FileType, Copy, Trash2, XCircle, ChevronsRight, ChevronsLeft, Minimize2, FolderTree } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -10,6 +10,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { useTabStore } from './useTabStore'
+import { useFileExplorerStore } from '@/components/Sidebar/FileExplorer_New/store/fileExplorerStore'
 import { toast } from 'sonner'
 
 interface FileTabProps {
@@ -36,6 +37,7 @@ function FileTab({
   onDelete
 }: FileTabProps) {
   const { closeTabsToRight, closeTabsToLeft, closeOtherTabs, closeAllTabs, tabOrder } = useTabStore();
+  const { revealInExplorer } = useFileExplorerStore();
 
   const getFileIcon = () => {
     const iconProps = { size: 14, className: "mr-1 flex-shrink-0" }
@@ -98,6 +100,16 @@ function FileTab({
 
   const handleCloseAll = () => {
     closeAllTabs()
+  }
+
+  const handleRevealInExplorer = async () => {
+    try {
+      await revealInExplorer(path)
+      toast.success('File revealed in explorer')
+    } catch (error) {
+      console.error('Failed to reveal file:', error)
+      toast.error('Failed to reveal file in explorer')
+    }
   }
 
   // Check if there are tabs to the right or left
@@ -168,6 +180,11 @@ function FileTab({
         </ContextMenuItem>
         
         <ContextMenuSeparator />
+        
+        <ContextMenuItem onClick={handleRevealInExplorer}>
+          <FolderTree className="mr-2 h-4 w-4" />
+          Reveal in Explorer
+        </ContextMenuItem>
         
         <ContextMenuItem onClick={handleCopyPath}>
           <Copy className="mr-2 h-4 w-4" />

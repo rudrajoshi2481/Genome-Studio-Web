@@ -464,10 +464,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
     setShowDeleteDialog({ paths, names });
   }, [selectedPaths]);
 
-  // Handle search
+  // Handle search with filters
   const handleSearch = useCallback((query: string, filters?: SearchFilters) => {
     if (query.trim()) {
-      searchFiles(query);
+      searchFiles(query, filters);
     } else {
       clearSearch();
     }

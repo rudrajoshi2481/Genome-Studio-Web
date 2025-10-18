@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useMemo } from 'react'
-import { FlipVertical2, RefreshCcw, Code2, Trash2, Edit, Copy, Search, Star, X, Filter } from 'lucide-react'
+import { FlipVertical2, RefreshCcw, Code2, Trash2, Edit, Copy, Search, Star, X, Filter, ChevronDown, ChevronUp } from 'lucide-react'
 import CustomNode from './CustomNode/CustomNode'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { fetchCustomNodes, deleteCustomNode, duplicateCustomNode, toggleFavoriteNode, getFavoriteNodes, CustomNode as CustomNodeType } from '@/lib/services/custom-node-service'
@@ -18,6 +18,11 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
 
 function Nodebar() {
@@ -36,6 +41,7 @@ function Nodebar() {
   const [favoriteNodes, setFavoriteNodes] = useState<Set<string>>(new Set())
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState('all')
+  const [isTagsOpen, setIsTagsOpen] = useState(false)
 
   // Ensure component only renders on client after hydration
   useEffect(() => {
@@ -495,30 +501,52 @@ function Nodebar() {
         </div>
       </div>
       
-      {/* Tags Filter */}
+      {/* Tags Filter - Collapsible */}
       {allTags.length > 0 && (
-        <div className="px-3 py-2 border-b">
-          <div className="flex items-center gap-2 mb-2">
-            <Filter className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">Filter by tags</span>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {allTags.map(tag => (
-              <Badge
-                key={tag}
-                variant={selectedTags.has(tag) ? "default" : "outline"}
-                className="cursor-pointer text-xs"
-                onClick={() => toggleTag(tag)}
-              >
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
+        <Collapsible open={isTagsOpen} onOpenChange={setIsTagsOpen} className="border-b">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="w-full justify-between px-3 py-2 h-auto hover:bg-accent/50"
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Filter by tags</span>
+                {selectedTags.size > 0 && (
+                  <Badge variant="default" className="h-4 px-1.5 text-[10px]">
+                    {selectedTags.size}
+                  </Badge>
+                )}
+              </div>
+              {isTagsOpen ? (
+                <ChevronUp className="h-3 w-3 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              )}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="px-3 pb-2 overflow-hidden">
+            <div className="max-h-32 overflow-y-auto">
+              <div className="flex flex-wrap gap-1.5 py-1">
+                {allTags.map(tag => (
+                  <Badge
+                    key={tag}
+                    variant={selectedTags.has(tag) ? "default" : "outline"}
+                    className="cursor-pointer text-[10px] px-2 py-0.5 hover:bg-accent shrink-0"
+                    onClick={() => toggleTag(tag)}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       )}
       
       {/* Nodebar content with tabs */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
         {isAuthenticated && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="px-3 pt-3">
@@ -737,7 +765,8 @@ function Nodebar() {
             <p>Please log in to view your custom nodes.</p>
           </div>
         )}
-      </ScrollArea>
+        </ScrollArea>
+      </div>
     </div>
   )
 }

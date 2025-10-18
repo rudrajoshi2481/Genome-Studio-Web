@@ -100,8 +100,9 @@ interface FileExplorerStore extends FileExplorerState {
   updateTreeNode: (event: FileSystemChangeEvent) => void;
   collapseAll: () => void;
   expandToPath: (path: string) => void;
+  revealInExplorer: (path: string) => Promise<void>;
   search: (query: string) => FileNode[];
-  searchFiles: (query: string) => Promise<void>;
+  searchFiles: (query: string, filters?: any) => Promise<void>;
   clearSearch: () => void;
   createFile: (name: string, parentPath?: string) => Promise<void>;
   createDirectory: (name: string, parentPath?: string) => Promise<void>;
@@ -936,6 +937,98 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     });
   },
 
+  revealInExplorer: async (path: string) => {
+    console.log('🔍 Revealing file in explorer:', path);
+    
+    try {
+      const state = get();
+      
+      // Check if path is within current root
+      if (!path.startsWith(state.rootPath)) {
+        console.log('⚠️ File is outside current root path');
+        console.log('   File path:', path);
+        console.log('   Root path:', state.rootPath);
+        
+        // Find a common parent or use a higher-level directory
+        // For /app/... files, use /app as root
+        // For /home/... files, use /home as root
+        const pathParts = path.split('/').filter(Boolean);
+        const newRoot = pathParts.length > 0 ? '/' + pathParts[0] : '/';
+        
+        console.log('🔄 Changing root to:', newRoot);
+        
+        // Change root and reload tree
+        get().setRootPath(newRoot);
+        await get().loadFileTree();
+      }
+      
+      // Get all parent directories
+      const pathParts = path.split('/').filter(Boolean);
+      const parentDirs: string[] = [];
+      
+      for (let i = 1; i < pathParts.length; i++) {
+        const dirPath = '/' + pathParts.slice(0, i).join('/');
+        parentDirs.push(dirPath);
+      }
+      
+      console.log('📂 Parent directories to expand:', parentDirs);
+      
+      // Expand all parent directories
+      const newExpandedPaths = [...state.expandedPaths];
+      for (const dirPath of parentDirs) {
+        if (!newExpandedPaths.includes(dirPath)) {
+          newExpandedPaths.push(dirPath);
+        }
+        
+        // Load children if not already loaded
+        const node = get().nodes.get(dirPath);
+        if (node && node.is_dir && (!node.children || node.children.length === 0)) {
+          console.log('📥 Loading children for:', dirPath);
+          try {
+            await get().loadNodeChildren(dirPath);
+          } catch (error) {
+            console.warn('⚠️ Could not load children for:', dirPath, error);
+          }
+        }
+      }
+      
+      // Update expanded paths
+      set({ expandedPaths: newExpandedPaths });
+      
+      // Select and activate the file
+      get().selectNode(path);
+      get().setActivePath(path);
+      
+      // Scroll to the file in the tree
+      // Wait a bit for the DOM to update
+      setTimeout(() => {
+        try {
+          // Find the file node in the DOM by its path
+          const escapedPath = path.replace(/[/\\]/g, '\\/');
+          const fileElement = document.querySelector(`[data-path="${path}"]`);
+          
+          if (fileElement) {
+            console.log('📜 Scrolling to file element');
+            fileElement.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center',
+              inline: 'nearest'
+            });
+          } else {
+            console.warn('⚠️ Could not find file element in DOM');
+          }
+        } catch (scrollError) {
+          console.warn('⚠️ Could not scroll to file:', scrollError);
+        }
+      }, 300);
+      
+      console.log('✅ File revealed in explorer');
+    } catch (error) {
+      console.error('❌ Failed to reveal file in explorer:', error);
+      throw error;
+    }
+  },
+
   search: (query: string) => {
     const { nodes } = get();
     const results: FileNode[] = [];
@@ -1024,8 +1117,18 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     }
   },
 
-  searchFiles: async (query: string) => {
-    console.log(' Searching files...', { query });
+  searchFiles: async (query: string, filters?: any) => {
+    console.log('🔍 Searching files via backend...', { query, filters });
+    
+    if (!query.trim()) {
+      set({ 
+        searchQuery: '',
+        searchResults: [],
+        isSearching: false 
+      });
+      return;
+    }
+
     set({ 
       isSearching: true, 
       searchQuery: query,
@@ -1033,16 +1136,31 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     });
     
     try {
-      const results = get().search(query);
+      const { rootPath } = get();
+      const results = await fileExplorerApi.searchFiles(query, rootPath, filters);
+      
+      console.log(`✅ Backend search found ${results.length} results`);
+      
+      // Convert search results to FileNode format
+      const fileNodes: FileNode[] = results.map((result: any) => ({
+        path: result.path,
+        name: result.name,
+        is_dir: result.is_dir,
+        size: result.size,
+        modified: result.modified,
+        parent: result.parent || null
+      }));
+      
       set({ 
-        searchResults: results,
+        searchResults: fileNodes,
         isSearching: false 
       });
     } catch (error) {
-      console.error('Search failed:', error);
+      console.error('❌ Backend search failed:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Search failed',
-        isSearching: false 
+        isSearching: false,
+        searchResults: []
       });
     }
   },

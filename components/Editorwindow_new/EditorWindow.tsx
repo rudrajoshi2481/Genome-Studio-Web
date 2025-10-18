@@ -12,10 +12,13 @@ import EditorFactory from './components/EditorFactory'
  */
 const EditorWindowContent = memo(() => {
   // Get tab store methods
-  const { getActiveTab, removeTab, activateTab } = useTabStore()
+  const { removeTab, activateTab } = useTabStore()
   
-  // Get active tab from the store
-  const activeTab = getActiveTab()
+  // Get active tab using selector to prevent infinite loops
+  const activeTab = useTabStore(state => {
+    if (!state.activeTabId) return null
+    return state.tabs.get(state.activeTabId) || null
+  })
   const [isMounted, setIsMounted] = React.useState(false)
   
   // Handle client-side mounting to prevent hydration mismatch
@@ -74,11 +77,14 @@ EditorWindowContent.displayName = 'EditorWindowContent'
  */
 const EditorWindow = () => {
   // Get tab store methods
-  const { getActiveTab, removeTab, activateTab, getTab } = useTabStore()
+  const { removeTab, activateTab, getTab } = useTabStore()
   const { openUnsavedChangesDialog } = useDialogStore()
   
-  // Get active tab
-  const activeTab = getActiveTab()
+  // Get active tab using selector to prevent infinite loops
+  const activeTab = useTabStore(state => {
+    if (!state.activeTabId) return null
+    return state.tabs.get(state.activeTabId) || null
+  })
   
   // Tab handlers
   const handleActivate = useCallback((tabId: string) => {

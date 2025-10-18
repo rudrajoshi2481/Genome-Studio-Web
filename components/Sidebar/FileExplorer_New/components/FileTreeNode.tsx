@@ -187,6 +187,7 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
           role="treeitem"
           aria-expanded={node.is_dir ? isExpanded : undefined}
           aria-selected={isSelected}
+          data-path={node.path}
         >
           {/* Expand/collapse button for directories */}
           {node.is_dir ? (

@@ -142,20 +142,26 @@ export const useCanvasHandlers = (
       const uniqueId = generateUniqueNodeId();
       
       // Check if this is a data type node
+      // Check both 'type' (for new nodes from nodebar) and 'node_type' (for saved nodes)
       let newNode;
-      if (nodeData.type === 'dataType') {
+      if (nodeData.type === 'dataType' || nodeData.node_type === 'dataTypeNode') {
+        // Extract data type from tags if it's a saved node
+        const dataType = nodeData.dataType || (nodeData.tags && nodeData.tags.find((tag: string) => 
+          ['string', 'int', 'float', 'bool', 'list', 'dict'].includes(tag)
+        )) || 'string';
+        
         // Create a data type node
         newNode = {
           id: uniqueId,
           type: 'dataType',
           position,
           data: {
-            dataType: nodeData.dataType,
-            value: getDefaultValueForType(nodeData.dataType),
-            label: nodeData.label || nodeData.dataType
+            dataType: dataType,
+            value: getDefaultValueForType(dataType),
+            label: nodeData.label || nodeData.function_name || dataType
           }
         };
-        toast.success(`Added ${nodeData.label || nodeData.dataType} node to canvas`);
+        toast.success(`Added ${nodeData.label || nodeData.function_name || dataType} node to canvas`);
       } else {
         // Create a custom code node
         newNode = {

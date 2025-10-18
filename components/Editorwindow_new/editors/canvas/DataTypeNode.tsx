@@ -7,7 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Pencil } from 'lucide-react';
+import { Pencil, Focus, Trash2, Copy, Save, Code } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { toast } from 'sonner';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { createCustomNode } from '@/lib/services/custom-node-service';
 
 // Define data types
 export type DataType = 'string' | 'int' | 'float' | 'bool' | 'list' | 'dict';
@@ -25,7 +35,8 @@ interface DataTypeNodeProps extends NodeProps {
 
 export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
   const nodeData: DataTypeNodeData = data as DataTypeNodeData;
-  const { setNodes } = useReactFlow();
+  const { setNodes, fitView, getNode } = useReactFlow();
+  const { token } = useAuthStore();
   const nodeRef = useRef<HTMLDivElement>(null);
   const [value, setValue] = useState<any>(
     nodeData.value !== undefined && nodeData.value !== null 
@@ -216,6 +227,127 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
     }
   };
 
+  // Context menu handlers
+  const handleFocusNode = () => {
+    const node = getNode(id);
+    if (node) {
+      fitView({
+        nodes: [node],
+        duration: 500,
+        padding: 0.5,
+        minZoom: 1,
+        maxZoom: 1.5,
+      });
+      toast.success(`Focused on "${label}"`);
+    }
+  };
+
+  const handleDeleteNode = () => {
+    setNodes((nds) => nds.filter((node) => node.id !== id));
+    toast.success(`Deleted node "${label}"`);
+  };
+
+  const handleDuplicateNode = () => {
+    // Generate a unique ID for the duplicate
+    const duplicateId = `node_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    
+    // Get the current node to duplicate
+    const currentNode = getNode(id);
+    if (!currentNode) {
+      toast.error('Could not find node to duplicate');
+      return;
+    }
+    
+    // Create a duplicate node with offset position
+    const duplicateNode = {
+      ...currentNode,
+      id: duplicateId,
+      position: {
+        x: currentNode.position.x + 50,
+        y: currentNode.position.y + 50,
+      },
+      data: {
+        ...currentNode.data,
+        label: `${label} (Copy)`,
+      },
+      selected: false,
+    };
+    
+    // Add the duplicate to the canvas
+    setNodes((nds) => [...nds, duplicateNode]);
+    
+    toast.success(`Duplicated "${label}"`);
+  };
+
+  const handleSaveToNodebar = async () => {
+    try {
+      if (!token) {
+        toast.error('Please log in to save nodes');
+        return;
+      }
+
+      // Generate Python code for the data type node
+      let sourceCode = '';
+      switch (nodeData.dataType) {
+        case 'string':
+          sourceCode = `def ${label}():\n    """Returns a string value"""\n    return "${value}"`;
+          break;
+        case 'int':
+          sourceCode = `def ${label}():\n    """Returns an integer value"""\n    return ${value}`;
+          break;
+        case 'float':
+          sourceCode = `def ${label}():\n    """Returns a float value"""\n    return ${value}`;
+          break;
+        case 'bool':
+          sourceCode = `def ${label}():\n    """Returns a boolean value"""\n    return ${value}`;
+          break;
+        case 'list':
+          sourceCode = `def ${label}():\n    """Returns a list value"""\n    return ${value}`;
+          break;
+        case 'dict':
+          sourceCode = `def ${label}():\n    """Returns a dictionary value"""\n    return ${value}`;
+          break;
+      }
+
+      // Prepare node data for saving
+      const nodeToSave = {
+        data: {
+          title: `${label} (${nodeData.dataType})`,
+          description: `Data type node: ${nodeData.dataType} with value ${JSON.stringify(value)}`,
+          function_name: label,
+          language: 'python',
+          source: sourceCode,
+          inputs: [],
+          outputs: [
+            {
+              id: 'output',
+              name: 'value',
+              type: nodeData.dataType
+            }
+          ],
+        },
+        tags: ['data-type', nodeData.dataType],
+        is_public: false,
+        node_type: 'dataTypeNode',  // Mark as data type node
+      };
+
+      console.log('Saving data type node to nodebar:', nodeToSave);
+      
+      // Call API to create custom node
+      const savedNode = await createCustomNode(token, nodeToSave);
+      
+      console.log('Data type node saved successfully:', savedNode);
+      toast.success(`Saved "${label}" to Nodebar!`);
+    } catch (error) {
+      console.error('Error saving data type node to nodebar:', error);
+      toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleViewCode = () => {
+    toast.info(`Data type: ${nodeData.dataType}, Value: ${JSON.stringify(value)}`);
+  };
+
   // Render input based on data type
   const renderInput = () => {
     switch (nodeData.dataType) {
@@ -314,14 +446,16 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
   };
 
   return (
-    <div
-      ref={nodeRef}
-      className={cn(
-        "rounded-lg border shadow-md transition-all duration-200 bg-white",
-        selected ? "ring-2 ring-blue-500 shadow-lg" : "border-gray-200",
-        "min-w-[200px]"
-      )}
-    >
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={nodeRef}
+          className={cn(
+            "rounded-lg border shadow-md transition-all duration-200 bg-white",
+            selected ? "ring-2 ring-blue-500 shadow-lg" : "border-gray-200",
+            "min-w-[200px]"
+          )}
+        >
         {/* Header */}
         <div className={cn(
           "px-3 py-2 border-b rounded-t-lg",
@@ -393,7 +527,34 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
           className="w-2.5 h-2.5 !bg-blue-500 !border-2 !border-white rounded-full"
           style={{ right: -5 }}
         />
-    </div>
+        </div>
+      </ContextMenuTrigger>
+      
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem onClick={handleFocusNode}>
+          <Focus className="mr-2 h-4 w-4" />
+          <span>Focus Node</span>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={handleViewCode}>
+          <Code className="mr-2 h-4 w-4" />
+          <span>View Value</span>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={handleDuplicateNode}>
+          <Copy className="mr-2 h-4 w-4" />
+          <span>Duplicate</span>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={handleSaveToNodebar}>
+          <Save className="mr-2 h-4 w-4" />
+          <span>Save to Nodebar</span>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={handleDeleteNode} className="text-destructive focus:text-destructive">
+          <Trash2 className="mr-2 h-4 w-4" />
+          <span>Delete</span>
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 };
 

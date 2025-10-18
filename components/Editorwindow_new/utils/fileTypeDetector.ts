@@ -34,8 +34,8 @@ export const getFileType = (filePath: string, extension?: string): FileType => {
     return FileType.IMAGE;
   }
   
-  // Data files
-  if (['csv', 'tsv', 'json', 'xml', 'yaml', 'yml'].includes(ext)) {
+  // Data files (CSV/TSV only - JSON/XML/YAML are better as code)
+  if (['csv', 'tsv'].includes(ext)) {
     return FileType.DATA;
   }
   
@@ -121,7 +121,7 @@ export const getSuggestedExtensions = (fileType: FileType): string[] => {
     case FileType.IMAGE:
       return ['png', 'jpg', 'jpeg', 'svg', 'gif'];
     case FileType.DATA:
-      return ['csv', 'tsv', 'json', 'xml', 'yaml'];
+      return ['csv', 'tsv'];
     case FileType.PDF:
       return ['pdf'];
     default:

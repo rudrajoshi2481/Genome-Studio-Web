@@ -156,14 +156,16 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
     }
   }, [onComponentChange])
 
-  // Handle pin/unpin functionality
+  // Handle pin/unpin functionality - only one item can be pinned at a time
   const handlePinToggle = (itemName: string) => {
-    const newPinnedItems = new Set(pinnedItems)
+    let newPinnedItems: Set<string>
     
     if (pinnedItems.has(itemName)) {
-      newPinnedItems.delete(itemName)
+      // Unpin the item
+      newPinnedItems = new Set()
     } else {
-      newPinnedItems.add(itemName)
+      // Pin the new item (replaces any previously pinned item)
+      newPinnedItems = new Set([itemName])
     }
     
     setPinnedItems(newPinnedItems)

@@ -450,6 +450,8 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
           fitView
           className="bg-background"
           proOptions={{ hideAttribution: false }}
+          noDragClassName="noDrag"
+          noWheelClassName="noDrag"
         >
           <Controls />
           <MiniMap />

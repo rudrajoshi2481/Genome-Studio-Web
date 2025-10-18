@@ -32,10 +32,57 @@ export interface CustomNode {
   outputs: CustomNodeIO[];
   tags: string[];
   is_public: boolean;
+  node_type?: string;  // "customNode" or "dataTypeNode"
   user_id: number;
   created_at: string;
   updated_at: string | null;
 }
+
+/**
+ * Create a new custom node
+ * @param token JWT authentication token
+ * @param nodeData Node data to create
+ * @returns Created custom node
+ */
+export const createCustomNode = async (token: string, nodeData: any): Promise<CustomNode> => {
+  try {
+    console.log('Creating custom node:', nodeData);
+    
+    if (!token) {
+      console.error('No authentication token provided');
+      throw new Error('Authentication token is required');
+    }
+    
+    const fullUrl = `${API_URL}/workflow-manager/custom-nodes/`;
+    console.log(`Making POST request to: ${fullUrl}`);
+    console.log('Node data:', JSON.stringify(nodeData, null, 2));
+    
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      },
+      body: JSON.stringify(nodeData)
+    });
+
+    console.log('API response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error creating custom node:', response.status, errorText);
+      throw new Error(`Failed to create custom node: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Create node response:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in createCustomNode:', error);
+    throw error;
+  }
+};
 
 /**
  * Fetch all custom nodes for the current user

@@ -62,15 +62,17 @@ function Appbar() {
     }
   }, []);
 
-  // Handle pin/unpin functionality for terminal tabs
+  // Handle pin/unpin functionality for terminal tabs - only one tab can be pinned at a time
   const handlePinToggle = (tabId: string) => {
-    const newPinnedTabs = new Set(pinnedTabs);
+    let newPinnedTabs: Set<string>;
     
     if (pinnedTabs.has(tabId)) {
-      newPinnedTabs.delete(tabId);
+      // Unpin the tab
+      newPinnedTabs = new Set();
       toast.info('Terminal tab unpinned');
     } else {
-      newPinnedTabs.add(tabId);
+      // Pin the new tab (replaces any previously pinned tab)
+      newPinnedTabs = new Set([tabId]);
       toast.success('Terminal tab pinned');
     }
     

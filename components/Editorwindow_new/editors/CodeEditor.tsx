@@ -10,6 +10,8 @@ import { markdown } from '@codemirror/lang-markdown'
 import { json } from '@codemirror/lang-json'
 import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
+import { StreamLanguage } from '@codemirror/language'
+import { shell } from '@codemirror/legacy-modes/mode/shell'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { Loader2, Save, AlertCircle } from 'lucide-react'
 import { editorAPI } from '../services/EditorAPI'
@@ -201,13 +203,17 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
       case 'rs':
       case 'rust':
       case 'go':
-      case 'yaml':
-      case 'yml':
+      // Shell scripts - Enhanced highlighting
       case 'sh':
       case 'bash':
       case 'zsh':
       case 'fish':
       case 'ksh':
+        return StreamLanguage.define(shell)
+      
+      // Other text-based files
+      case 'yaml':
+      case 'yml':
       case 'conf':
       case 'config':
       case 'ini':
