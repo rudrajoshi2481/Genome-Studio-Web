@@ -1516,24 +1516,43 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     try {
       const blob = await fileExplorerApi.downloadFile(path);
       
+      // Determine filename - check if it's a ZIP (for folders)
+      let filename = path.split('/').pop() || 'download';
+      
+      // If blob type is ZIP, ensure .zip extension
+      if (blob.type === 'application/zip' && !filename.endsWith('.zip')) {
+        filename = `${filename}.zip`;
+      }
+      
       // Create download link and trigger download
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = path.split('/').pop() || 'download';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       
-      console.log('✅ File download initiated');
+      console.log(`✅ Download initiated: ${filename} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
       set({ isLoading: false });
     } catch (error) {
       console.error('❌ Download failed:', error);
-      set({ 
-        error: error instanceof Error ? error.message : 'Download failed',
-        isLoading: false 
-      });
+      const errorMessage = error instanceof Error ? error.message : 'Download failed';
+      
+      // Check if it's a timeout error
+      if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
+        set({ 
+          error: 'Download timeout - folder may be too large. Try downloading a smaller folder.',
+          isLoading: false 
+        });
+      } else {
+        set({ 
+          error: errorMessage,
+          isLoading: false 
+        });
+      }
+      throw error; // Re-throw so the UI can handle it
     }
   },
 

@@ -520,13 +520,25 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         </div>
 
         {/* Output Handle - styled like CustomNode */}
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="output"
-          className="w-2.5 h-2.5 !bg-blue-500 !border-2 !border-white rounded-full"
-          style={{ right: -5 }}
-        />
+        <div 
+          className="noDrag" 
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ position: 'absolute', right: -5, top: '50%', transform: 'translateY(-50%)', zIndex: 100 }}
+        >
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="output"
+            className="w-2.5 h-2.5 !bg-blue-500 !border-2 !border-white rounded-full"
+            style={{ 
+              position: 'relative',
+              left: 0,
+              top: 0,
+              transform: 'none',
+              cursor: 'crosshair'
+            }}
+          />
+        </div>
         </div>
       </ContextMenuTrigger>
       

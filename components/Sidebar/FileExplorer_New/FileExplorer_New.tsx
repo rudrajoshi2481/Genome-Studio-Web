@@ -331,15 +331,90 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
 
   // Handle download
   const handleDownload = useCallback(async (node: FileNode) => {
-    if (node.is_dir) {
-      console.warn('Cannot download directory directly');
-      return;
-    }
-    
     try {
-      await downloadFile(node.path);
+      console.log(`⬇️ Downloading ${node.is_dir ? 'folder' : 'file'}: ${node.path}`);
+      
+      // For folders, use WebSocket for progress updates
+      if (node.is_dir) {
+        const { DownloadWebSocket } = await import('./services/download-websocket');
+        
+        let filesProcessed = 0;
+        
+        // Show initial loading toast
+        toast.loading('Preparing download...', {
+          description: 'Initializing ZIP creation',
+          duration: Infinity,
+          id: 'folder-download',
+        });
+        
+        const downloader = new DownloadWebSocket(
+          // Progress callback
+          (progress) => {
+            if (progress.type === 'start') {
+              toast.loading('Creating ZIP archive...', {
+                description: `Compressing ${node.name}`,
+                duration: Infinity,
+                id: 'folder-download',
+              });
+            } else if (progress.type === 'progress') {
+              filesProcessed = progress.files_processed || 0;
+              toast.loading('Creating ZIP archive...', {
+                description: `Processed ${filesProcessed} files...`,
+                duration: Infinity,
+                id: 'folder-download',
+              });
+            } else if (progress.type === 'complete') {
+              toast.loading('Downloading...', {
+                description: `Receiving ${progress.filename} (${(progress.size! / 1024 / 1024).toFixed(2)} MB)`,
+                duration: Infinity,
+                id: 'folder-download',
+              });
+            }
+          },
+          // Complete callback
+          (blob, filename) => {
+            // Trigger download
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            toast.dismiss('folder-download');
+            toast.success('Folder download complete!', {
+              description: `${filename} (${filesProcessed} files)`,
+              duration: 3000,
+            });
+          },
+          // Error callback
+          (error) => {
+            toast.dismiss('folder-download');
+            toast.error('Download failed', {
+              description: error,
+              duration: 5000,
+            });
+          }
+        );
+        
+        await downloader.downloadFolder(node.path);
+      } else {
+        // For files, use regular download
+        await downloadFile(node.path);
+        toast.success('File download started', {
+          description: `Downloading ${node.name}`,
+          duration: 2000,
+        });
+      }
     } catch (error) {
       console.error('Download failed:', error);
+      toast.dismiss('folder-download');
+      toast.error('Download failed', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+        duration: 5000,
+      });
     }
   }, [downloadFile]);
 

@@ -70,6 +70,10 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
               <CloudArrowUpIcon className="w-4 h-4 mr-2" />
               Upload Files
             </ContextMenuItem>
+            <ContextMenuItem onClick={() => handleActionClick('download')} className="flex items-center">
+              <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+              Download Folder
+            </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem onClick={() => handleActionClick('rename')} className="flex items-center">
               <PencilIcon className="w-4 h-4 mr-2" />

@@ -365,16 +365,11 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     const outputsButtonHeight = unifiedOutputs.length ? 30 : 0; // Outputs accordion button if outputs exist
     
     // Calculate height for outputs content when expanded
-    // For bash nodes with terminal: 200px minimum, for others estimate based on output count
+    // All languages now use terminal view with min-height of 200px
     let outputsContentHeight = 0;
     if (outputsOpen && unifiedOutputs.length > 0) {
-      if (nodeData.language === 'bash') {
-        // Terminal view has min-height of 200px
-        outputsContentHeight = 220; // 200px + padding
-      } else {
-        // Estimate ~20px per output line for text/rich outputs
-        outputsContentHeight = Math.min(unifiedOutputs.length * 20, 400);
-      }
+      // Terminal view has min-height of 200px
+      outputsContentHeight = 220; // 200px + padding
     }
     
     // Calculate base height from component parts
@@ -393,7 +388,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     const minimumHeight = 180;
     
     return Math.max(minimumHeight, baseHeight + inputsHeight + outputsHeight + dividerHeight);
-  }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, nodeData.language, unifiedOutputs.length, outputsOpen]);
+  }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, unifiedOutputs.length, outputsOpen]);
 
   return (
     <ContextMenu>
@@ -595,22 +590,29 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
             {nodeData.inputs.map((input, idx) => (
               <div key={`port-${input.id || idx}`} className="relative h-8 flex items-center px-3">
                 {/* Input handle */}
-                <Handle
-                  id={`input-${input.id || idx}`}
-                  type="target"
-                  position={Position.Left}
-                  style={{ 
-                    left: -5,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: '#5D688A',
-                    width: 10,
-                    height: 10,
-                    border: '2px solid hsl(var(--background))',
-                    boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.1)',
-                    zIndex: 10
-                  }}
-                />
+                <div 
+                  className="noDrag" 
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{ position: 'absolute', left: -5, top: '50%', transform: 'translateY(-50%)', zIndex: 100 }}
+                >
+                  <Handle
+                    id={`input-${input.id || idx}`}
+                    type="target"
+                    position={Position.Left}
+                    style={{ 
+                      position: 'relative',
+                      left: 0,
+                      top: 0,
+                      transform: 'none',
+                      background: '#5D688A',
+                      width: 10,
+                      height: 10,
+                      border: '2px solid hsl(var(--background))',
+                      boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.1)',
+                      cursor: 'crosshair'
+                    }}
+                  />
+                </div>
                 {/* Input label */}
                 <div 
                   className="text-xs font-medium text-foreground ml-2 select-text"
@@ -638,22 +640,29 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                   <span className="text-muted-foreground ml-1">{output.type}</span>
                 </div>
                 {/* Output handle */}
-                <Handle
-                  id={`output-${output.id || idx}`}
-                  type="source"
-                  position={Position.Right}
-                  style={{ 
-                    right: -5,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: '#5D688A',
-                    width: 10,
-                    height: 10,
-                    border: '2px solid hsl(var(--background))',
-                    boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.1)',
-                    zIndex: 10
-                  }}
-                />
+                <div 
+                  className="noDrag" 
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{ position: 'absolute', right: -5, top: '50%', transform: 'translateY(-50%)', zIndex: 100 }}
+                >
+                  <Handle
+                    id={`output-${output.id || idx}`}
+                    type="source"
+                    position={Position.Right}
+                    style={{ 
+                      position: 'relative',
+                      left: 0,
+                      top: 0,
+                      transform: 'none',
+                      background: '#5D688A',
+                      width: 10,
+                      height: 10,
+                      border: '2px solid hsl(var(--background))',
+                      boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.1)',
+                      cursor: 'crosshair'
+                    }}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -724,106 +733,12 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
               </div>
             
             {outputsOpen && (
-              <div 
-                className="mt-2 space-y-1 noDrag"
-                style={{ 
-                  maxHeight: '400px',
-                  overflowY: 'auto'
-                }}
-              >
-                {/* Use terminal view for bash nodes */}
-                {nodeData.language === 'bash' ? (
-                  (() => {
-                    // Convert unified outputs to log format for terminal
-                    const terminalLogs = unifiedOutputs
-                      .filter(output => output.type === 'text')
-                      .map((output, index) => ({
-                        timestamp: new Date().toISOString(),
-                        level: 'INFO',
-                        message: output.content,
-                        source: 'stdout'
-                      }));
-                    
-                    console.log('[CustomNode] Bash node terminal logs:', terminalLogs);
-                    
-                    return (
-                      <TerminalOutput 
-                        logs={terminalLogs}
-                        isRunning={isExecuting}
-                      />
-                    );
-                  })()
-                ) : (
-                  /* Regular output for Python/R nodes */
-                  unifiedOutputs.map((output, index) => {
-                    console.log(`[CustomNode ${id}] Rendering output ${index}:`, output.type, output.var_name);
-                    
-                    if (output.type === 'text') {
-                      // Render text output (print statements)
-                      return (
-                        <pre 
-                          key={index}
-                          className="text-xs p-2 select-text whitespace-pre-wrap font-mono text-foreground bg-muted/30 rounded border border-border noDrag"
-                          style={{
-                            maxHeight: '300px',
-                            overflowY: 'auto'
-                          }}
-                        >
-                          {output.content}
-                        </pre>
-                      );
-                    } else if (output.type === 'error') {
-                      // Render error output
-                      return (
-                        <div key={index} className="p-2 bg-red-50 border border-red-200 rounded text-xs">
-                          <div className="font-semibold text-red-800 mb-1 flex items-center gap-1">
-                            <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <line x1="15" y1="9" x2="9" y2="15"></line>
-                              <line x1="9" y1="9" x2="15" y2="15"></line>
-                            </svg>
-                            Error
-                          </div>
-                          <pre className="text-red-700 whitespace-pre-wrap font-mono text-xs select-text">
-                            {output.content}
-                          </pre>
-                          {output.traceback && (
-                            <details className="mt-2">
-                              <summary className="cursor-pointer text-red-600 hover:text-red-800 font-medium">
-                                Show Traceback
-                              </summary>
-                              <pre className="mt-1 text-red-600 whitespace-pre-wrap font-mono text-xs select-text max-h-40 overflow-y-auto">
-                                {output.traceback}
-                              </pre>
-                            </details>
-                          )}
-                        </div>
-                      );
-                    } else if (output.type === 'rich') {
-                      // Filter out internal variables
-                      const internalVars = ['plt', 'np', 'pd', 'idx', 'fig_name', 'rich_output', 'sys', 'os', 'math', 'random'];
-                      if (output.var_name && internalVars.includes(output.var_name)) {
-                        return null;
-                      }
-                      
-                      // Skip module representations
-                      if (output.content?.text && output.content.text.includes('module') && output.content.text.includes('from')) {
-                        return null;
-                      }
-                      
-                      // Render rich output (plots, dataframes, etc.)
-                      const htmlContent = typeof output.content === 'string' ? output.content : output.content?.html;
-                      if (!htmlContent) return null;
-                      
-                      return (
-                        <div key={index} className="rich-output-content">
-                          <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-                        </div>
-                      );
-                    }
-                    return null;
-                  })
-                )}
+              <div className="mt-2 noDrag">
+                {/* Use unified terminal view for all languages */}
+                <TerminalOutput 
+                  outputs={unifiedOutputs}
+                  isRunning={isExecuting}
+                />
               </div>
             )}
           </div>
