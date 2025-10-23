@@ -184,12 +184,12 @@ function Settings() {
       
       toast.success('Profile updated successfully')
       setIsEditing(false)
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update profile')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update profile')
     }
   }
 
-  const updateSetting = (key: string, value: any) => {
+  const updateSetting = (key: string, value: unknown) => {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
@@ -242,8 +242,8 @@ function Settings() {
       updateSetting('avatar', `http://${host}:${port}${result.avatar_url}`)
       
       toast.success('Avatar uploaded successfully')
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to upload avatar')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to upload avatar')
     }
   }
 

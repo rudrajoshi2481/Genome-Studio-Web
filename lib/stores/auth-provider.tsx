@@ -34,4 +34,6 @@ export function useAuth() {
   return context;
 }
 
-export default { AuthStoreProvider, useAuth };
+const authProvider = { AuthStoreProvider, useAuth };
+
+export default authProvider;

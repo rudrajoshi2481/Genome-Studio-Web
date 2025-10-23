@@ -1,14 +1,20 @@
 import { create } from 'zustand'
-import { useAuthToken } from './auth-store'
 import * as authService from '../services/auth-service'
 import { toast } from "sonner"
 import { host, port } from '@/config/server'
+
+interface FileMetadata {
+  size?: number;
+  modified?: string;
+  permissions?: string;
+  [key: string]: unknown;
+}
 
 interface FileContent {
   path: string
   content: string
   originalContent?: string  // Original content when file was loaded, used for conflict resolution
-  metadata: any
+  metadata: FileMetadata
   lastUpdated: number
   hasConflicts?: boolean    // Indicates if the file has merge conflicts
   encoding?: string        // Encoding of the content (utf-8 or base64)
@@ -35,7 +41,7 @@ interface FileContentState {
   updateFileContent: (path: string, content: string, rootPath: string) => Promise<MergeResult>
   connectToFileWatcher: (directory: string) => Promise<void>
   disconnectFromFileWatcher: (directory: string) => void
-  handleFileChange: (path: string, newContent: string, metadata: any) => void
+  handleFileChange: (path: string, newContent: string, metadata: FileMetadata) => void
   addActiveTab: (filePath: string) => void
   removeActiveTab: (filePath: string) => void
   watchActiveTabFiles: () => void
@@ -303,7 +309,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
     }
   },
 
-  handleFileChange: (path: string, newContent: string, metadata: any) => {
+  handleFileChange: (path: string, newContent: string, metadata: FileMetadata) => {
     // Check if we have this file in our store
     const currentFile = get().files[path]
     const recentlySavedFiles = get().recentlySavedFiles
@@ -343,9 +349,9 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
                       // console.log(`[FILE CHANGE] Rejecting update for ${path} - current version has newer timestamp`)
             return // Skip update to preserve newer version
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
           // If parsing fails, fall back to normal behavior
-          // console.log(`[FILE CHANGE] Error parsing JSON for comparison: ${e.message}`)
+          // console.log(`[FILE CHANGE] Error parsing JSON for comparison: ${e instanceof Error ? e.message : 'unknown'}`)
         }
       }
       
@@ -495,10 +501,14 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
     // Clear the interval when the component unmounts
     // This would need to be handled by the component that calls watchActiveTabFiles
     // For now, we'll clear any existing interval
-    if ((window as any)._fileWatchInterval) {
-      clearInterval((window as any)._fileWatchInterval)
+    interface WindowWithInterval extends Window {
+      _fileWatchInterval?: NodeJS.Timeout;
     }
-    (window as any)._fileWatchInterval = intervalId
+    const win = window as WindowWithInterval;
+    if (win._fileWatchInterval) {
+      clearInterval(win._fileWatchInterval)
+    }
+    win._fileWatchInterval = intervalId
   },
   
   // Watch a specific file for changes
@@ -599,13 +609,19 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
 }))
 
 // Helper function to process file changes from WebSocket
-function handleFileChanges(changes: any[]) {
+interface FileChange {
+  path: string;
+  event_type?: string;
+  [key: string]: unknown;
+}
+
+function handleFileChanges(changes: FileChange[]) {
   const store = useFileContentStore.getState()
   
   // Track files that need content updates
   const filesToUpdate = new Set<string>();
   const backupFiles = new Set<string>();
-  const normalizedChanges = new Map<string, any[]>();
+  const normalizedChanges = new Map<string, FileChange[]>();
   
   // First pass: categorize changes and normalize file paths
   changes.forEach(change => {

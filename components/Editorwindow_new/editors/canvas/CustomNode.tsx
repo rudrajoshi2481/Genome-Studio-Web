@@ -37,8 +37,17 @@ export interface LogEntry {
 // Define execution status type
 export type NodeExecutionStatus = 'idle' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
+// Define unified output type
+export interface UnifiedOutput {
+  type: 'text' | 'rich' | 'error';
+  content: unknown;
+  order: number;
+  var_name?: string;
+  traceback?: string;
+}
+
 // Define the shape of the node data
-export interface NodeData extends Record<string, any> {
+export interface NodeData extends Record<string, unknown> {
   title: string;
   description: string;
   inputs: NodeIO[];
@@ -69,6 +78,23 @@ export interface NodeData extends Record<string, any> {
   // Node dimensions
   width?: number;
   height?: number;
+  // Unified outputs
+  unified_outputs?: UnifiedOutput[];
+  // Output HTML
+  output_html?: Record<string, unknown>;
+  // Last execution data
+  lastExecution?: {
+    logs?: LogEntry[];
+    output_html?: Record<string, unknown>;
+    status?: string;
+    error_message?: string;
+    error_traceback?: string;
+    duration_seconds?: number;
+  };
+  // Error information
+  error_message?: string;
+  error_traceback?: string;
+  duration_seconds?: number;
 }
 
 // Format duration in milliseconds to a compact string (e.g., "2.5s" or "1.2m")
@@ -92,7 +118,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   // Ensure data is properly typed
   const nodeData: NodeData = data as NodeData;
   const updateNodeInternals = useUpdateNodeInternals();
-  const { fitView, getNode } = useReactFlow();
+  const { fitView, getNode, setNodes } = useReactFlow();
   const { token } = useAuthStore();
   const nodeRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ 
@@ -101,14 +127,14 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   });
   const [outputsOpen, setOutputsOpen] = useState(true); // Outputs open by default
   const [isExecuting, setIsExecuting] = useState(false);
-  const [unifiedOutputs, setUnifiedOutputs] = useState<any[]>([]);
+  const [unifiedOutputs, setUnifiedOutputs] = useState<UnifiedOutput[]>([]);
   const [isLocked, setIsLocked] = useState(false); // Lock state: false = draggable, true = locked (no drag)
   
   // Extract unified outputs from node data (combines logs + rich outputs + errors in execution order)
   useLayoutEffect(() => {
     console.log(`[CustomNode ${id}] Loading unified outputs from nodeData:`, nodeData);
     
-    let outputsToLoad: any[] = [];
+    let outputsToLoad: UnifiedOutput[] = [];
     
     // Primary location: node.unified_outputs (new format)
     if (nodeData.unified_outputs && Array.isArray(nodeData.unified_outputs)) {
@@ -122,7 +148,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       const richOutputs = nodeData.output_html || nodeData.lastExecution?.output_html || {};
       
       // Add logs as text outputs
-      logs.forEach((log: any, index: number) => {
+      logs.forEach((log: { message: string }, index: number) => {
         outputsToLoad.push({
           type: 'text',
           content: log.message,
@@ -262,8 +288,6 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   };
 
   const handleDuplicateNode = () => {
-    const { setNodes } = useReactFlow();
-    
     // Generate a unique ID for the duplicate
     const duplicateId = `node_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
     
@@ -309,24 +333,19 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
 
       // Prepare node data for saving
       const nodeToSave = {
-        data: {
-          title: nodeData.title,
-          description: nodeData.description || '',
-          function_name: nodeData.function_name,
-          language: nodeData.language || 'python',
-          source: nodeData.source_code || '',
-          inputs: nodeData.inputs || [],
-          outputs: nodeData.outputs || [],
-        },
-        tags: nodeData.tags || [],
-        is_public: nodeData.is_public || false,
-        node_type: 'customNode',  // Mark as custom node
+        title: nodeData.title,
+        description: nodeData.description || '',
+        function_name: nodeData.function_name,
+        language: nodeData.language || 'python',
+        source: nodeData.source_code || '',
+        inputs: nodeData.inputs || [],
+        outputs: nodeData.outputs || [],
       };
 
       console.log('Saving node to nodebar:', nodeToSave);
       
       // Call API to create custom node
-      const savedNode = await createCustomNode(token, nodeToSave);
+      const savedNode = await createCustomNode(token, nodeToSave as Partial<import('@/lib/services/custom-node-service').CustomNodeData>);
       
       console.log('Node saved successfully:', savedNode);
       toast.success(`Saved "${nodeData.title}" to Nodebar!`);

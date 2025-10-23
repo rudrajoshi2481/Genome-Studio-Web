@@ -8,12 +8,20 @@ const config = getServerConfig();
  * 
  * Handles user authentication, token management, and user information
  */
+export interface User {
+  id: number;
+  username: string;
+  email?: string;
+  is_admin?: boolean;
+  [key: string]: unknown;
+}
+
 export interface AuthResponse {
   success: boolean;
   message?: string;
   token?: string;
   expiresIn?: number;
-  user?: any;
+  user?: User;
 }
 
 /**
@@ -68,7 +76,7 @@ export async function login(username: string, password: string): Promise<AuthRes
       success: true,
       token: data.access_token,
       expiresIn: data.expires_in,
-      user,
+      user: user ?? undefined,
     };
   } catch (error) {
     console.error('Login error:', error);
@@ -98,7 +106,7 @@ export function logout(): void {
  * @param token Optional token to use for the request
  * @returns User information or null if not authenticated
  */
-export async function getCurrentUser(token?: string): Promise<any> {
+export async function getCurrentUser(token?: string): Promise<User | null> {
   console.log('🔍 [AUTH-SERVICE] getCurrentUser called');
   
   try {
@@ -205,10 +213,12 @@ export function getToken(): string | null {
   return tokenCookie.split('=')[1];
 }
 
-export default {
+const authService = {
   login,
   logout,
   getCurrentUser,
   isAuthenticated,
   getToken,
 };
+
+export default authService;

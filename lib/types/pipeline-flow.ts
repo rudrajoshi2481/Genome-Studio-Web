@@ -11,7 +11,7 @@ export interface DataProcessingPipeline {
   config: PipelineConfig;
   nodes: PipelineNode[];
   edges: PipelineEdge[];
-  global_variables: Record<string, any>;
+  global_variables: Record<string, unknown>;
   shared_imports: string[];
   execution_history: ExecutionHistoryEntry[];
 }
@@ -66,8 +66,8 @@ export interface NodeData {
   inputs: NodeInput[];
   outputs: NodeOutput[];
   logs: LogEntry[];
-  errors: any[];
-  warnings: any[];
+  errors: string[];
+  warnings: string[];
   stdout: string[];
   stderr: string[];
   metadata: NodeMetadata;
@@ -99,7 +99,7 @@ export interface NodeInput {
   description: string;
   data_type: string;
   source_node_id: string;
-  default_value: any;
+  default_value: unknown;
 }
 
 export interface NodeOutput {
@@ -152,7 +152,7 @@ export interface PipelineEdge {
   type?: string;
   data?: {
     label?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

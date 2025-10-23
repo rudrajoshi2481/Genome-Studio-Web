@@ -6,8 +6,8 @@ import { CustomNode } from "../services/custom-node-service";
 export interface FlowNodeData {
   title: string;
   description: string;
-  inputs: any[];
-  outputs: any[];
+  inputs: unknown[];
+  outputs: unknown[];
   language: string;
   function_name: string;
   source_code: string;
@@ -55,7 +55,7 @@ export const generateUniqueNodeId = () => {
 /**
  * Calculates a position for a new node based on the current viewport
  */
-export const calculateNewNodePosition = (reactFlowInstance: any) => {
+export const calculateNewNodePosition = (reactFlowInstance: { getViewport: () => { x: number; y: number; zoom: number } } | null) => {
   if (!reactFlowInstance) {
     return { x: 100, y: 100 };
   }

@@ -65,8 +65,10 @@ export const endpoints = {
   },
 };
 
-export default {
+const apiConfig = {
   apiEndpoint,
   websocketUrls,
   endpoints,
 };
+
+export default apiConfig;

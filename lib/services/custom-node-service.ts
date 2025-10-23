@@ -44,7 +44,7 @@ export interface CustomNode {
  * @param nodeData Node data to create
  * @returns Created custom node
  */
-export const createCustomNode = async (token: string, nodeData: any): Promise<CustomNode> => {
+export const createCustomNode = async (token: string, nodeData: Partial<CustomNodeData>): Promise<CustomNode> => {
   try {
     console.log('Creating custom node:', nodeData);
     
@@ -210,7 +210,7 @@ export const deleteCustomNode = async (token: string, nodeId: string | number): 
  * @param nodeData Updated node data
  * @returns Updated custom node
  */
-export const updateCustomNode = async (token: string, nodeId: string | number, nodeData: any): Promise<CustomNode> => {
+export const updateCustomNode = async (token: string, nodeId: string | number, nodeData: Partial<CustomNodeData>): Promise<CustomNode> => {
   try {
     console.log(`Updating custom node with ID: ${nodeId}`);
     
@@ -358,7 +358,7 @@ export const toggleFavoriteNode = async (token: string, nodeId: string): Promise
  * @param nodesData Array of node data objects
  * @returns Upload result with created and failed counts
  */
-export const bulkUploadNodes = async (token: string, nodesData: any[]): Promise<any> => {
+export const bulkUploadNodes = async (token: string, nodesData: Partial<CustomNodeData>[]): Promise<{ created: number; failed: number; errors?: string[] }> => {
   try {
     console.log(`Bulk uploading ${nodesData.length} nodes`);
     

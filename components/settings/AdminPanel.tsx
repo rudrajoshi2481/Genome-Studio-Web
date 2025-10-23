@@ -95,9 +95,9 @@ export default function AdminPanel() {
       const data = await response.json();
       console.log('✅ [ADMIN-PANEL] Users fetched:', data.length);
       setUsers(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ [ADMIN-PANEL] Error:', error);
-      toast.error(error.message || 'Failed to fetch users');
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch users');
     } finally {
       setIsLoading(false);
     }
@@ -145,9 +145,9 @@ export default function AdminPanel() {
           ? `${updatedUser.username} is now an admin`
           : `${updatedUser.username} is no longer an admin`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ [ADMIN-PANEL] Error:', error);
-      toast.error(error.message || 'Failed to update user role');
+      toast.error(error instanceof Error ? error.message : 'Failed to update user role');
     }
   };
 

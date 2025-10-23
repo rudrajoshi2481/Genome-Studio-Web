@@ -5,7 +5,7 @@
 
 export { FileTreeNode } from './FileTreeNode';
 export { SearchBar } from './SearchBar';
-export { ContextMenu } from './ContextMenu';
+export { FileContextMenu as ContextMenu } from './ContextMenu';
 export { CreateDialog } from './CreateDialog';
 export { UploadDialog } from './UploadDialog';
 export { DeleteConfirmDialog } from './DeleteConfirmDialog';

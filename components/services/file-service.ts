@@ -16,7 +16,7 @@ export const FileService = {
    */
   async getFileContent(filePath: string, tokenParam?: string | null, rootPath: string = '/home'): Promise<{
     content: string;
-    metadata: any;
+    metadata: Record<string, unknown>;
     binary: boolean;
     truncated: boolean;
   }> {

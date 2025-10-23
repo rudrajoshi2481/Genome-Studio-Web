@@ -135,9 +135,9 @@ export default function Settings() {
 
       toast.success('Profile updated successfully!');
       setIsEditing(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ [SETTINGS-NEW] Save error:', error);
-      toast.error(error.message || 'Failed to update profile');
+      toast.error(error instanceof Error ? error.message : 'Failed to update profile');
     } finally {
       setIsSaving(false);
     }
@@ -222,9 +222,9 @@ export default function Settings() {
       handleChange('avatar', `http://${host}:${port}${result.avatar_url}`);
 
       toast.success('Avatar uploaded successfully!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ [SETTINGS-NEW] Avatar upload error:', error);
-      toast.error(error.message || 'Failed to upload avatar');
+      toast.error(error instanceof Error ? error.message : 'Failed to upload avatar');
     }
   };
 

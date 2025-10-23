@@ -17,7 +17,7 @@ export interface User {
   role?: string;
   created_at?: string;
   updated_at?: string;
-  [key: string]: any; // Allow for additional properties
+  [key: string]: unknown; // Allow for additional properties
 }
 
 // Define the authentication state
