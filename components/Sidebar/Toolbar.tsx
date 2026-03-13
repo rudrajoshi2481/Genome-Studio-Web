@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { Folder, LucideIcon, Workflow,KanbanSquare, PackageSearch, Warehouse } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
+import { host, port } from '@/config/server'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -47,6 +48,28 @@ interface ToolbarProps {
 function Toolbar({ onComponentChange }: ToolbarProps) {
   const router = useRouter()
   const { user, isAuthenticated, token, logout } = useAuthStore()
+
+  // Get the full avatar URL
+  const getAvatarUrl = (avatarPath: string | undefined) => {
+    if (!avatarPath) return '';
+    if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
+      return avatarPath;
+    }
+    return `http://${host}:${port}${avatarPath}`;
+  };
+
+  // Get user initials for avatar fallback
+  const getInitials = () => {
+    if (!user) return 'U';
+    if (user.full_name) {
+      const parts = user.full_name.split(' ');
+      if (parts.length >= 2) {
+        return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+      }
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return user.username?.substring(0, 2).toUpperCase() || 'U';
+  };
   const [activeItem, setActiveItem] = useState<string>("File Explorer")
   const [pinnedItems, setPinnedItems] = useState<Set<string>>(new Set())
   
@@ -237,39 +260,21 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
       <div>
       <HoverCard>
         <HoverCardTrigger asChild>
-          <Avatar className="rounded-lg cursor-pointer">
-          <AvatarImage src="https://github.com/evilrabbit.png" alt="@evilrabbit" />
+          <Avatar className="h-9 w-9 cursor-pointer">
+            <AvatarImage src={getAvatarUrl(user?.avatar)} alt={user?.username || 'User'} />
+            <AvatarFallback className="text-xs">{getInitials()}</AvatarFallback>
           </Avatar>
         </HoverCardTrigger>
-        <HoverCardContent side="right" className="w-60">
-          <div className="flex space-x-4">
-            <Avatar>
-              <AvatarImage src="https://github.com/evilrabbit.png" alt="@evilrabbit" />
-              {/* <AvatarFallback>{getInitials()}</AvatarFallback> */}
+        <HoverCardContent side="right" className="w-64">
+          <div className="flex gap-4">
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={getAvatarUrl(user?.avatar)} alt={user?.username || 'User'} />
+              <AvatarFallback>{getInitials()}</AvatarFallback>
             </Avatar>
             <div className="space-y-1 flex-1">
               <h4 className="text-sm font-semibold">{user?.full_name || user?.username || 'Guest User'}</h4>
-              
+              <p className="text-xs text-muted-foreground">@{user?.username}</p>
               <p className="text-xs text-muted-foreground">{user?.email || ''}</p>
-              
-              {/* Display token (truncated for UI) */}
-              {/* <div className="mt-2">
-                <p className="text-xs font-medium">Token:</p>
-                <p className="text-xs break-all bg-gray-100 p-1 rounded">
-                  {token ? `${token.substring(0, 20)}...` : 'No token available'}
-                </p>
-              </div> */}
-              {/* <div className="flex items-center justify-between "> */}
-                {/* <span className="text-xs text-muted-foreground">ID: {user?.id || 'Not logged in'}</span> */}
-                {/* {isAuthenticated && (
-                  <button 
-                    onClick={logout}
-                    className="text-xs text-red-500 hover:text-red-700"
-                  >
-                    Sign out
-                  </button>
-                )} */}
-              {/* </div> */}
             </div>
           </div>
         </HoverCardContent>
