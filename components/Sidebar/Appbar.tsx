@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { Search } from 'lucide-react'
 import {
@@ -13,8 +13,11 @@ function Appbar() {
   // Get user data from auth store
   const { user, isAuthenticated, logout } = useAuthStore();
   
-  // Detect OS for keyboard shortcut display
-  const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  // Detect OS for keyboard shortcut display (after hydration to avoid mismatch)
+  const [isMac, setIsMac] = useState(false);
+  useEffect(() => {
+    setIsMac(navigator.platform.toUpperCase().indexOf('MAC') >= 0);
+  }, []);
   
   // Generate initials for avatar fallback
   const getInitials = () => {

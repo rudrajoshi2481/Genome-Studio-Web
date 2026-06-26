@@ -85,6 +85,11 @@ const EditorWindow = () => {
     if (!state.activeTabId) return null
     return state.tabs.get(state.activeTabId) || null
   })
+
+  const [isMounted, setIsMounted] = React.useState(false)
+  React.useEffect(() => {
+    setIsMounted(true)
+  }, [])
   
   // Tab handlers
   const handleActivate = useCallback((tabId: string) => {
@@ -113,7 +118,7 @@ const EditorWindow = () => {
         <div className="h-full w-full flex flex-col overflow-hidden">  
           {/* Tab bar */}
           <div className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0">
-            {allTabs.map(tab => (
+            {isMounted && allTabs.map(tab => (
               <FileTab 
                 key={tab.id}
                 id={tab.id} 
