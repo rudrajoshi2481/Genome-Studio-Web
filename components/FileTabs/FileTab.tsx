@@ -20,6 +20,7 @@ interface FileTabProps {
   extension?: string
   isActive?: boolean
   isDirty?: boolean
+  isExecuting?: boolean
   onActivate?: (id: string) => void
   onClose?: (id: string) => void
   onDelete?: (path: string) => void
@@ -32,6 +33,7 @@ function FileTab({
   extension,
   isActive = false,
   isDirty = false,
+  isExecuting = false,
   onActivate,
   onClose,
   onDelete
@@ -123,15 +125,20 @@ function FileTab({
       <ContextMenuTrigger asChild>
         <div 
           className={cn(
-            'flex items-center h-9 px-3 py-1 text-sm cursor-pointer group',
+            'flex items-center h-9 px-3 py-1 text-sm cursor-pointer group relative overflow-hidden',
             'transition-colors duration-200',
             isActive ? 'bg-gray-100' : 'hover:bg-gray-50',
+            isDirty && !isExecuting && 'border-b-2 border-yellow-400',
+            isExecuting && 'border-b-2 border-green-500',
           )}
           onClick={handleActivate}
           data-tab-id={id}
           title={path}
           suppressHydrationWarning
         >
+          {isExecuting && (
+            <div className="absolute inset-0 pointer-events-none running-stripes" />
+          )}
       {getFileIcon()}
       <span className="whitespace-nowrap">{name}</span>
       {isDirty && (

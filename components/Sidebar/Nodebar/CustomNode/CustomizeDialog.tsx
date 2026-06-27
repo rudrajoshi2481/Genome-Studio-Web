@@ -305,7 +305,7 @@ export default function CustomizeDialog() {
             {/* Selection and Actions Bar */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {selectedNodes.size} of {filteredNodes.length} selected
                 </p>
                 {selectedNodes.size > 0 && (
@@ -342,7 +342,7 @@ export default function CustomizeDialog() {
                 </div>
               ) : filteredNodes.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {nodes.length === 0 ? 'No nodes found' : 'No nodes match your filters'}
                   </p>
                 </div>
@@ -364,7 +364,7 @@ export default function CustomizeDialog() {
                         <div className="flex items-start gap-2 mb-2">
                           <Code2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium line-clamp-2 leading-tight">{node.title}</p>
+                            <p className="text-xs font-medium line-clamp-2 leading-tight">{node.title}</p>
                           </div>
                           <Checkbox
                             checked={isSelected}
@@ -417,7 +417,7 @@ export default function CustomizeDialog() {
                       </div>
                     </div>
                     <h3 className="text-lg font-semibold">Upload Custom Nodes</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Upload a JSON file to preview and select nodes before saving
                     </p>
                   </div>
@@ -437,7 +437,7 @@ export default function CustomizeDialog() {
                     >
                       <FileJson className="h-12 w-12 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-medium">Click to upload JSON file</p>
+                        <p className="text-xs font-medium">Click to upload JSON file</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           Preview nodes before saving to database
                         </p>
@@ -449,11 +449,11 @@ export default function CustomizeDialog() {
                     <div className="space-y-3">
                       <div className="p-4 border rounded-lg space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Upload Summary</span>
+                          <span className="text-xs font-medium">Upload Summary</span>
                         </div>
                         
                         {uploadResult.created > 0 && (
-                          <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center gap-2 text-xs">
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             <span className="text-green-600">
                               {uploadResult.created} node(s) created successfully
@@ -463,7 +463,7 @@ export default function CustomizeDialog() {
                         
                         {uploadResult.failed > 0 && (
                           <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm">
+                            <div className="flex items-center gap-2 text-xs">
                               <XCircle className="h-4 w-4 text-red-500" />
                               <span className="text-red-600">
                                 {uploadResult.failed} node(s) failed
@@ -499,7 +499,7 @@ export default function CustomizeDialog() {
               <>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {selectedPreviewNodes.size} of {previewNodes.length} selected
                     </p>
                     {selectedPreviewNodes.size > 0 && (
@@ -559,7 +559,7 @@ export default function CustomizeDialog() {
                           <div className="flex items-start gap-2 mb-2">
                             <Code2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium line-clamp-2 leading-tight">
+                              <p className="text-xs font-medium line-clamp-2 leading-tight">
                                 {node.title || 'Untitled Node'}
                               </p>
                             </div>

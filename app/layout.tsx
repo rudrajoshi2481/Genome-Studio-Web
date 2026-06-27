@@ -1,15 +1,9 @@
 import type { Metadata } from "next";
-import { EB_Garamond, Poppins } from "next/font/google";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { CommandDialogComponent } from "@/components/command_dialog/Command_Dialog"
-const garamond = EB_Garamond({
-  subsets: ["latin"],
-  variable: "--font-garamond",
-  display: "swap",
-});
-
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -33,7 +27,7 @@ export default function RootLayout({
       
       </head>
       <body
-        className={`${garamond.variable} ${poppins.variable} font-sans antialiased`}
+        className={`${poppins.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
         <AuthProvider>

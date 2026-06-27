@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useLayoutEffect, useRef, useState } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals, useReactFlow } from 'reactflow';
 import { cn } from "@/lib/utils" // Import cn from shadcn utils if available, or define it
 import { workflowManagerAPI } from '@/services/WorkflowManagerAPI';
@@ -14,7 +14,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Focus, Trash2, Copy, Save, Eye, Code, Lock, Unlock } from 'lucide-react';
+import { Focus, Trash2, Copy, Save, Eye, Code, Lock, Unlock, ChevronRight, Terminal } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { createCustomNode } from '@/lib/services/custom-node-service';
 
@@ -131,19 +132,15 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   const [isLocked, setIsLocked] = useState(false); // Lock state: false = draggable, true = locked (no drag)
   
   // Extract unified outputs from node data (combines logs + rich outputs + errors in execution order)
-  useLayoutEffect(() => {
-    console.log(`[CustomNode ${id}] Loading unified outputs from nodeData:`, nodeData);
-    
+  useEffect(() => {
     let outputsToLoad: UnifiedOutput[] = [];
     
     // Primary location: node.unified_outputs (new format)
     if (nodeData.unified_outputs && Array.isArray(nodeData.unified_outputs)) {
-      console.log(`[CustomNode ${id}] Found unified_outputs in nodeData:`, nodeData.unified_outputs);
       outputsToLoad = nodeData.unified_outputs;
     }
     // Fallback: combine logs and output_html manually for backward compatibility
     else {
-      console.log(`[CustomNode ${id}] No unified_outputs, falling back to separate logs + output_html`);
       const logs = nodeData.logs || nodeData.lastExecution?.logs || [];
       const richOutputs = nodeData.output_html || nodeData.lastExecution?.output_html || {};
       
@@ -182,16 +179,14 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     }
     
     if (outputsToLoad.length > 0) {
-      console.log(`[CustomNode ${id}] Setting unified outputs:`, outputsToLoad);
       setUnifiedOutputs(outputsToLoad);
     } else {
-      console.log(`[CustomNode ${id}] No outputs to load`);
       setUnifiedOutputs([]);
     }
-  }, [nodeData, id]);
+  }, [nodeData.unified_outputs, nodeData.logs, nodeData.output_html, nodeData.status, nodeData.error_message, nodeData.error_traceback, nodeData.lastExecution, id]);
 
   // Calculate node dimensions for proper handle spacing
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (nodeRef.current) {
       const { offsetWidth, offsetHeight } = nodeRef.current;
       setDimensions({
@@ -204,20 +199,13 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
 
   // Handle single node execution
   const handleRunNode = async () => {
-    console.log('🚀 CustomNode: Starting node execution');
-    console.log('📋 CustomNode: Node data:', JSON.stringify(nodeData, null, 2));
-    console.log('🔍 CustomNode: File path check:', nodeData.filePath);
-    
     if (!nodeData.filePath) {
-      console.error('❌ CustomNode: No file path found in node data');
-      console.log('📊 CustomNode: Available node data keys:', Object.keys(nodeData));
       toast.error('No file path specified for node execution');
       return;
     }
 
     try {
       setIsExecuting(true);
-      console.log(`🎯 CustomNode: Executing node "${nodeData.title}" (ID: ${id})`);
       toast.info(`Executing node: ${nodeData.title}`);
 
       const requestPayload = {
@@ -225,43 +213,24 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         node_id: id
       };
       
-      console.log('📤 CustomNode: Sending request to backend:', JSON.stringify(requestPayload, null, 2));
-
       const result = await workflowManagerAPI.executeSingleNode(requestPayload);
 
-      console.log('📥 CustomNode: Received response from backend:', JSON.stringify(result, null, 2));
-
-      // Logs are now part of unified_outputs, no need to set them separately
-      console.log(`📝 CustomNode: Execution complete, outputs will be loaded from file`);
-      
       if (result.status === 'completed') {
-        console.log('✅ CustomNode: Node execution completed successfully');
         toast.success(`Node "${nodeData.title}" completed successfully`);
         
-        // Trigger file refetch to get updated execution results
-        console.log('🔄 CustomNode: Triggering file refetch to get updated execution data');
         if (onExecutionComplete) {
           onExecutionComplete();
         }
       } else if (result.status === 'failed') {
-        console.error('❌ CustomNode: Node execution failed:', result.error_message);
         toast.error(`Node "${nodeData.title}" failed: ${result.error_message}`);
       } else {
         console.warn('⚠️ CustomNode: Unexpected execution status:', result.status);
       }
 
     } catch (error) {
-      console.error('💥 CustomNode: Error executing node:', error);
-      console.error('🔍 CustomNode: Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        nodeId: id,
-        filePath: nodeData.filePath
-      });
       toast.error(`Failed to execute node: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsExecuting(false);
-      console.log('🏁 CustomNode: Node execution finished');
     }
   };
   // Context menu handlers
@@ -421,7 +390,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
             isLocked && "noDrag"  // Add noDrag when locked
           )}
           style={{ 
-            width: dimensions.width, 
+            width: nodeData.width || dimensions.width,
             minHeight: minHeight,
             position: 'relative'
           }}
@@ -438,17 +407,22 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         minHeight={240}
         isVisible={selected}
         onResize={(event, params) => {
-          // Update local dimensions state
-          setDimensions({
-            width: params.width,
-            height: params.height
-          });
-          // Update node data with new dimensions
+          // Update node data with new dimensions directly (no React state)
           if (nodeData) {
             nodeData.width = params.width;
             nodeData.height = params.height;
           }
           // Update handle positions
+          updateNodeInternals(id);
+        }}
+        onResizeEnd={() => {
+          // Sync final dimensions to React state after resize completes
+          if (nodeRef.current) {
+            setDimensions({
+              width: nodeRef.current.offsetWidth,
+              height: nodeRef.current.offsetHeight
+            });
+          }
           updateNodeInternals(id);
         }}
         handleStyle={{
@@ -468,10 +442,25 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       />
 
       {/* Node header with title */}
-      <div className="bg-muted border-b border-border px-4 py-2 flex items-center justify-between">
-        <div className="font-medium text-sm text-foreground">{nodeData.title || 'Untitled Node'}</div>
+      {(() => {
+        const isRunning = isExecuting || nodeData.status === 'running';
+        const isCompleted = !isRunning && (nodeData.status === 'completed' || nodeData.lastExecution?.status === 'success');
+        const stripeColor = isRunning ? 'rgba(255, 255, 255, 0.25)' : isCompleted ? 'rgba(34, 197, 94, 0.15)' : null;
+        return (
+        <div
+          className={cn(
+            "border-b border-border px-4 py-2 flex items-center justify-between relative overflow-hidden",
+            isRunning ? "bg-yellow-500/80 stripe-flow" : "bg-muted",
+            isRunning && "text-white"
+          )}
+          style={stripeColor ? {
+            backgroundImage: `repeating-linear-gradient(135deg, transparent, transparent 6px, ${stripeColor} 6px, ${stripeColor} 12px)`,
+            backgroundSize: '200% 100%',
+          } : undefined}
+        >
+        <div className="font-medium text-sm text-foreground relative z-10">{nodeData.title || 'Untitled Node'}</div>
         {/* <div className="font-medium text-sm text-foreground">{nodeData.function_name || 'Untitled Node'}</div> */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative z-10">
           <div className="text-xs px-2 py-0.5 bg-background rounded-full text-muted-foreground">
             {nodeData.language || 'python'}
           </div>
@@ -491,6 +480,8 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           </button>
         </div>
       </div>
+        );
+      })()}
       
       {/* Node content */}
       <div className="p-3 select-text" onMouseDown={(e) => {
@@ -523,7 +514,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           )}
           
           {/* Execution order badge */}
-          {nodeData.execution_order && (
+          {nodeData.execution_order != null && nodeData.execution_order !== 0 && (
             <div className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium flex items-center gap-1 shadow-sm border border-blue-200">
               <span className="text-xs">#</span>
               {nodeData.execution_order}
@@ -728,32 +719,30 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           return (
             <div className="mt-2">
               <div 
-                className="w-full text-xs font-semibold text-foreground py-1 px-0 flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
+                className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-muted/50 hover:bg-muted cursor-pointer transition-colors text-xs font-medium text-muted-foreground"
                 onClick={() => {
                   setOutputsOpen(!outputsOpen);
-                  // Update node internals immediately and after animation
                   updateNodeInternals(id);
                   setTimeout(() => updateNodeInternals(id), 50);
                 }}
               >
-                <svg 
+                <ChevronRight 
                   className={cn(
-                    "h-3 w-3 transition-transform",
+                    "h-3.5 w-3.5 transition-transform shrink-0",
                     outputsOpen ? "rotate-90" : ""
                   )}
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-                Output ({displayCount})
+                />
+                <Terminal className="h-3.5 w-3.5 shrink-0" />
+                <span>Output</span>
+                {displayCount > 0 && (
+                  <Badge variant="secondary" className="ml-auto h-4 px-1.5 text-[10px] gap-0.5">
+                    {displayCount}
+                  </Badge>
+                )}
               </div>
             
             {outputsOpen && (
-              <div className="mt-2 noDrag">
-                {/* Use unified terminal view for all languages */}
+              <div className="mt-1.5 noDrag">
                 <TerminalOutput 
                   outputs={unifiedOutputs}
                   isRunning={isExecuting}

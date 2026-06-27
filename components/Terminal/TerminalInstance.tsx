@@ -258,22 +258,6 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
             {connected ? 'Connected' : 'Disconnected'}
           </div>
         )}
-        {/* Optional: Display current dimensions for debugging */}
-        {process.env.NODE_ENV === 'development' && (
-          <div style={{ 
-            position: 'absolute', 
-            bottom: 0, 
-            right: 0, 
-            background: 'rgba(0,0,0,0.8)', 
-            color: 'white', 
-            padding: '4px', 
-            fontSize: '12px',
-            zIndex: 1000
-          }}>
-            {containerDimensions.width}×{containerDimensions.height}
-          </div>
-        )}
-        
         {/* Compact System Stats - positioned in top left */}
         {/* <div style={{
           position: 'absolute',

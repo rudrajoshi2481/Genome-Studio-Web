@@ -68,6 +68,18 @@ export class FileExplorerApiService {
       return '/home'; // Fallback if localStorage fails
     }
   }
+
+  // Derive a root_path that contains the given path for create operations
+  private deriveRootPath(path: string): string {
+    const stored = this.getCurrentRootPath();
+    // If the path is already within the stored root, use it
+    if (path.startsWith(stored)) {
+      return stored;
+    }
+    // Otherwise use the parent directory of the path being created
+    const parent = path.substring(0, path.lastIndexOf('/'));
+    return parent || '/';
+  }
   // Get file tree
   async getFileTree(rootPath: string, forceRefresh: boolean = false, maxDepth: number = 3): Promise<FileTreeResponse> {
     const params = new URLSearchParams({
@@ -152,7 +164,7 @@ export class FileExplorerApiService {
       method: 'POST',
       body: JSON.stringify({
         path,
-        root_path: this.getCurrentRootPath(),
+        root_path: this.deriveRootPath(path),
         content
       })
     });
@@ -164,7 +176,7 @@ export class FileExplorerApiService {
       method: 'POST',
       body: JSON.stringify({
         path,
-        root_path: this.getCurrentRootPath()
+        root_path: this.deriveRootPath(path)
       })
     });
   }

@@ -102,12 +102,11 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
   onContextAction,
   selectedPaths
 }) => {
-  const { 
-    isNodeExpanded, 
-    toggleNode
-  } = useFileExplorerStore();
+  // Select only the specific state we need to avoid re-rendering on unrelated store changes
+  const expandedPaths = useFileExplorerStore((state) => state.expandedPaths);
+  const toggleNode = useFileExplorerStore((state) => state.toggleNode);
 
-  const isExpanded = isNodeExpanded(node.path);
+  const isExpanded = expandedPaths.includes(node.path);
   const isSelected = selectedPaths.has(node.path);
   
   const iconColor = getFileColor(node.name, node.is_dir);
@@ -217,7 +216,7 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
           />
 
           {/* File/folder name */}
-          <span className="flex-1 truncate text-sm font-medium">
+          <span className="flex-1 truncate text-xs font-medium">
             {node.name}
           </span>
 

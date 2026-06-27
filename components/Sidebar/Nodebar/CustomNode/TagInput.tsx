@@ -53,8 +53,8 @@ export const Tag = ({
       
       // Sizes
       'text-xs px-2 py-1 rounded-md': size === 'sm',
-      'text-sm px-2.5 py-1.5 rounded-md': size === 'md',
-      'text-base px-3 py-2 rounded-lg': size === 'lg',
+      'text-xs px-2.5 py-1.5 rounded-md': size === 'md',
+      'text-xs px-3 py-2 rounded-lg': size === 'lg',
       
       // Interactive
       'cursor-pointer': onClick,
@@ -165,7 +165,7 @@ const TagInput = ({
           <input
             type="text"
             placeholder={placeholder}
-            className="flex-1 bg-transparent outline-none text-sm"
+            className="flex-1 bg-transparent outline-none text-xs"
             disabled
             value="" // Add default empty value to prevent uncontrolled to controlled warning
           />
@@ -203,7 +203,7 @@ const TagInput = ({
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           placeholder={disabled ? "Disabled" : placeholder}
           disabled={disabled}
-          className="flex-1 bg-transparent outline-none text-sm disabled:cursor-not-allowed"
+          className="flex-1 bg-transparent outline-none text-xs disabled:cursor-not-allowed"
         />
         {input && (
           <button
@@ -225,7 +225,7 @@ const TagInput = ({
               key={index}
               type="button"
               onClick={() => addTag(suggestion)}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+              className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
             >
               {suggestion}
             </button>

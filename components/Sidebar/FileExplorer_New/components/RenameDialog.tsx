@@ -153,14 +153,14 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
 
         <div className="space-y-6">
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Current Name</Label>
+            <Label className="text-xs font-medium">Current Name</Label>
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
               {isDirectory ? (
                 <Folder className="h-4 w-4 text-blue-500 flex-shrink-0" />
               ) : (
                 <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               )}
-              <code className="text-sm font-mono text-foreground">
+              <code className="text-xs font-mono text-foreground">
                 {currentName}
               </code>
             </div>
@@ -169,7 +169,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
           <Separator />
 
           <div className="space-y-3">
-            <Label htmlFor="new-name" className="text-sm font-medium">New Name</Label>
+            <Label htmlFor="new-name" className="text-xs font-medium">New Name</Label>
             <Input
               id="new-name"
               ref={inputRef}

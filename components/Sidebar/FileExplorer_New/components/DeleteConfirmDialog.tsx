@@ -60,7 +60,7 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
         <div className="space-y-4">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Items to Delete</span>
+              <span className="text-xs font-medium">Items to Delete</span>
               <Badge variant="destructive" className="text-xs">
                 {paths.length} {isMultiple ? 'items' : 'item'}
               </Badge>
@@ -77,7 +77,7 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
                       ) : (
                         <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       )}
-                      <span className="text-sm truncate">{name}</span>
+                      <span className="text-xs truncate">{name}</span>
                     </div>
                   );
                 })}
@@ -90,7 +90,7 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
                   ) : (
                     <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   )}
-                  <span className="text-sm font-medium">{names[0]}</span>
+                  <span className="text-xs font-medium">{names[0]}</span>
                 </div>
                 <code className="text-xs text-muted-foreground font-mono">{paths[0]}</code>
               </div>

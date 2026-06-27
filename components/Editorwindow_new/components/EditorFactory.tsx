@@ -15,6 +15,7 @@ interface EditorFactoryProps {
   tabId: string
   filePath: string
   extension?: string
+  isActive?: boolean
 }
 
 interface FileInfo {
@@ -27,7 +28,7 @@ interface FileInfo {
  * EditorFactory component that dynamically loads the appropriate editor/viewer
  * based on file type using the new file-explorer-new API
  */
-const EditorFactory: React.FC<EditorFactoryProps> = ({ tabId, filePath, extension }) => {
+const EditorFactory: React.FC<EditorFactoryProps> = ({ tabId, filePath, extension, isActive }) => {
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -127,7 +128,7 @@ const EditorFactory: React.FC<EditorFactoryProps> = ({ tabId, filePath, extensio
     // Route to appropriate component based on file type
     switch (fileType) {
       case FileType.WORKFLOW:
-        return <Canvas tabId={tabId} filePath={filePath} />
+        return <Canvas tabId={tabId} filePath={filePath} isActive={isActive} />
       
       case FileType.IMAGE:
         return <ImageViewer tabId={tabId} filePath={filePath} />

@@ -3,7 +3,7 @@
  * Production-ready, efficient file explorer with real-time sync
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { 
   RefreshCw, 
   FilePlus, 
@@ -571,6 +571,9 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
     event.preventDefault();
   }, []);
 
+  // Memoize selectedPaths Set to avoid recreating it on every render
+  const selectedPathsSet = useMemo(() => new Set(selectedPaths), [selectedPaths]);
+
   // Render search results or file tree
   const renderContent = () => {
     if (searchQuery && searchResults.length > 0) {
@@ -582,7 +585,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
           {searchResults.map((result, index) => (
             <div
               key={`${result.path}-${index}`}
-              className="flex items-center px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded text-sm"
+              className="flex items-center px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded text-xs"
               onClick={() => handleFileSelect(result.path)}
               onDoubleClick={() => {
                 // Only open files, not directories
@@ -611,7 +614,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
       return (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Search className="w-8 h-8 mb-3" />
-          <p className="text-sm font-medium">No files found</p>
+          <p className="text-xs font-medium">No files found</p>
           <p className="text-xs text-muted-foreground/70 mt-1">Try adjusting your search filters</p>
         </div>
       );
@@ -621,7 +624,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
       return (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Folder className="w-8 h-8 mb-3" />
-          <p className="text-sm font-medium">No files to display</p>
+          <p className="text-xs font-medium">No files to display</p>
           <p className="text-xs text-muted-foreground/70 mt-1">The directory appears to be empty</p>
         </div>
       );
@@ -633,7 +636,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         onSelect={handleFileSelect}
         onOpen={handleFileOpen}
         onContextAction={handleContextAction}
-        selectedPaths={new Set(selectedPaths)}
+        selectedPaths={selectedPathsSet}
       />
     );
   };
@@ -829,7 +832,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         {isLoading && !fileTree ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="w-8 h-8 mb-3 animate-spin" />
-            <p className="text-sm font-medium">Loading files...</p>
+            <p className="text-xs font-medium">Loading files...</p>
             <p className="text-xs text-muted-foreground/70 mt-1">Please wait while we fetch your files</p>
           </div>
         ) : (

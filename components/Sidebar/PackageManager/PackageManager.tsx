@@ -149,7 +149,7 @@ function PackageManager() {
       {/* Compact Header */}
       <div className="flex-shrink-0 border-b px-3 py-2">
         <div className="flex items-center justify-between">
-          <h1 className="text-sm font-medium">Package Manager</h1>
+          <h1 className="text-xs font-medium">Package Manager</h1>
           {selectedEnvironment && (
             <span className="text-xs text-muted-foreground">{selectedEnvironment}</span>
           )}

@@ -131,7 +131,7 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
             </div>
             <div>
               <h3 className="text-lg font-semibold">Create New {type === 'file' ? 'File' : 'Folder'}</h3>
-              <p className="text-sm text-muted-foreground font-normal">
+              <p className="text-xs text-muted-foreground font-normal">
                 in <Badge variant="outline" className="font-mono text-xs">{parentPath || '/'}</Badge>
               </p>
             </div>
@@ -141,7 +141,7 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
         <div className="space-y-6">
           {/* Name input */}
           <div className="space-y-3">
-            <Label htmlFor="name" className="text-sm font-medium">
+            <Label htmlFor="name" className="text-xs font-medium">
               {type === 'file' ? 'File' : 'Folder'} Name
             </Label>
             <Input
@@ -163,7 +163,7 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
             {error && (
               <Alert variant="destructive" className="py-2">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-sm">
+                <AlertDescription className="text-xs">
                   {error}
                 </AlertDescription>
               </Alert>
@@ -175,7 +175,7 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-muted-foreground" />
-                <Label className="text-sm font-medium text-muted-foreground">
+                <Label className="text-xs font-medium text-muted-foreground">
                   Quick Extensions
                 </Label>
               </div>

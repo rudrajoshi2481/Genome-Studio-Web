@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { 
   ReactFlow, 
   ReactFlowProvider, 
@@ -23,7 +23,7 @@ import { useTabStore } from '@/components/FileTabs/useTabStore';
 import { editorAPI } from '../../services/EditorAPI';
 import { nodeTypes } from './nodeTypes';
 import { useCanvasHandlers } from './hooks';
-import Toolbar from './Toolbar';
+import Toolbar, { RealtimeLogUpdate, RealtimeOutputUpdate, RealtimeStatusUpdate, RealtimeProgressUpdate } from './Toolbar';
 import { WorkflowExecutionStatus } from '@/services/WorkflowManagerAPI';
 import { 
   parseFlowData, 
@@ -39,20 +39,177 @@ import {
 interface CanvasProps {
   tabId: string;
   filePath: string;
+  isActive?: boolean;
 }
 
 // Canvas content component
-const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
+const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [executionStatus, setExecutionStatus] = useState<WorkflowExecutionStatus | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true); // Flag to prevent dirty on initial load
+  const [savedViewport, setSavedViewport] = useState<{ x: number; y: number; zoom: number } | null>(null);
+  const wasActiveRef = useRef(isActive); // Track previous active state
+  
+  // Reset isInitialLoad when tab becomes active (e.g. switching back to a hidden tab)
+  // ReactFlow recalculates dimensions when a hidden element becomes visible,
+  // which would incorrectly set the dirty flag without this guard.
+  useEffect(() => {
+    if (isActive && !wasActiveRef.current) {
+      setIsInitialLoad(true);
+      setTimeout(() => setIsInitialLoad(false), 300);
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive]);
   
   const { updateContent, setDirty, setSaved, registerSaveCallback, unregisterSaveCallback } = useEditorContext();
   const { updateTab } = useTabStore();
+  const isTabDirty = useTabStore(state => state.tabs.get(tabId)?.isDirty ?? false);
   const reactFlowInstance = useReactFlow();
+
+  // --- Buffered WebSocket update mechanism ---
+  // Buffers incoming updates and flushes them in a single setNodes call via rAF
+  // to prevent excessive re-renders during fast streaming.
+  type PendingUpdate =
+    | { kind: 'log'; nodeId: string; log: Record<string, unknown> }
+    | { kind: 'output'; nodeId: string; output: Record<string, unknown> }
+    | { kind: 'status'; nodeId: string; status: string; errorMessage?: string; errorTraceback?: string };
+
+  const pendingUpdatesRef = useRef<PendingUpdate[]>([]);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushUpdates = useCallback(() => {
+    flushTimerRef.current = null;
+    const updates = pendingUpdatesRef.current;
+    if (updates.length === 0) return;
+    pendingUpdatesRef.current = [];
+
+    setNodes((prevNodes) => {
+      // Group updates by nodeId for efficiency
+      const updatesByNode = new Map<string, PendingUpdate[]>();
+      for (const u of updates) {
+        const arr = updatesByNode.get(u.nodeId);
+        if (arr) arr.push(u);
+        else updatesByNode.set(u.nodeId, [u]);
+      }
+
+      return prevNodes.map((node) => {
+        const nodeUpdates = updatesByNode.get(node.id);
+        if (!nodeUpdates) return node;
+
+        let data = { ...node.data } as Record<string, unknown>;
+        let nodeStatus: string | undefined;
+
+        for (const u of nodeUpdates) {
+          if (u.kind === 'log') {
+            const currentLogs = (data.logs as Array<Record<string, unknown>>) || [];
+            const newLogs = [...currentLogs, u.log];
+            data.logs = newLogs;
+            const currentOutputs = (data.unified_outputs as Array<Record<string, unknown>>) || [];
+            data.unified_outputs = [...currentOutputs, { type: 'text', content: (u.log as Record<string, unknown>).message, order: newLogs.length - 1 }];
+          } else if (u.kind === 'output') {
+            const currentOutputs = (data.unified_outputs as Array<Record<string, unknown>>) || [];
+            const order = (u.output as Record<string, unknown>).order as number | undefined ?? currentOutputs.length;
+            const newOutput: Record<string, unknown> = {
+              type: (u.output as Record<string, unknown>).html ? 'rich' : 'text',
+              content: (u.output as Record<string, unknown>).html || (u.output as Record<string, unknown>).text || '',
+              order,
+            };
+            if ((u.output as Record<string, unknown>).mime_type) {
+              newOutput.mime_type = (u.output as Record<string, unknown>).mime_type;
+            }
+            data.unified_outputs = [...currentOutputs, newOutput];
+            if ((u.output as Record<string, unknown>).html) {
+              const currentHtml = (data.output_html as Record<string, unknown>) || {};
+              data.output_html = { ...currentHtml, [`output_${order}`]: (u.output as Record<string, unknown>).html };
+            }
+          } else if (u.kind === 'status') {
+            data.status = u.status;
+            nodeStatus = u.status;
+            if (u.errorMessage) {
+              data.error_message = u.errorMessage;
+            }
+            if (u.errorTraceback) {
+              data.error_traceback = u.errorTraceback;
+            }
+          }
+        }
+
+        const result: typeof node = { ...node, data };
+        if (nodeStatus) {
+          (result as Record<string, unknown>).status = nodeStatus;
+        }
+        return result;
+      });
+    });
+  }, [setNodes]);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushTimerRef.current) return;
+    flushTimerRef.current = setTimeout(flushUpdates, 50);
+  }, [flushUpdates]);
+
+  // Clean up flush timer on unmount
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleRealtimeLog = useCallback((update: RealtimeLogUpdate) => {
+    pendingUpdatesRef.current.push({ kind: 'log', nodeId: update.nodeId, log: update.log });
+    scheduleFlush();
+  }, [scheduleFlush]);
+
+  const handleRealtimeOutput = useCallback((update: RealtimeOutputUpdate) => {
+    pendingUpdatesRef.current.push({ kind: 'output', nodeId: update.nodeId, output: update.output });
+    scheduleFlush();
+  }, [scheduleFlush]);
+
+  const handleRealtimeStatus = useCallback((update: RealtimeStatusUpdate) => {
+    if (!update.nodeId) return;
+    pendingUpdatesRef.current.push({
+      kind: 'status',
+      nodeId: update.nodeId,
+      status: update.status,
+      errorMessage: update.errorMessage,
+      errorTraceback: update.errorTraceback,
+    });
+    scheduleFlush();
+  }, [scheduleFlush]);
+
+  const handleRealtimeProgress = useCallback((_update: RealtimeProgressUpdate) => {
+    // Progress is handled by Toolbar internally; could add a progress bar here
+  }, []);
+
+  // Clear all node execution state in the UI when a full run starts
+  // (not triggered for single node execution)
+  const handleFullRunStart = useCallback(() => {
+    setNodes((prevNodes) =>
+      prevNodes.map((node) => {
+        const cleanedData = { ...node.data };
+        delete cleanedData.logs;
+        delete cleanedData.output_html;
+        delete cleanedData.unified_outputs;
+        delete cleanedData.status;
+        delete cleanedData.execution_order;
+        delete cleanedData.lastExecution;
+        delete cleanedData.error_message;
+        delete cleanedData.error_traceback;
+        return {
+          ...node,
+          data: cleanedData,
+          status: undefined,
+        };
+      })
+    );
+    setExecutionStatus(null);
+  }, [setNodes]);
 
   // Load file content
   const loadFileContent = useCallback(async () => {
@@ -61,17 +218,13 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
     try {
       setIsLoading(true);
       setError(null);
+      setIsInitialLoad(true);
       
-      const timestamp = new Date().toISOString();
-      console.log(`📂 Canvas [${timestamp}]: Loading file content for:`, filePath);
       const fileContent = await editorAPI.getFileContent(filePath);
-      console.log(`📂 Canvas [${timestamp}]: File content received, length:`, fileContent.content?.length);
       
       // Parse workflow content using the new file parser
       if (fileContent.content) {
         const validationResult = isValidFlowFormat(fileContent.content);
-        
-        console.log('📋 Canvas: Flow validation result:', validationResult);
         
         if (validationResult.isValid && validationResult.parsedData) {
           // Convert flow format to ReactFlow format
@@ -87,33 +240,33 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
             }
           }));
           
-          console.log('✅ Canvas: Loaded flow format - nodes:', nodesWithFilePath.length, 'edges:', reactFlowEdges.length);
-          
-          // Log execution status of nodes
-          nodesWithFilePath.forEach(node => {
-            if (node.data.status || node.data.unified_outputs) {
-              console.log(`  📊 Node ${node.id}: status=${node.data.status}, outputs=${node.data.unified_outputs?.length || 0}`);
-            }
-          });
+          console.log('Canvas: Loaded', nodesWithFilePath.length, 'nodes,', reactFlowEdges.length, 'edges');
           
           setNodes(nodesWithFilePath);
           setEdges(reactFlowEdges);
+          
+          // Restore viewport from file config or localStorage
+          const fileViewport = validationResult.parsedData.config?.viewport;
+          const localViewport = typeof window !== 'undefined' ? localStorage.getItem(`canvas_viewport_${tabId}`) : null;
+          if (localViewport) {
+            try { setSavedViewport(JSON.parse(localViewport)); } catch {}
+          } else if (fileViewport) {
+            setSavedViewport(fileViewport);
+          } else {
+            setSavedViewport(null);
+          }
         } else {
-          console.log('⚠️ Canvas: Flow validation failed, trying legacy format. Missing props:', validationResult.missingProps);
           // Try to parse as legacy format or create empty flow
           try {
             const legacyData = JSON.parse(fileContent.content);
             if (legacyData.nodes && legacyData.edges) {
-              console.log('✅ Canvas: Loaded legacy format - nodes:', legacyData.nodes.length, 'edges:', legacyData.edges.length);
               setNodes(legacyData.nodes);
               setEdges(legacyData.edges);
             } else {
-              console.log('⚠️ Canvas: No nodes/edges found, creating empty flow');
               setNodes([]);
               setEdges([]);
             }
           } catch (parseError) {
-            console.warn('⚠️ Canvas: Could not parse workflow, creating empty flow');
             setNodes([]);
             setEdges([]);
           }
@@ -136,9 +289,9 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
       // This allows ReactFlow to finish its initialization
       setTimeout(() => {
         setIsInitialLoad(false);
-      }, 100);
+      }, 300);
       
-      console.log('✅ Canvas: File content loaded successfully');
+      console.log('Canvas: File content loaded');
     } catch (error) {
       console.error('❌ Canvas: Error loading file content:', error);
       setError(error instanceof Error ? error.message : 'Failed to load file');
@@ -149,7 +302,6 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
 
   // Handle edge connections
   const onConnect = useCallback((params: Connection) => {
-    console.log('🔗 Canvas: Connecting nodes', params);
     const newEdge = {
       ...params,
       id: `edge-${params.source}-${params.target}-${Date.now()}`,
@@ -173,8 +325,6 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
     if (!filePath) return;
 
     try {
-      console.log('💾 Canvas: Saving file content for:', filePath);
-      
       // Convert ReactFlow nodes and edges to flow format
       const flowNodes = convertToFlowNodes(nodes);
       const flowEdges = convertToFlowEdges(edges);
@@ -182,32 +332,84 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
       // Get current viewport
       const viewport = reactFlowInstance.getViewport();
       
-      // Create flow data structure
-      const fileName = filePath.split('/').pop()?.replace('.flow', '') || 'workflow';
-      const flowData = {
-        id: `flow_${Date.now()}`,
-        name: fileName,
-        description: `Workflow saved on ${new Date().toLocaleDateString()}`,
-        version: '1.0.0',
-        created: new Date().toISOString(),
-        modified: new Date().toISOString(),
-        author: '',
-        config: {
-          auto_layout: false,
-          execution_mode: 'sequential',
-          default_language: 'python',
-          environment: 'default',
-          viewport: viewport
-        },
-        nodes: flowNodes,
-        edges: flowEdges,
-        global_variables: {},
-        shared_imports: [],
-        execution_history: []
-      };
-
-      // Serialize to JSON
-      const content = serializeFlowData(flowData);
+      // Read the CURRENT file content from disk to preserve execution data
+      // (logs, outputs, execution_history, global_variables, etc.)
+      let existingData: Record<string, unknown> | null = null;
+      try {
+        const fileResponse = await editorAPI.getFileContent(filePath);
+        if (fileResponse && fileResponse.content) {
+          existingData = JSON.parse(fileResponse.content);
+        }
+      } catch (e) {
+        console.warn('Canvas: Could not read existing file for merge, creating fresh:', e);
+      }
+      
+      let content: string;
+      
+      if (existingData) {
+        // Merge: update positions, dimensions, edges, code — preserve execution data
+        // Build node list from CANVAS state (not disk) so deleted nodes stay deleted
+        const existingNodeMap = new Map(
+          ((existingData.nodes as Array<Record<string, unknown>>) || []).map(n => [n.id as string, n])
+        );
+        
+        const mergedNodes = flowNodes.map(flowNode => {
+          const existingNode = existingNodeMap.get(flowNode.id);
+          if (existingNode) {
+            // Preserve execution data from existing file, update visual/code from canvas
+            const existingNodeData = (existingNode.data as Record<string, unknown>) || {};
+            const flowNodeData = (flowNode.data as Record<string, unknown>) || {};
+            // Start with existing data (preserves execution logs, status, etc.)
+            // Then overlay ALL fields from the canvas flow node so no edits are lost
+            const mergedData: Record<string, unknown> = {
+              ...existingNodeData,
+              ...flowNodeData,
+            };
+            return {
+              ...existingNode,
+              position: flowNode.position,
+              data: mergedData,
+            };
+          }
+          // New node not in file yet
+          return flowNode as unknown as Record<string, unknown>;
+        });
+        
+        existingData.nodes = mergedNodes;
+        existingData.edges = flowEdges;
+        
+        // Update viewport in config
+        if (!existingData.config) existingData.config = {};
+        (existingData.config as Record<string, unknown>).viewport = viewport;
+        existingData.modified = new Date().toISOString();
+        
+        content = JSON.stringify(existingData, null, 2);
+      } else {
+        // No existing file — create fresh structure
+        const fileName = filePath.split('/').pop()?.replace('.flow', '') || 'workflow';
+        const flowData = {
+          id: `flow_${Date.now()}`,
+          name: fileName,
+          description: `Workflow saved on ${new Date().toLocaleDateString()}`,
+          version: '1.0.0',
+          created: new Date().toISOString(),
+          modified: new Date().toISOString(),
+          author: '',
+          config: {
+            auto_layout: false,
+            execution_mode: 'sequential',
+            default_language: 'python',
+            environment: 'default',
+            viewport: viewport
+          },
+          nodes: flowNodes,
+          edges: flowEdges,
+          global_variables: {},
+          shared_imports: [],
+          execution_history: []
+        };
+        content = serializeFlowData(flowData);
+      }
       
       // Save using API
       await editorAPI.updateFileContent(filePath, content);
@@ -219,16 +421,14 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
       updateTab(tabId, { isDirty: false });
       
       toast.success('Workflow saved successfully');
-      console.log('✅ Canvas: File saved successfully');
       
-      // Auto-refresh canvas after save to reload any updated data
-      setIsInitialLoad(true); // Prevent dirty flag during refresh
-      await loadFileContent();
+      // Do NOT reload file after save — this prevents flashing and races with backend
+      // The node positions are already updated in the canvas state
     } catch (error) {
       console.error('❌ Canvas: Error saving file:', error);
       setError('Failed to save file');
     }
-  }, [filePath, tabId, nodes, edges, reactFlowInstance, updateContent, setSaved, setDirty, updateTab, loadFileContent]);
+  }, [filePath, tabId, nodes, edges, reactFlowInstance, updateContent, setSaved, setDirty, updateTab]);
 
   // Use canvas handlers hook
   const {
@@ -256,27 +456,37 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
   }, [onDropHandler, reactFlowInstance]);
 
   // Handle execution completion callback
+  // Debounced — only reload once after burst of node completions settles
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleExecutionComplete = useCallback(() => {
-    console.log('🔄 Canvas: Node execution completed, refetching file content');
-    loadFileContent();
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => {
+      reloadTimerRef.current = null;
+      loadFileContent();
+    }, 500);
   }, [loadFileContent]);
 
   // Add node deletion handler and execution callback to node data
+  // Use refs for stable callbacks to avoid recreating node objects on every render
+  const handleNodeDeleteRef = useRef(handleNodeDelete);
+  const handleExecutionCompleteRef = useRef(handleExecutionComplete);
+  handleNodeDeleteRef.current = handleNodeDelete;
+  handleExecutionCompleteRef.current = handleExecutionComplete;
+
   const nodesWithDeleteHandler = useMemo(() => {
     return nodes.map((node) => ({
       ...node,
       data: {
         ...node.data,
-        filePath: filePath, // Ensure filePath is always present
-        onNodeDelete: handleNodeDelete,
-        onExecutionComplete: handleExecutionComplete,
-        // Add dirty flag setters for DataTypeNode and other nodes that need to mark changes
+        filePath: filePath,
+        onNodeDelete: handleNodeDeleteRef.current,
+        onExecutionComplete: handleExecutionCompleteRef.current,
         setDirty: setDirty,
         updateTab: updateTab,
         tabId: tabId
       }
     }));
-  }, [nodes, filePath, handleNodeDelete, handleExecutionComplete, setDirty, updateTab, tabId]);
+  }, [nodes, filePath, setDirty, updateTab, tabId]);
 
   // Load file content on mount
   useEffect(() => {
@@ -432,12 +642,18 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
         onStop={handleStop}
         onReset={handleReset}
         onRefresh={loadFileContent}
+        onFullRunStart={handleFullRunStart}
         filePath={filePath}
         fileName={filePath?.split('/').pop() || 'workflow'}
+        tabId={tabId}
         onExecutionStatusChange={setExecutionStatus}
+        onRealtimeLog={handleRealtimeLog}
+        onRealtimeOutput={handleRealtimeOutput}
+        onRealtimeStatus={handleRealtimeStatus}
+        onRealtimeProgress={handleRealtimeProgress}
       />
       
-      <div className="flex-1 relative">
+      <div className={`flex-1 relative ${isTabDirty ? 'ring-2 ring-yellow-400 ring-inset' : ''}`}>
         <ReactFlow
           nodes={nodesWithDeleteHandler}
           edges={edges}
@@ -447,7 +663,12 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath }) => {
           onDrop={onDrop}
           onDragOver={onDragOver}
           nodeTypes={nodeTypes}
-          fitView
+          {...(savedViewport ? { defaultViewport: savedViewport, fitView: false } : { fitView: true })}
+          onMoveEnd={(_, vp) => {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`canvas_viewport_${tabId}`, JSON.stringify(vp));
+            }
+          }}
           className="bg-background"
           proOptions={{ hideAttribution: false }}
           noDragClassName="noDrag"

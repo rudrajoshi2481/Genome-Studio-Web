@@ -34,7 +34,7 @@ export const NewFileDialog: React.FC<NewFileDialogProps> = ({
           <DialogDescription>
             Enter a name for the new file. Include the file extension (e.g., .js, .txt, .py).
             <br />
-            <span className="text-sm font-medium mt-2 block">
+            <span className="text-xs font-medium mt-2 block">
               Location: {parentPath}
             </span>
           </DialogDescription>
@@ -96,7 +96,7 @@ export const NewFolderDialog: React.FC<NewFolderDialogProps> = ({
           <DialogDescription>
             Enter a name for the new folder.
             <br />
-            <span className="text-sm font-medium mt-2 block">
+            <span className="text-xs font-medium mt-2 block">
               Location: {parentPath}
             </span>
           </DialogDescription>

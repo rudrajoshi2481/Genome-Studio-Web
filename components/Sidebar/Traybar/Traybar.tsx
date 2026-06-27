@@ -1,10 +1,10 @@
 import React from 'react'
 import AIChat from './Ai-Chat/AIChat'
 
-function Traybar() {
+function Traybar({ onClose }: { onClose?: () => void }) {
   return (
-    <div>
-        <AIChat />
+    <div className="flex h-full w-full flex-col overflow-hidden border-l bg-background">
+      <AIChat onClose={onClose} />
     </div>
   )
 }

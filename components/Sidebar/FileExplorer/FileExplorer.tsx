@@ -657,9 +657,9 @@ const FileExplorer: React.FC = () => {
           }}>
             <div className={`w-full h-full overflow-y-auto overflow-x-hidden p-2 ${dragState.isDragging ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
               {isLoading ? (
-                <div className="text-sm text-gray-500 p-2">Loading...</div>
+                <div className="text-xs text-gray-500 p-2">Loading...</div>
               ) : error ? (
-                <div className="text-sm text-red-500 p-2">Error: {error}</div>
+                <div className="text-xs text-red-500 p-2">Error: {error}</div>
               ) : fileTree && fileTree.children ? (
                 // Render children of root instead of root itself
                 // Sort to show folders first, then files
@@ -686,7 +686,7 @@ const FileExplorer: React.FC = () => {
                     />
                   ))
               ) : (
-                <div className="text-sm text-gray-500 p-2">No files found</div>
+                <div className="text-xs text-gray-500 p-2">No files found</div>
               )}
             </div>
           </ContextMenuTrigger>

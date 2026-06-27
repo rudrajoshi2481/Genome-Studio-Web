@@ -78,8 +78,12 @@ export const useCanvasHandlers = (
     
     onNodesChange(changes);
     
-    // Only set dirty if not during initial load
-    if (!isInitialLoad) {
+    // Set dirty for all changes EXCEPT automatic ReactFlow internal changes
+    // (dimensions recalculated on mount/visibility, select on click focus)
+    const hasUserChange = changes.some((change: any) => 
+      change.type !== 'dimensions' && change.type !== 'select'
+    );
+    if (hasUserChange && !isInitialLoad) {
       setDirty(tabId, true);
       updateTab(tabId, { isDirty: true });
     }
@@ -89,8 +93,11 @@ export const useCanvasHandlers = (
   const handleEdgesChange = useCallback((changes: any) => {
     onEdgesChange(changes);
     
-    // Only set dirty if not during initial load
-    if (!isInitialLoad) {
+    // Set dirty for all edge changes EXCEPT automatic select changes
+    const hasUserChange = changes.some((change: any) => 
+      change.type !== 'select'
+    );
+    if (hasUserChange && !isInitialLoad) {
       setDirty(tabId, true);
       updateTab(tabId, { isDirty: true });
     }
@@ -116,9 +123,6 @@ export const useCanvasHandlers = (
     (event: React.DragEvent<HTMLDivElement>, reactFlowInstance: any) => {
       event.preventDefault();
 
-      // Get the ReactFlow bounds
-      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-      
       // Try to get the custom node data
       let nodeData: NodeData;
       try {
@@ -131,9 +135,10 @@ export const useCanvasHandlers = (
       }
 
       // Calculate position where node was dropped
+      // screenToFlowPosition expects screen coordinates (clientX/clientY)
       const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top
+        x: event.clientX,
+        y: event.clientY
       });
 
       console.log('🎯 Canvas: Drop position:', position);

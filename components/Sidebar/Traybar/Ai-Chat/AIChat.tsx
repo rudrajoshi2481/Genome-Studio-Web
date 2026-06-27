@@ -1,37 +1,115 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useChatStore } from './components/chatStore';
 import { useChatWebSocket } from './hooks/useChatWebSocket';
-import ConversationHistory from './components/ConversationHistory';
 import Appbar from './Appbar';
 import Footer from './Footer';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import UserMessage from './components/UserMessage';
 import AIMessage from './components/AIMessage';
+import ReasoningMessage from './components/ReasoningMessage';
+import PlanMessage from './components/PlanMessage';
+import TaskMessage from './components/TaskMessage';
+import ConfirmationMessage from './components/ConfirmationMessage';
 import ToolMessage from './components/ToolMessage';
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from '@/components/ai-elements/conversation';
+import {
+  Suggestions,
+  Suggestion,
+} from '@/components/ai-elements/suggestion';
+import { Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import QueuePanel from './components/QueuePanel';
+import { getApiBaseUrl } from '@/config/server';
+import { Conversation as ConvType } from './components/chatStore';
 
-function AIChat() {
-  const { 
-    showConversationHistory, 
-    setShowConversationHistory,
+function AIChat({ onClose }: { onClose?: () => void }) {
+  const {
     setCurrentConversation,
     clearMessages,
-    messages
+    messages,
+    queuedMessages,
+    queuedTodos,
+    conversations,
+    setConversations,
+    currentConversationId,
+    setLoading,
+    isLoading: isLoadingConvs
   } = useChatStore();
-  const { sendMessage } = useChatWebSocket();
+  const { sendMessage, stopSending } = useChatWebSocket();
+
+  const [showAllConvs, setShowAllConvs] = useState(false);
+  const [showConvList, setShowConvList] = useState(false);
+
+  useEffect(() => {
+    fetchConversations(false);
+  }, []);
+
+  const fetchConversations = async (fetchAll: boolean) => {
+    setLoading(true);
+    try {
+      const url = `${getApiBaseUrl()}/ai-chat/conversations${fetchAll ? '?all=true' : ''}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setConversations(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleNewConversation = () => {
     setCurrentConversation(null);
     clearMessages();
-    setShowConversationHistory(false);
+    setShowConvList(false);
   };
 
-  const handleSendMessage = (content: string) => {
-    sendMessage(content);
+  const handleSelectConversation = async (conv: ConvType) => {
+    setCurrentConversation(conv.id);
+    clearMessages();
+    setShowConvList(false);
+    try {
+      const url = `${getApiBaseUrl()}/ai-chat/conversations/${conv.id}/messages`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        // Load messages into the store
+        useChatStore.setState({ messages: data });
+      }
+    } catch (error) {
+      console.error('Failed to load conversation messages:', error);
+    }
   };
 
-  const renderMessage = (message: any) => {
+  const handleToggleShowAll = () => {
+    const next = !showAllConvs;
+    setShowAllConvs(next);
+    fetchConversations(next);
+  };
+
+  const handleSendMessage = (content: string, model?: string) => {
+    setShowConvList(false);
+    sendMessage(content, model);
+  };
+
+  const handleSuggestion = (suggestion: string) => {
+    setShowConvList(false);
+    sendMessage(suggestion);
+  };
+
+  const renderMessage = (message: any, index: number) => {
+    const groupedTypes = ['tool', 'reasoning', 'plan', 'task', 'confirmation'];
+    const isGrouped = index > 0 && groupedTypes.includes(message.type);
+    const wrapperClass = isGrouped ? '-mt-2' : '';
+    
+    const content = (() => {
     switch (message.type) {
       case 'human':
         return <UserMessage key={message.id} message={message} />;
@@ -39,13 +117,19 @@ function AIChat() {
         return <AIMessage key={message.id} message={message} />;
       case 'tool':
         return <ToolMessage key={message.id} message={message} />;
+      case 'reasoning':
+        return <ReasoningMessage key={message.id} message={message} />;
+      case 'plan':
+        return <PlanMessage key={message.id} message={message} />;
+      case 'task':
+        return <TaskMessage key={message.id} message={message} />;
+      case 'confirmation':
+        return <ConfirmationMessage key={message.id} message={message} />;
       case 'thinking':
         return (
-          <div key={message.id} className="text-xs text-muted-foreground text-center py-2 animate-pulse">
-            <span className="inline-flex items-center gap-1">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-              {message.content}
-            </span>
+          <div key={message.id} className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground">
+            <Loader2 size={12} className="animate-spin" />
+            <span>{message.content}</span>
           </div>
         );
       case 'stream':
@@ -59,68 +143,95 @@ function AIChat() {
       default:
         return null;
     }
+    })();
+
+    if (wrapperClass) {
+      return <div key={message.id} className={wrapperClass}>{content}</div>;
+    }
+    return content;
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <Appbar />
-      
-      <div className='flex-1 overflow-hidden'>
-        <ScrollArea className="h-full w-full">
-          <div className="w-full">
-            {messages.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
-                <div className="text-center space-y-2 max-w-sm w-full">
-                  <div className="w-10 h-10 mx-auto bg-muted rounded-full flex items-center justify-center">
-                    <svg
-                      className="w-5 h-5 text-muted-foreground"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                      />
-                    </svg>
-                  </div>
-                  <div className="px-2">
-                    <h3 className="text-sm font-semibold text-foreground">Start a conversation</h3>
-                    <p className="text-sm text-muted-foreground mt-1 leading-tight">
-                      Ask about genome analysis or workflows
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 justify-center px-2">
-                    <div className="px-3 py-1 bg-muted rounded-full text-sm text-muted-foreground">
-                      Analysis
-                    </div>
-                    <div className="px-3 py-1 bg-muted rounded-full text-sm text-muted-foreground">
-                      Workflows
-                    </div>
-                    <div className="px-3 py-1 bg-muted rounded-full text-sm text-muted-foreground">
-                      Code
-                    </div>
-                  </div>
-                </div>
+    <div className="flex h-full w-full flex-col bg-background">
+      <Appbar onNewChat={handleNewConversation} onToggleHistory={() => {
+        if (!showConvList && conversations.length === 0) {
+          fetchConversations(false);
+        }
+        setShowConvList(!showConvList);
+      }} showHistory={showConvList} onClose={onClose} />
+
+      <Conversation className="flex-1">
+        <ConversationContent className="gap-4 p-3">
+          {messages.length === 0 ? (
+            <>
+              <ConversationEmptyState
+                title="Start a conversation"
+                description="Ask about genome analysis or workflows"
+                icon={<Sparkles className="size-8" />}
+              />
+              <div className="space-y-3">
+                <Suggestions className="justify-center">
+                  {[
+                    "Analyze my genome data",
+                    "Create a workflow",
+                    "Help with code",
+                    "Explain a gene variant",
+                    "Search for genetic markers",
+                    "Compare genome assemblies",
+                  ].map((suggestion) => (
+                    <Suggestion
+                      key={suggestion}
+                      suggestion={suggestion}
+                      onClick={handleSuggestion}
+                    />
+                  ))}
+                </Suggestions>
               </div>
-            ) : (
-              messages.map(renderMessage)
-            )}
-          </div>
-        </ScrollArea>
-      </div>
+            </>
+          ) : (
+            messages.map((msg, idx) => renderMessage(msg, idx))
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
 
-      {/* Conversation History Cards - Show above footer when toggled
-      {showConversationHistory && (
-        <div className="border-t bg-background">
-          <ConversationHistory onNewConversation={handleNewConversation} />
+      {(queuedMessages.length > 0 || queuedTodos.length > 0) && (
+        <div className="px-3 pb-1">
+          <QueuePanel onSendMessage={handleSendMessage} />
         </div>
-      )} */}
+      )}
 
-      <div className='mb-6 mx-3 shadow-md'>
-        <Footer onSendMessage={handleSendMessage} />
+      {/* Conversation tabs */}
+      {showConvList && conversations.length > 0 && (
+        <div className="px-3 pb-1 space-y-0.5">
+          <button
+            onClick={handleToggleShowAll}
+            className="ml-auto flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground px-1 py-0.5"
+          >
+            {showAllConvs ? (
+              <><ChevronUp className="size-3" /> Show Less</>
+            ) : (
+              <><ChevronDown className="size-3" /> Show All</>
+            )}
+          </button>
+          {conversations.map((conv) => (
+            <button
+              key={conv.id}
+              onClick={() => handleSelectConversation(conv)}
+              className={`w-full text-left rounded-md px-2 py-1 text-xs font-medium transition-colors truncate ${
+                currentConversationId === conv.id
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              {conv.title || 'Untitled'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className='p-3 pt-1'>
+        <Footer onSendMessage={handleSendMessage} onStop={stopSending} />
       </div>
     </div>
   );

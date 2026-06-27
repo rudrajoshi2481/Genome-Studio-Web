@@ -1,7 +1,6 @@
 "use client"
 import React, { useState } from 'react'
-import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { PlayIcon, XIcon, Loader2, PlusIcon, Settings } from "lucide-react"
+import { PlayIcon, Loader2, PlusIcon, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useNodeStore } from './nodeStore'
 import { useAuthStore } from '@/lib/stores/auth-store'
@@ -83,33 +82,6 @@ interface NodeCreatePayload {
   tags: string[];
   is_public: boolean;
 }
-
-// Custom large dialog content component
-const LargeDialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPrimitive.Portal>
-    <DialogPrimitive.Overlay
-      className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-    />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed left-[50%] top-[50%] z-50 flex flex-col w-[80vw] h-[80vh] translate-x-[-50%] translate-y-[-50%] border bg-background shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-lg overflow-hidden",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        <XIcon className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPrimitive.Portal>
-))
-LargeDialogContent.displayName = "LargeDialogContent"
 
 interface CustomNodeProps {
   onSaveSuccess?: () => void;
@@ -546,10 +518,10 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           </div>
         )}
         
-        <LargeDialogContent>
+        <DialogContent className="flex flex-col w-[80vw] h-[80vh] max-w-[80vw] gap-0 p-0 overflow-hidden">
         <DialogHeader className="px-6 py-3 border-b shrink-0">
           <DialogTitle className="text-lg">{isEditMode ? 'Edit Custom Node' : 'Create Custom Node'}</DialogTitle>
-          <DialogDescription className="text-sm">
+          <DialogDescription className="text-xs">
             {isEditMode ? 'Edit your custom node properties and code.' : 'Create a custom node with Python or R code.'}
           </DialogDescription>
         </DialogHeader>
@@ -560,22 +532,22 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             <ResizablePanel defaultSize={30} minSize={25} maxSize={40}>
               <div className="h-full flex flex-col border-r">
                 <div className="px-4 py-2.5 border-b">
-                  <h3 className="font-semibold text-sm">Properties</h3>
+                  <h3 className="font-semibold text-xs">Properties</h3>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Node Name</label>
+                      <label className="text-xs font-medium">Node Name</label>
                       <input 
                         type="text" 
-                        className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" 
+                        className="w-full px-3 py-2 border rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-ring" 
                         placeholder="Enter name..." 
                         value={nodeName}
                         onChange={(e) => setNodeName(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Description</label>
+                      <label className="text-xs font-medium">Description</label>
                       <Textarea 
                         className="w-full min-h-[80px] resize-none" 
                         placeholder="Enter description..." 
@@ -584,9 +556,9 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Language</label>
+                      <label className="text-xs font-medium">Language</label>
                       <select 
-                        className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                        className="w-full px-3 py-2 border rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                         value={nodeLanguage}
                         onChange={(e) => setNodeLanguage(e.target.value as 'Python' | 'R' | 'Bash')}
                       >
@@ -597,7 +569,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Tags</label>
+                      <label className="text-xs font-medium">Tags</label>
                       <TagInput
                         tags={tags}
                         onAddTag={addTag}
@@ -620,7 +592,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                   <ResizablePanel defaultSize={60} minSize={30}>
                     <div className="h-full flex flex-col">
                       <div className="px-4 py-1.5 border-b flex items-center justify-between shrink-0">
-                        <h3 className="font-semibold text-sm">Node Code</h3>
+                        <h3 className="font-semibold text-xs">Node Code</h3>
                         <div className="flex items-center gap-2">
                           <CopyToChatGPT
                             code={code}
@@ -668,7 +640,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                   <ResizablePanel defaultSize={40} minSize={20}>
                     <div className="h-full flex flex-col">
                       <div className="px-4 py-2.5 border-b shrink-0">
-                        <h3 className="font-semibold text-sm">Node Connections</h3>
+                        <h3 className="font-semibold text-xs">Node Connections</h3>
                       </div>
                       <div className="flex-1 overflow-y-auto p-6">
                         {testResult && testResult.node && (
@@ -734,7 +706,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                               <CardContent className="border-none p-0 pt-4">
                                 <div className="grid grid-cols-2 gap-6">
                                   <div className="space-y-2">
-                                    <h5 className="font-medium text-sm flex items-center gap-2">
+                                    <h5 className="font-medium text-xs flex items-center gap-2">
                                       <div className="w-3 h-3 rounded-full bg-red-500"></div>
                                       Inputs
                                     </h5>
@@ -748,7 +720,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                                     </ul>
                                   </div>
                                   <div className="space-y-2">
-                                    <h5 className="font-medium text-sm flex items-center gap-2">
+                                    <h5 className="font-medium text-xs flex items-center gap-2">
                                       <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                                       Outputs
                                     </h5>
@@ -763,8 +735,8 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                                   </div>
                                 </div>
                                 <div className="mt-4 pt-3 border-t">
-                                  <h5 className="font-medium text-sm mb-2">Function:</h5>
-                                  <div className="bg-background border p-2 rounded-md text-sm font-mono flex items-center justify-between">
+                                  <h5 className="font-medium text-xs mb-2">Function:</h5>
+                                  <div className="bg-background border p-2 rounded-md text-xs font-mono flex items-center justify-between">
                                     <span>{testResult.node.data.function_name}</span>
                                     <Badge variant="secondary">
                                       {testResult.node.data.language}
@@ -781,7 +753,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                           </Alert>
                         )}
                         {!testResult && !testError && (
-                          <div className="text-muted-foreground text-sm flex items-center justify-center h-full">
+                          <div className="text-muted-foreground text-xs flex items-center justify-center h-full">
                             Click "Test Node" to analyze your code
                           </div>
                         )}
@@ -798,12 +770,12 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           <div className="flex items-center justify-between w-full gap-4">
             <div className="flex items-center gap-2 flex-1">
               {saveError && (
-                <div className="text-sm text-destructive flex items-center gap-2">
+                <div className="text-xs text-destructive flex items-center gap-2">
                   <span className="text-xs">{saveError}</span>
                 </div>
               )}
               {saveSuccess && (
-                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
                   <span className="text-xs">✓ {isEditMode ? 'Node updated successfully!' : 'Node saved successfully!'}</span>
                 </div>
               )}
@@ -836,7 +808,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             </div>
           </div>
         </DialogFooter>
-      </LargeDialogContent>
+      </DialogContent>
       </Dialog>
     </>
   )

@@ -11,14 +11,9 @@ import EditorFactory from './components/EditorFactory'
  * Reimplemented to use new file-explorer-new API
  */
 const EditorWindowContent = memo(() => {
-  // Get tab store methods
-  const { removeTab, activateTab } = useTabStore()
-  
   // Get active tab using selector to prevent infinite loops
-  const activeTab = useTabStore(state => {
-    if (!state.activeTabId) return null
-    return state.tabs.get(state.activeTabId) || null
-  })
+  const activeTabId = useTabStore(state => state.activeTabId)
+  const allTabs = useTabStore(state => state.getAllTabs())
   const [isMounted, setIsMounted] = React.useState(false)
   
   // Handle client-side mounting to prevent hydration mismatch
@@ -26,39 +21,31 @@ const EditorWindowContent = memo(() => {
     setIsMounted(true)
   }, [])
   
-  // Tab handlers
-  const handleTabClose = useCallback((tabId: string) => {
-    removeTab(tabId)
-  }, [removeTab])
-
-  const handleTabActivate = useCallback((tabId: string) => {
-    activateTab(tabId)
-  }, [activateTab])
-  
   // Show consistent loading state during SSR and initial client render
   if (!isMounted) {
     return (
       <div className='flex flex-col h-full'>
-        {/* <div className='flex items-center justify-center h-full text-gray-500 flex-col'>
-          <div className="animate-pulse">
-            <div className="w-96 h-96 bg-gray-200 rounded-lg mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-48 mx-auto"></div>
-          </div>
-        </div> */}
       </div>
     )
   }
   
   return (
     <div className='flex flex-col h-full overflow-hidden'>
-      {activeTab ? (
-        <div className='flex-1 overflow-hidden'>
-          <EditorFactory 
-            tabId={activeTab.id}
-            filePath={activeTab.path}
-            extension={activeTab.extension}
-          />
-        </div>
+      {allTabs.length > 0 ? (
+        allTabs.map(tab => (
+          <div
+            key={tab.id}
+            className='flex-1 overflow-hidden'
+            style={{ display: tab.id === activeTabId ? 'flex' : 'none' }}
+          >
+            <EditorFactory 
+              tabId={tab.id}
+              filePath={tab.path}
+              extension={tab.extension}
+              isActive={tab.id === activeTabId}
+            />
+          </div>
+        ))
       ) : (
         <div className='flex items-center justify-center h-full text-gray-500 flex-col overflow-hidden'>
           {/* Add skeleton */}
@@ -127,6 +114,7 @@ const EditorWindow = () => {
                 extension={tab.extension}
                 isActive={activeTab?.id === tab.id}
                 isDirty={tab.isDirty}
+                isExecuting={tab.isExecuting}
                 onActivate={handleActivate}
                 onClose={handleClose}
               />

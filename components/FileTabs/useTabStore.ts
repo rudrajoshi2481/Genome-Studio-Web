@@ -8,6 +8,7 @@ export interface TabFile {
   content?: string;
   isDirty?: boolean;
   isModified?: boolean;
+  isExecuting?: boolean;
   extension?: string;
 }
 
@@ -526,7 +527,11 @@ export const useTabStore = create<TabState>()(
       name: 'tab-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        tabs: mapToObject(state.tabs as Map<string, TabFile> | Record<string, TabFile>),
+        tabs: Object.fromEntries(
+          Array.from((state.tabs instanceof Map ? state.tabs : new Map(Object.entries(state.tabs as Record<string, TabFile>))).entries()).map(
+            ([key, value]) => [key, { ...value, isExecuting: false }]
+          )
+        ),
         activeTabId: state.activeTabId,
         tabOrder: state.tabOrder,
         options: state.options
@@ -536,6 +541,14 @@ export const useTabStore = create<TabState>()(
           if (state.tabs && typeof state.tabs === 'object' && !(state.tabs instanceof Map)) {
             const tabsObject = state.tabs as unknown as Record<string, TabFile>;
             state.tabs = objectToMap(tabsObject);
+          }
+          // Clear isExecuting on rehydration — execution state doesn't survive page reload
+          if (state.tabs instanceof Map) {
+            state.tabs.forEach((tab) => {
+              if (tab.isExecuting) {
+                tab.isExecuting = false;
+              }
+            });
           }
         }
       }

@@ -1,12 +1,38 @@
-import React, { useState } from 'react';
-import { Download, Save, Play, Square, RotateCcw, CheckCircle, AlertCircle, RefreshCw, Network, GitBranch, FileText } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Download, Save, Play, Square, RotateCcw, CheckCircle, AlertCircle, RefreshCw, Network, GitBranch, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Node, Edge, useReactFlow } from 'reactflow';
 import { serializeFlowData, convertToFlowNodes, convertToFlowEdges } from './utils/file-parser';
 import { workflowManagerAPI, WorkflowExecutionStatus } from '@/services/WorkflowManagerAPI';
+import { workflowWebSocket, LogStreamMessage, OutputStreamMessage, StatusUpdateMessage, ProgressUpdateMessage } from '@/services/WorkflowWebSocket';
+import { useTabStore } from '@/components/FileTabs/useTabStore';
+
+export interface RealtimeLogUpdate {
+  nodeId: string;
+  log: { timestamp: string; level: string; message: string; source: string };
+}
+
+export interface RealtimeOutputUpdate {
+  nodeId: string;
+  output: { type: string; html?: string; text?: string; order?: number; mime_type?: string };
+}
+
+export interface RealtimeStatusUpdate {
+  nodeId?: string;
+  status: string;
+  errorMessage?: string;
+  errorTraceback?: string;
+}
+
+export interface RealtimeProgressUpdate {
+  progressPercentage: number;
+  nodesCompleted: number;
+  totalNodes: number;
+}
 
 interface ToolbarProps {
   nodes: Node[];
@@ -16,9 +42,15 @@ interface ToolbarProps {
   onStop?: () => void;
   onReset?: () => void;
   onRefresh?: () => void;
+  onFullRunStart?: () => void;
   filePath?: string;
   fileName?: string;
+  tabId?: string;
   onExecutionStatusChange?: (status: WorkflowExecutionStatus | null) => void;
+  onRealtimeLog?: (update: RealtimeLogUpdate) => void;
+  onRealtimeOutput?: (update: RealtimeOutputUpdate) => void;
+  onRealtimeStatus?: (update: RealtimeStatusUpdate) => void;
+  onRealtimeProgress?: (update: RealtimeProgressUpdate) => void;
 }
 
 function Toolbar({
@@ -29,14 +61,47 @@ function Toolbar({
   onStop,
   onReset,
   onRefresh = () => {},
+  onFullRunStart,
   filePath,
   fileName = 'workflow',
-  onExecutionStatusChange
+  tabId,
+  onExecutionStatusChange,
+  onRealtimeLog,
+  onRealtimeOutput,
+  onRealtimeStatus,
+  onRealtimeProgress
 }: ToolbarProps) {
   const reactFlowInstance = useReactFlow();
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionId, setExecutionId] = useState<string | null>(null);
+  const { updateTab } = useTabStore();
   const [executionStatus, setExecutionStatus] = useState<WorkflowExecutionStatus | null>(null);
+
+  const updateExecutingState = (executing: boolean) => {
+    setIsExecuting(executing);
+    if (tabId) {
+      updateTab(tabId, { isExecuting: executing });
+    }
+  };
+  const wsConnectedRef = useRef(false);
+  const hasFinishedRef = useRef(false);
+  const [progress, setProgress] = useState<{ percentage: number; completed: number; total: number } | null>(null);
+  const onRealtimeLogRef = useRef(onRealtimeLog);
+  const onRealtimeOutputRef = useRef(onRealtimeOutput);
+  const onRealtimeStatusRef = useRef(onRealtimeStatus);
+  const onRealtimeProgressRef = useRef(onRealtimeProgress);
+  const onExecutionStatusChangeRef = useRef(onExecutionStatusChange);
+  const onRefreshRef = useRef(onRefresh);
+  const onFullRunStartRef = useRef(onFullRunStart);
+
+  // Keep refs in sync with latest props without re-creating WebSocket handlers
+  onRealtimeLogRef.current = onRealtimeLog;
+  onRealtimeOutputRef.current = onRealtimeOutput;
+  onRealtimeStatusRef.current = onRealtimeStatus;
+  onRealtimeProgressRef.current = onRealtimeProgress;
+  onExecutionStatusChangeRef.current = onExecutionStatusChange;
+  onRefreshRef.current = onRefresh;
+  onFullRunStartRef.current = onFullRunStart;
 
   const handleDownload = () => {
     try {
@@ -98,12 +163,15 @@ function Toolbar({
     }
 
     try {
-      setIsExecuting(true);
+      updateExecutingState(true);
+      hasFinishedRef.current = false;
+      setProgress(null);
       toast.info('Starting workflow execution...');
 
       const validation = await workflowManagerAPI.validateWorkflow(filePath);
       if (!validation.is_valid) {
         toast.error(`Workflow validation failed: ${validation.errors.join(', ')}`);
+        updateExecutingState(false);
         return;
       }
 
@@ -111,13 +179,91 @@ function Toolbar({
         file_path: filePath,
         execution_mode: 'dependency_based' as const,
         stop_on_error: true,
-        timeout_seconds: 300
+        timeout_seconds: 86400
       };
+
+      // Clear all node execution state in the UI for a fresh full run
+      onFullRunStartRef.current?.();
 
       const result = await workflowManagerAPI.executeWorkflow(requestPayload);
       setExecutionId(result.execution_id);
       toast.success('Workflow execution started!');
 
+      // Subscribe to execution updates via WebSocket (per-execution handlers)
+      workflowWebSocket.subscribeToExecution(result.execution_id, {
+        onConnect: () => {
+          console.log('✅ Toolbar: WebSocket connected for execution', result.execution_id);
+          wsConnectedRef.current = true;
+        },
+        onDisconnect: () => {
+          console.log('Toolbar: WebSocket disconnected', result.execution_id);
+          wsConnectedRef.current = false;
+        },
+        onLog: (msg: LogStreamMessage) => {
+          onRealtimeLogRef.current?.({
+            nodeId: msg.node_id,
+            log: msg.log
+          });
+        },
+        onOutput: (msg: OutputStreamMessage) => {
+          onRealtimeOutputRef.current?.({
+            nodeId: msg.node_id,
+            output: msg.output
+          });
+        },
+        onStatus: (msg: StatusUpdateMessage) => {
+          onRealtimeStatusRef.current?.({
+            nodeId: msg.node_id,
+            status: msg.status,
+            errorMessage: msg.error_message,
+            errorTraceback: msg.error_traceback,
+          });
+
+          // Handle terminal statuses (deduplicate with polling)
+          if (msg.status === 'completed' && !msg.node_id) {
+            if (hasFinishedRef.current) return;
+            hasFinishedRef.current = true;
+            updateExecutingState(false);
+            setProgress(null);
+            toast.success('Workflow execution completed!');
+            // Unsubscribe after completion
+            workflowWebSocket.unsubscribeFromExecution(result.execution_id);
+          } else if (msg.status === 'failed' && !msg.node_id) {
+            if (hasFinishedRef.current) return;
+            hasFinishedRef.current = true;
+            updateExecutingState(false);
+            setProgress(null);
+            const errMsg = msg.error_message ? `: ${msg.error_message}` : '';
+            toast.error(`Workflow execution failed${errMsg}`);
+            // Unsubscribe after failure
+            workflowWebSocket.unsubscribeFromExecution(result.execution_id);
+          }
+        },
+        onProgress: (msg: ProgressUpdateMessage) => {
+          setProgress({
+            percentage: msg.progress_percentage,
+            completed: msg.nodes_completed,
+            total: msg.total_nodes,
+          });
+          onRealtimeProgressRef.current?.({
+            progressPercentage: msg.progress_percentage,
+            nodesCompleted: msg.nodes_completed,
+            totalNodes: msg.total_nodes
+          });
+        },
+        onError: (error: Event) => {
+          console.error('Toolbar: WebSocket error:', error);
+        }
+      });
+
+      // Wait for WebSocket to connect (up to 2s)
+      const startTime = Date.now();
+      while (!wsConnectedRef.current && Date.now() - startTime < 2000) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      console.log('Toolbar: WebSocket ready:', wsConnectedRef.current);
+
+      // Fallback: also poll status (in case WebSocket fails)
       pollExecutionStatus(result.execution_id);
 
       if (onRun) {
@@ -126,7 +272,7 @@ function Toolbar({
     } catch (error) {
       console.error('Error starting workflow:', error);
       toast.error(`Failed to start workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setIsExecuting(false);
+      updateExecutingState(false);
     }
   };
 
@@ -139,12 +285,16 @@ function Toolbar({
     try {
       await workflowManagerAPI.stopExecution(executionId);
       toast.success('Workflow execution stopped');
-      setIsExecuting(false);
+      updateExecutingState(false);
       setExecutionId(null);
       setExecutionStatus(null);
 
-      if (onExecutionStatusChange) {
-        onExecutionStatusChange(null);
+      // Unsubscribe from this execution's WebSocket updates
+      workflowWebSocket.unsubscribeFromExecution(executionId);
+      wsConnectedRef.current = false;
+
+      if (onExecutionStatusChangeRef.current) {
+        onExecutionStatusChangeRef.current(null);
       }
 
       if (onStop) {
@@ -161,21 +311,20 @@ function Toolbar({
       const status = await workflowManagerAPI.getExecutionStatus(execId);
       setExecutionStatus(status);
 
-      if (onExecutionStatusChange) {
-        onExecutionStatusChange(status);
+      if (onExecutionStatusChangeRef.current) {
+        onExecutionStatusChangeRef.current(status);
       }
       
-      // Reload the file to get updated node data with execution results
-      // This happens during execution so completed nodes show results immediately
-      if (onRefresh) {
-        console.log('Toolbar: Reloading file to get latest execution results');
-        onRefresh();
-      }
-      
-      if (status.status === 'running') {
-        setTimeout(() => pollExecutionStatus(execId), 1000);
+      // Continue polling while idle (not started yet) or running
+      // Only stop on terminal statuses: completed, failed, cancelled
+      if (status.status === 'running' || status.status === 'idle') {
+        setTimeout(() => pollExecutionStatus(execId), 2000);
       } else {
-        setIsExecuting(false);
+        // Don't duplicate terminal handling if WebSocket already handled it
+        if (hasFinishedRef.current) return;
+        hasFinishedRef.current = true;
+        updateExecutingState(false);
+        setProgress(null);
         if (status.status === 'completed') {
           toast.success('Workflow execution completed!');
         } else if (status.status === 'failed') {
@@ -184,7 +333,9 @@ function Toolbar({
       }
     } catch (error) {
       console.error('Error polling execution status:', error);
-      setIsExecuting(false);
+      // Don't stop executing on poll error - WebSocket might still be working
+      // Retry after a longer delay
+      setTimeout(() => pollExecutionStatus(execId), 3000);
     }
   };
 
@@ -196,19 +347,31 @@ function Toolbar({
     }
   };
 
+  // Cleanup WebSocket subscription on unmount
+  const executionIdRef = useRef(executionId);
+  executionIdRef.current = executionId;
+  useEffect(() => {
+    return () => {
+      if (executionIdRef.current) {
+        workflowWebSocket.unsubscribeFromExecution(executionIdRef.current);
+      }
+    };
+  }, []);
+
   return (
-    <TooltipProvider>
-      <div className="flex items-center px-4 py-0 bg-background border-b border-border shadow-sm">
+    <TooltipProvider delayDuration={300}>
+      <div className="flex items-center gap-2 px-3 py-2 bg-background border-b border-border shadow-sm">
         {/* File Operations (Left) */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleSave}
+                className="h-8 w-8"
               >
-                <Save className="h-5 w-5" />
+                <Save className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Save Workflow</TooltipContent>
@@ -220,16 +383,19 @@ function Toolbar({
                 variant="ghost"
                 size="icon"
                 onClick={handleDownload}
+                className="h-8 w-8"
               >
-                <Download className="h-5 w-5" />
+                <Download className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Download Workflow</TooltipContent>
           </Tooltip>
         </div>
 
+        <Separator orientation="vertical" className="h-6" />
+
         {/* Execution Controls (Center) */}
-        <div className="flex-1 flex justify-center items-center gap-2">
+        <div className="flex-1 flex justify-center items-center gap-1.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -237,10 +403,14 @@ function Toolbar({
                 size="sm"
                 onClick={handleRun}
                 disabled={isExecuting}
-                className="gap-1"
+                className="gap-1.5 h-8 px-3"
               >
-                <Play className="h-2 w-2" />
-                {isExecuting ? 'Running' : 'Run'}
+                {isExecuting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                )}
+                {isExecuting ? 'Running...' : 'Run'}
               </Button>
             </TooltipTrigger>
             <TooltipContent>Run Workflow</TooltipContent>
@@ -249,13 +419,13 @@ function Toolbar({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={handleStop}
                 disabled={!isExecuting}
-                className="gap-1"
+                className="gap-1.5 h-8 px-3"
               >
-                <Square className="h-4 w-4" />
+                <Square className="h-3.5 w-3.5 fill-current" />
                 Stop
               </Button>
             </TooltipTrigger>
@@ -263,29 +433,32 @@ function Toolbar({
           </Tooltip>
 
           {executionStatus && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {executionStatus.status === 'running' && (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
-                  <span>
+            <>
+              <Separator orientation="vertical" className="h-5 mx-1" />
+              <div className="flex items-center gap-1.5">
+                {executionStatus.status === 'running' && (
+                  <Badge variant="outline" className="gap-1.5 bg-blue-500/5 text-blue-700 border-blue-500/20">
+                    <Loader2 className="h-3 w-3 animate-spin" />
                     {executionStatus.completed_nodes.length}/{executionStatus.total_nodes} nodes
-                  </span>
-                </>
-              )}
-              {executionStatus.status === 'completed' && (
-                <>
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>Completed</span>
-                </>
-              )}
-              {executionStatus.status === 'failed' && (
-                <>
-                  <AlertCircle className="h-4 w-4 text-red-500" />
-                  <span>Failed</span>
-                </>
-              )}
-            </div>
+                  </Badge>
+                )}
+                {executionStatus.status === 'completed' && (
+                  <Badge variant="outline" className="gap-1.5 bg-green-500/5 text-green-700 border-green-500/20">
+                    <CheckCircle className="h-3 w-3" />
+                    Completed
+                  </Badge>
+                )}
+                {executionStatus.status === 'failed' && (
+                  <Badge variant="outline" className="gap-1.5 bg-destructive/5 text-destructive border-destructive/20">
+                    <AlertCircle className="h-3 w-3" />
+                    Failed
+                  </Badge>
+                )}
+              </div>
+            </>
           )}
+
+          <Separator orientation="vertical" className="h-5 mx-1" />
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -293,8 +466,9 @@ function Toolbar({
                 variant="ghost"
                 size="icon"
                 onClick={handleReset}
+                className="h-8 w-8"
               >
-                <RotateCcw className="h-5 w-5" />
+                <RotateCcw className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Reset Workflow</TooltipContent>
@@ -306,47 +480,38 @@ function Toolbar({
                 variant="ghost"
                 size="icon"
                 onClick={onRefresh}
+                className="h-8 w-8"
               >
-                <RefreshCw className="h-5 w-5" />
+                <RefreshCw className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Refresh File</TooltipContent>
           </Tooltip>
         </div>
 
+        <Separator orientation="vertical" className="h-6" />
+
         {/* Flow Info (Right) */}
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Network className="h-4 w-4" />
-                <span>{nodes.length}</span>
-              </div>
+              <Badge variant="secondary" className="gap-1.5 cursor-default">
+                <Network className="h-3 w-3" />
+                {nodes.length}
+              </Badge>
             </TooltipTrigger>
             <TooltipContent>{nodes.length} nodes</TooltipContent>
           </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <GitBranch className="h-4 w-4" />
-                <span>{edges.length}</span>
-              </div>
+              <Badge variant="secondary" className="gap-1.5 cursor-default">
+                <GitBranch className="h-3 w-3" />
+                {edges.length}
+              </Badge>
             </TooltipTrigger>
             <TooltipContent>{edges.length} connections</TooltipContent>
           </Tooltip>
-
-          {/* {filePath && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <FileText className="h-4 w-4" />
-                  <span className="font-mono text-xs truncate max-w-[200px]">{filePath.split('/').pop()}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>{filePath}</TooltipContent>
-            </Tooltip>
-          )} */}
         </div>
       </div>
     </TooltipProvider>

@@ -39,13 +39,17 @@ type ToolbarItem = {
 interface ToolbarProps {
   /** Callback when a sidebar component is selected */
   onComponentChange: (component: React.ReactNode) => void
+  /** Whether the sidebar content panel is open */
+  sidebarOpen?: boolean
+  /** Toggle the sidebar content panel */
+  onToggleSidebar?: () => void
 }
 
 /**
  * Toolbar component that displays sidebar navigation items
  * Handles both sidebar components and page navigation
  */
-function Toolbar({ onComponentChange }: ToolbarProps) {
+function Toolbar({ onComponentChange, sidebarOpen, onToggleSidebar }: ToolbarProps) {
   const router = useRouter()
   const { user, isAuthenticated, token, logout } = useAuthStore()
 
@@ -138,13 +142,22 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
    * For page items: navigates to the corresponding route
    */
   const handleItemClick = (item: ToolbarItem) => {
-    setActiveItem(item.name)
-    
-    if (item.type === 'sidebar') {
-      onComponentChange(item.component())
-    } else {
+    if (item.type === 'page') {
       router.push(item.link)
+      return
     }
+
+    // If clicking the already-active item, toggle the sidebar
+    if (activeItem === item.name) {
+      if (onToggleSidebar) onToggleSidebar()
+      return
+    }
+
+    // Switching to a different item — set it active and open sidebar
+    setActiveItem(item.name)
+    onComponentChange(item.component())
+    // If sidebar is closed, open it to show the new component
+    if (!sidebarOpen && onToggleSidebar) onToggleSidebar()
   }
 
   // Load pinned items from localStorage on mount
@@ -204,7 +217,9 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
   }
 
   return (
-    <nav className="flex flex-col items-center gap-2 p-2 border-r h-full bg-background justify-between">
+    <nav
+      className="flex flex-col items-center gap-2 p-2 border-r h-full bg-background justify-between"
+    >
      <div className="flex flex-col items-center gap-2">
      {TOOLBAR_ITEMS.map((item) => {
         const isActive = activeItem === item.name
@@ -221,7 +236,11 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
                   isPinned && 'bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50'
                 )}
                 onClick={() => handleItemClick(item)}
-                title={`${item.name}${isPinned ? ' (Pinned)' : ''}`}
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  if (onToggleSidebar) onToggleSidebar()
+                }}
+                title={`${item.name}${isPinned ? ' (Pinned)' : ''}${onToggleSidebar ? ' (Double-click to toggle sidebar)' : ''}`}
                 aria-label={item.name}
                 aria-pressed={isActive}
               >
@@ -272,7 +291,7 @@ function Toolbar({ onComponentChange }: ToolbarProps) {
               <AvatarFallback>{getInitials()}</AvatarFallback>
             </Avatar>
             <div className="space-y-1 flex-1">
-              <h4 className="text-sm font-semibold">{user?.full_name || user?.username || 'Guest User'}</h4>
+              <h4 className="text-xs font-semibold">{user?.full_name || user?.username || 'Guest User'}</h4>
               <p className="text-xs text-muted-foreground">@{user?.username}</p>
               <p className="text-xs text-muted-foreground">{user?.email || ''}</p>
             </div>

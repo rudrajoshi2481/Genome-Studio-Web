@@ -162,7 +162,9 @@ class WorkflowManagerAPI {
       throw new Error(`Failed to get execution status: ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    // Backend returns { status: "success", execution_status: {...} }
+    return data.execution_status || data;
   }
 
   /**
@@ -218,10 +220,13 @@ class WorkflowManagerAPI {
 
   /**
    * Create WebSocket connection for real-time updates
+   * Note: Use WorkflowWebSocketService for full real-time streaming support.
+   * This method is kept for backward compatibility.
    */
   createWebSocketConnection(workflowId: string): WebSocket {
     const token = useAuthStore.getState().token;
-    const wsUrl = `${this.wsUrl}/ws/workflow-execution/${workflowId}${token ? `?token=${token}` : ''}`;
+    const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const wsUrl = `${this.wsUrl}/ws/${clientId}${token ? `?token=${token}` : ''}`;
     console.log('🔌 WorkflowManagerAPI: Creating WebSocket connection with auth token:', token ? 'Token included' : 'No token');
     return new WebSocket(wsUrl);
   }

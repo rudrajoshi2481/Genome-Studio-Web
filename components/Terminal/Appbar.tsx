@@ -113,6 +113,7 @@ function Appbar() {
   };
   
   return (
+    <TooltipProvider>
     <>
       <div className='flex justify-between border-b w-full p-1 pr-3'>
         <div className="flex-1 min-w-0 relative">
@@ -305,6 +306,7 @@ function Appbar() {
         </DialogContent>
       </Dialog>
     </>
+    </TooltipProvider>
   );
 }
 

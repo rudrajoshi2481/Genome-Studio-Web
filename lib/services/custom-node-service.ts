@@ -44,7 +44,7 @@ export interface CustomNode {
  * @param nodeData Node data to create
  * @returns Created custom node
  */
-export const createCustomNode = async (token: string, nodeData: Partial<CustomNodeData>): Promise<CustomNode> => {
+export const createCustomNode = async (token: string, nodeData: Partial<CustomNodeData> | Record<string, unknown>): Promise<CustomNode> => {
   try {
     console.log('Creating custom node:', nodeData);
     
@@ -52,10 +52,30 @@ export const createCustomNode = async (token: string, nodeData: Partial<CustomNo
       console.error('No authentication token provided');
       throw new Error('Authentication token is required');
     }
-    
+
+    // Normalize payload: backend expects { data: { title, source, ... }, tags, is_public }
+    // Some callers send flat data (title, source, inputs, outputs) — wrap it.
+    const raw = nodeData as Record<string, unknown>;
+    let payload: Record<string, unknown>;
+
+    if (raw.data && typeof raw.data === 'object') {
+      // Already nested (e.g. from DataTypeNode or sidebar CustomNode)
+      payload = raw;
+    } else {
+      // Flat structure from canvas CustomNode — wrap in { data: {...} }
+      payload = {
+        data: { ...raw },
+        tags: raw.tags || [],
+        is_public: raw.is_public || false,
+      };
+      // Remove fields that don't belong inside data
+      delete (payload.data as Record<string, unknown>).tags;
+      delete (payload.data as Record<string, unknown>).is_public;
+    }
+
     const fullUrl = `${API_URL}/workflow-manager/custom-nodes/`;
     console.log(`Making POST request to: ${fullUrl}`);
-    console.log('Node data:', JSON.stringify(nodeData, null, 2));
+    console.log('Normalized payload:', JSON.stringify(payload, null, 2));
     
     const response = await fetch(fullUrl, {
       method: 'POST',
@@ -64,7 +84,7 @@ export const createCustomNode = async (token: string, nodeData: Partial<CustomNo
         'Authorization': `Bearer ${token}`,
         'accept': 'application/json'
       },
-      body: JSON.stringify(nodeData)
+      body: JSON.stringify(payload)
     });
 
     console.log('API response status:', response.status);

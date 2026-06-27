@@ -328,47 +328,34 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
 
   loadFileTree: async (forceFresh = false) => {
     const { rootPath } = get();
-    console.log(`🌳 Loading file tree for root path: ${rootPath}`, { forceFresh });
     
     try {
-      // Use the API service with forceRefresh parameter
-      console.log('🌐 Fetching tree data via API service with forceRefresh:', forceFresh);
-      
       const treeResponse = await fileExplorerApi.getFileTree(rootPath, forceFresh);
       
       if (!treeResponse || !treeResponse.tree) {
         throw new Error('Invalid response from file tree API');
       }
       
-      console.log('🌳 File tree loaded successfully:', treeResponse);
-      console.log('📊 Tree stats - Files:', treeResponse.total_files, 'Directories:', treeResponse.total_directories);
-      
-      // Initialize tree using the new logic
       get().initializeTree(treeResponse.tree);
       
     } catch (error) {
-      console.error('❌ Failed to load file tree:', error);
+      console.error('Failed to load file tree:', error);
     }
   },
 
   initializeTree: (rootNode: FileNode) => {
     const state = get();
-    console.log('🌳 Initializing tree with root node:', rootNode.path);
     
     // Save expanded paths before clearing
     const savedExpandedPaths = [...state.expandedPaths];
-    console.log('💾 Saving expanded paths during tree init:', savedExpandedPaths);
     
     // Clear existing state but preserve expanded paths
     state.nodes.clear();
     state.selectedPaths = [];
-    // DON'T clear expandedPaths - keep them for refresh
     
-    // Build tree recursively and populate hash map (inspired by original FileExplorer)
+    // Build tree recursively and populate hash map
     const buildTreeFromNode = (node: FileNode, parentPath: string | null): void => {
-      // Skip Vim temporary files like '4913'
       if (isVimTempFile(node.path)) {
-        console.log(`Skipping Vim temporary file: ${node.path}`);
         return;
       }
       
@@ -393,23 +380,15 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     
     // Restore expanded paths or set initial if empty
     if (savedExpandedPaths.length > 0) {
-      // Restore saved expanded paths
       state.expandedPaths = savedExpandedPaths;
-      console.log('✓ Restored expanded paths:', savedExpandedPaths);
     } else {
-      // First load - expand root by default
       state.expandedPaths = [rootNode.path];
-      console.log('✓ Set initial expanded path:', rootNode.path);
     }
     
-    // Update state
     set({ 
       fileTree: rootNode,
       lastTreeUpdate: Date.now()
     });
-    
-    console.log(`🌳 Tree initialized with ${state.nodes.size} nodes`);
-    console.log(`📂 Expanded paths after init: ${state.expandedPaths.length} folders`);
   },
 
   toggleNode: (path: string) => {
@@ -631,6 +610,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     const { rootPath } = get();
     const token = getToken();
     const wsUrl = `ws://${host}:${port}/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`;
+    let treeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
     
     try {
       const ws = new WebSocket(wsUrl);
@@ -654,17 +634,17 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('📡 Received WebSocket message:', message);
           
           // Handle tree_change messages (bulk operations, file watcher events)
           if (message.type === 'tree_change') {
-            console.log('🌳 Tree change detected, refreshing...');
-            // Force refresh the tree to show changes
-            get().loadFileTree(undefined, true).then(() => {
-              console.log('✅ Tree refreshed after change');
-            }).catch((error: unknown) => {
-              console.error('❌ Failed to refresh tree:', error);
-            });
+            // Debounce tree refreshes — multiple events can arrive in quick succession
+            if (treeRefreshTimer) clearTimeout(treeRefreshTimer);
+            treeRefreshTimer = setTimeout(() => {
+              treeRefreshTimer = null;
+              get().loadFileTree(undefined, true).catch((error: unknown) => {
+                console.error('Failed to refresh tree:', error);
+              });
+            }, 300);
             return;
           }
           
@@ -674,7 +654,6 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
             
             // Check for duplicate events using timestamp and path
             if (state.lastProcessedEvents.has(eventKey)) {
-              console.log('🔄 Skipping duplicate WebSocket event:', eventKey);
               return;
             }
             
@@ -689,10 +668,6 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
             processedEvents.add(eventKey);
             set({ lastProcessedEvents: processedEvents });
             
-            console.log('📁 Processing file system change:', message);
-            console.log('🌳 BEFORE UPDATE - Current tree state:');
-            console.log('📊 Total nodes:', get().nodes.size);
-            console.log('🗂️ File tree:', JSON.stringify(get().fileTree, null, 2));
             
             get().updateTreeNode({
               change_type: message.change_type,
@@ -700,11 +675,6 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
               is_dir: message.is_dir,
               timestamp: message.timestamp
             });
-            
-            console.log('🌳 AFTER UPDATE - Updated tree state:');
-            console.log('📊 Total nodes:', get().nodes.size);
-            console.log('🗂️ File tree:', JSON.stringify(get().fileTree, null, 2));
-            console.log('✅ Tree update completed');
           }
         } catch (error) {
           console.error('❌ Error parsing WebSocket message:', error);
@@ -793,25 +763,13 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
 
   // Direct tree manipulation for real-time updates (inspired by original FileExplorer)
   updateTreeNode: (event: FileSystemChangeEvent) => {
-    console.log('🔥 === STARTING TREE UPDATE ===');
-    console.log('📝 Event details:', event);
-    
     const state = get();
     if (!state.fileTree) {
-      console.log('⚠️ No file tree to update, skipping direct update');
       return;
     }
 
-    console.log(`🌳 Direct tree update: ${event.change_type} - ${event.path} (isDir: ${event.is_dir})`);
-    console.log('📊 Current state before update:');
-    console.log('   - Total nodes in map:', state.nodes.size);
-    console.log('   - File tree root:', state.fileTree.path);
-    console.log('   - Selected paths:', state.selectedPaths);
-    console.log('   - Expanded paths:', state.expandedPaths);
-    
     // Skip Vim temporary files
     if (isVimTempFile(event.path)) {
-      console.log(`⏭️ Skipping Vim temporary file in tree update: ${event.path}`);
       return;
     }
     
@@ -819,30 +777,30 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     const updatedTree = JSON.parse(JSON.stringify(state.fileTree));
     let treeModified = false;
     
-    console.log('🔄 Processing change type:', event.change_type);
+    // Prepare state updates
+    let updatedSelectedPaths = state.selectedPaths;
+    let updatedExpandedPaths = state.expandedPaths;
+    let updatedActivePath = state.activePath;
+    const updatedNodes = new Map(state.nodes);
     
     if (event.change_type === 'deleted') {
       // Remove the node from the tree
       const removed = removeNodeFromTree(updatedTree, event.path);
       if (removed) {
-        console.log(`✅ Removed node from tree: ${event.path}`);
         treeModified = true;
         
-        // Clean up state
-        state.nodes.delete(event.path);
-        state.selectedPaths = state.selectedPaths.filter((path: string) => path !== event.path);
-        state.expandedPaths = state.expandedPaths.filter((path: string) => path !== event.path);
+        // Clean up state via new values (not direct mutation)
+        updatedNodes.delete(event.path);
+        updatedSelectedPaths = state.selectedPaths.filter((path: string) => path !== event.path);
+        updatedExpandedPaths = state.expandedPaths.filter((path: string) => path !== event.path);
         if (state.activePath === event.path) {
-          state.activePath = null;
+          updatedActivePath = null;
         }
-      } else {
-        console.log(`⚠️ Node not found in tree for removal: ${event.path}`);
       }
     } else if (event.change_type === 'created') {
       // Add the new node to the tree
       const added = addNodeToTree(updatedTree, event.path, event.is_dir);
       if (added) {
-        console.log(`✅ Added node to tree: ${event.path}`);
         treeModified = true;
         
         // Add to nodes map
@@ -863,43 +821,32 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
           active: false
         };
         
-        state.nodes.set(event.path, newNode);
-      } else {
-        console.log(`⚠️ Could not add node to tree: ${event.path}`);
+        updatedNodes.set(event.path, newNode);
       }
     } else if (event.change_type === 'modified') {
       // Update the node's metadata
       const updated = updateNodeInTree(updatedTree, event.path);
       if (updated) {
-        console.log(`✅ Updated node in tree: ${event.path}`);
         treeModified = true;
         
         // Update in nodes map
-        const node = state.nodes.get(event.path);
+        const node = updatedNodes.get(event.path);
         if (node) {
-          node.modified = event.timestamp;
+          updatedNodes.set(event.path, { ...node, modified: event.timestamp });
         }
       }
     }
     
-    // Update state if tree was modified
+    // Update state if tree was modified — use set() for all changes
     if (treeModified) {
-      console.log('💾 Applying tree changes to state...');
-      console.log('📊 Updated tree structure:', JSON.stringify(updatedTree, null, 2));
-      
       set({ 
         fileTree: updatedTree, 
+        nodes: updatedNodes,
+        selectedPaths: updatedSelectedPaths,
+        expandedPaths: updatedExpandedPaths,
+        activePath: updatedActivePath,
         lastTreeUpdate: Date.now()
       });
-      
-      console.log(`✅ Tree state updated successfully for ${event.change_type}: ${event.path}`);
-      console.log('📊 Final state after update:');
-      console.log('   - Total nodes in map:', get().nodes.size);
-      console.log('   - Last tree update:', get().lastTreeUpdate);
-      console.log('🔥 === TREE UPDATE COMPLETED ===');
-    } else {
-      console.log('⚠️ No tree modifications were made');
-      console.log('🔥 === TREE UPDATE SKIPPED ===');
     }
   },
 
@@ -1219,7 +1166,6 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
   },
 
   deleteItems: async (paths: string[]) => {
-    console.log('🗑️ Deleting items...', { paths });
     set({ isLoading: true, error: null });
     
     try {
@@ -1247,7 +1193,6 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
         // Close the matching tabs
         tabsToClose.forEach(tab => {
           tabStore.closeTab(tab.id);
-          console.log(`🗑️ Closed tab for deleted ${isDir ? 'directory' : 'file'}: ${tab.path}`);
         });
       }
       

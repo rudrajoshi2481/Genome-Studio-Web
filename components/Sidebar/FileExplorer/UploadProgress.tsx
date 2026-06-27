@@ -167,7 +167,7 @@ const UploadProgress: React.FC<UploadProgressProps> = ({
           >
             {expanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
           </button>
-          <div className="text-sm font-medium">
+          <div className="text-xs font-medium">
             Uploading: {filesCompleted}/{totalFiles} files
           </div>
         </div>

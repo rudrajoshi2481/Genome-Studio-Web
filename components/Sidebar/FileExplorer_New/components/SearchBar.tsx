@@ -162,7 +162,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             <PopoverContent className="w-80 p-4" align="end">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-sm">Search Filters</h4>
+                  <h4 className="font-medium text-xs">Search Filters</h4>
                   {hasActiveFilters && (
                     <Badge variant="secondary" className="text-xs">
                       {Object.values(filters).filter(v => 
@@ -177,7 +177,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 
                 {/* File types */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">File Types</Label>
+                  <Label className="text-xs font-medium">File Types</Label>
                   <div className="flex flex-wrap gap-2">
                     {['files', 'directories'].map((type) => (
                       <Button
@@ -205,7 +205,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
                 {/* File extensions */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Common Extensions</Label>
+                  <Label className="text-xs font-medium">Common Extensions</Label>
                   <div className="flex flex-wrap gap-1">
                     {['.js', '.ts', '.py', '.java', '.cpp', '.html', '.css', '.json', '.md', '.txt'].map((ext) => (
                       <Button
@@ -230,7 +230,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
                 {/* Search options */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Search Options</Label>
+                  <Label className="text-xs font-medium">Search Options</Label>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -238,7 +238,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                         checked={filters.include_content || false}
                         onCheckedChange={(checked) => handleFilterChange({ include_content: !!checked })}
                       />
-                      <Label htmlFor="include-content" className="text-sm font-normal">
+                      <Label htmlFor="include-content" className="text-xs font-normal">
                         Search file contents
                       </Label>
                     </div>
@@ -249,7 +249,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                         checked={filters.case_sensitive || false}
                         onCheckedChange={(checked) => handleFilterChange({ case_sensitive: !!checked })}
                       />
-                      <Label htmlFor="case-sensitive" className="text-sm font-normal">
+                      <Label htmlFor="case-sensitive" className="text-xs font-normal">
                         Case sensitive
                       </Label>
                     </div>
@@ -260,7 +260,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                         checked={filters.regex || false}
                         onCheckedChange={(checked) => handleFilterChange({ regex: !!checked })}
                       />
-                      <Label htmlFor="regex" className="text-sm font-normal">
+                      <Label htmlFor="regex" className="text-xs font-normal">
                         Regular expressions
                       </Label>
                     </div>
@@ -270,7 +270,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 {/* Max results */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Max Results</Label>
+                    <Label className="text-xs font-medium">Max Results</Label>
                     <Badge variant="outline" className="text-xs">
                       {filters.max_results}
                     </Badge>

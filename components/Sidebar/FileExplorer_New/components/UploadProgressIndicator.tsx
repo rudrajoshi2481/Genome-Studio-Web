@@ -111,7 +111,7 @@ export const UploadProgressIndicator: React.FC<UploadProgressIndicatorProps> = (
       <HoverCardContent side="right" align="start" className="w-72">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
+            <h4 className="text-xs font-semibold flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-green-600" />
               Uploading Files
             </h4>
@@ -133,7 +133,7 @@ export const UploadProgressIndicator: React.FC<UploadProgressIndicatorProps> = (
           {currentFile && (
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Current file:</p>
-              <p className="text-sm font-medium truncate" title={currentFile}>
+              <p className="text-xs font-medium truncate" title={currentFile}>
                 {currentFile}
               </p>
             </div>
@@ -143,13 +143,13 @@ export const UploadProgressIndicator: React.FC<UploadProgressIndicatorProps> = (
           <div className="grid grid-cols-2 gap-2 pt-2 border-t">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Speed</p>
-              <p className="text-sm font-medium text-green-600">
+              <p className="text-xs font-medium text-green-600">
                 {formatSpeed(speed)}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Time remaining</p>
-              <p className="text-sm font-medium">
+              <p className="text-xs font-medium">
                 {currentFile?.includes('Refreshing') 
                   ? 'Finishing...' 
                   : timeRemaining > 0 

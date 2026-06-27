@@ -116,7 +116,7 @@ export const AddWorkspaceFolderDialog: React.FC<AddWorkspaceFolderDialogProps> =
                 value={folderPath}
                 onChange={(e) => setFolderPath(e.target.value)}
                 disabled={isLoading}
-                className="font-mono text-sm"
+                className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
                 Enter the absolute path to the folder you want to add

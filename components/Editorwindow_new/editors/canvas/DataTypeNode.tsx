@@ -1,13 +1,13 @@
 "use client"
 
-import React, { useState, useLayoutEffect, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Pencil, Focus, Trash2, Copy, Save, Code } from 'lucide-react';
+import { Pencil, Focus, Trash2, Copy, Save, Code, Type, Hash, Braces, ToggleLeft, List as ListIcon } from 'lucide-react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -15,6 +15,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { createCustomNode } from '@/lib/services/custom-node-service';
@@ -108,42 +109,62 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
   }
 
   // Get icon for data type
-  function getDataTypeIcon(dataType: DataType): string {
+  function getDataTypeIcon(dataType: DataType): React.ComponentType<{ className?: string }> {
     switch (dataType) {
       case 'string':
-        return '📝';
+        return Type;
       case 'int':
-        return '🔢';
+        return Hash;
       case 'float':
-        return '🔢';
+        return Hash;
       case 'bool':
-        return '✓';
+        return ToggleLeft;
       case 'list':
-        return '📋';
+        return ListIcon;
       case 'dict':
-        return '📚';
+        return Braces;
       default:
-        return '📦';
+        return Type;
     }
   }
 
-  // Get color for data type (subtle header colors)
-  function getDataTypeColor(dataType: DataType): string {
+  // Get badge variant for data type
+  function getDataTypeBadgeClass(dataType: DataType): string {
     switch (dataType) {
       case 'string':
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-500/10 text-green-700 border-green-500/20';
       case 'int':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
       case 'float':
-        return 'bg-cyan-50 border-cyan-200';
+        return 'bg-cyan-500/10 text-cyan-700 border-cyan-500/20';
       case 'bool':
-        return 'bg-purple-50 border-purple-200';
+        return 'bg-purple-500/10 text-purple-700 border-purple-500/20';
       case 'list':
-        return 'bg-orange-50 border-orange-200';
+        return 'bg-orange-500/10 text-orange-700 border-orange-500/20';
       case 'dict':
-        return 'bg-pink-50 border-pink-200';
+        return 'bg-pink-500/10 text-pink-700 border-pink-500/20';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
+    }
+  }
+
+  // Get diagonal stripe pattern color for data type header
+  function getDataTypeStripeColor(dataType: DataType): string {
+    switch (dataType) {
+      case 'string':
+        return 'rgba(34, 197, 94, 0.12)';
+      case 'int':
+        return 'rgba(59, 130, 246, 0.12)';
+      case 'float':
+        return 'rgba(6, 182, 212, 0.12)';
+      case 'bool':
+        return 'rgba(168, 85, 247, 0.12)';
+      case 'list':
+        return 'rgba(249, 115, 22, 0.12)';
+      case 'dict':
+        return 'rgba(236, 72, 153, 0.12)';
+      default:
+        return 'rgba(107, 114, 128, 0.10)';
     }
   }
 
@@ -357,9 +378,9 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
             type="text"
             value={value}
             onChange={(e) => handleValueChange(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
             placeholder="Enter string..."
-            className="text-xs h-8"
+            className="h-9"
           />
         );
       
@@ -372,9 +393,9 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
               const val = e.target.value === '' ? 0 : parseInt(e.target.value);
               handleValueChange(isNaN(val) ? 0 : val);
             }}
-            onKeyDown={(e) => e.stopPropagation()}
-            placeholder="Enter integer..."
-            className="text-xs h-8"
+            onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
+            placeholder="0"
+            className="h-9"
             step="1"
           />
         );
@@ -388,22 +409,22 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
               const val = e.target.value === '' ? 0.0 : parseFloat(e.target.value);
               handleValueChange(isNaN(val) ? 0.0 : val);
             }}
-            onKeyDown={(e) => e.stopPropagation()}
-            placeholder="Enter float..."
-            className="text-xs h-8"
+            onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
+            placeholder="0.0"
+            className="h-9"
             step="0.1"
           />
         );
       
       case 'bool':
         return (
-          <div className="flex items-center space-x-2 py-2">
+          <div className="flex items-center gap-2.5 py-1">
             <Checkbox
               id={`bool-${id}`}
               checked={value}
               onCheckedChange={(checked) => handleValueChange(checked)}
             />
-            <Label htmlFor={`bool-${id}`} className="text-xs cursor-pointer">
+            <Label htmlFor={`bool-${id}`} className="text-sm cursor-pointer text-foreground">
               {value ? 'True' : 'False'}
             </Label>
           </div>
@@ -414,9 +435,9 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
           <Textarea
             value={value}
             onChange={(e) => handleValueChange(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
             placeholder='["item1", "item2"]'
-            className="text-xs min-h-[60px] font-mono"
+            className="min-h-[72px] font-mono text-sm"
           />
         );
       
@@ -425,9 +446,9 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
           <Textarea
             value={value}
             onChange={(e) => handleValueChange(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
             placeholder='{"key": "value"}'
-            className="text-xs min-h-[60px] font-mono"
+            className="min-h-[72px] font-mono text-sm"
           />
         );
       
@@ -437,13 +458,15 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
             type="text"
             value={value}
             onChange={(e) => handleValueChange(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
             placeholder="Enter value..."
-            className="text-xs h-8"
+            className="h-9"
           />
         );
     }
   };
+
+  const DataTypeIcon = getDataTypeIcon(nodeData.dataType);
 
   return (
     <ContextMenu>
@@ -451,31 +474,32 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         <div
           ref={nodeRef}
           className={cn(
-            "rounded-lg border shadow-md transition-all duration-200 bg-white",
-            selected ? "ring-2 ring-blue-500 shadow-lg" : "border-gray-200",
-            "min-w-[200px]"
+            "rounded-none border border-border shadow-md transition-all duration-200 bg-background overflow-visible",
+            selected && "ring-2 ring-primary shadow-lg",
+            "min-w-[220px]"
           )}
+          style={{ position: 'relative' }}
         >
         {/* Header */}
-        <div className={cn(
-          "px-3 py-2 border-b rounded-t-lg",
-          getDataTypeColor(nodeData.dataType)
-        )}>
-          <div className="flex items-center gap-2">
-            <span className="text-base">{getDataTypeIcon(nodeData.dataType)}</span>
-            <div className="flex-1">
-              <div className="text-[10px] font-medium text-gray-600 uppercase tracking-wide">
-                {nodeData.dataType}
-              </div>
+        <div 
+          className="bg-muted border-b border-border px-3 py-2 flex items-center justify-between relative overflow-hidden"
+          style={{
+            backgroundImage: `repeating-linear-gradient(135deg, transparent, transparent 6px, ${getDataTypeStripeColor(nodeData.dataType)} 6px, ${getDataTypeStripeColor(nodeData.dataType)} 12px)`,
+            backgroundSize: '200% 100%',
+          }}
+        >
+          <div className="flex items-center gap-2 flex-1 min-w-0 relative z-10">
+            <DataTypeIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="flex-1 min-w-0">
               {isEditingLabel ? (
-                <input
+                <Input
                   ref={labelInputRef}
                   type="text"
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   onBlur={handleLabelBlur}
                   onKeyDown={(e) => {
-                    e.stopPropagation();
+                    if (!(e.ctrlKey || e.metaKey)) e.stopPropagation();
                     if (e.key === 'Enter') {
                       const validation = isValidVariableName(label);
                       if (validation.valid) {
@@ -492,30 +516,39 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
                       setLabelError('');
                     }
                   }}
-                  className="text-xs font-medium text-gray-800 bg-white/80 border border-gray-300 rounded px-1 py-0.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  className="h-7 text-sm py-0 px-1.5"
                 />
               ) : (
                 <div 
-                  className="text-xs font-medium text-gray-800 flex items-center gap-1 cursor-pointer hover:text-blue-600 group"
+                  className="text-sm font-medium text-foreground flex items-center gap-1 cursor-pointer hover:text-primary transition-colors group truncate"
                   onClick={() => setIsEditingLabel(true)}
                 >
-                  {label}
-                  <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                  <span className="truncate">{label}</span>
+                  <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
                 </div>
               )}
             </div>
           </div>
+          <Badge 
+            variant="outline" 
+            className={cn("ml-2 shrink-0 relative z-10", getDataTypeBadgeClass(nodeData.dataType))}
+          >
+            {nodeData.dataType}
+          </Badge>
         </div>
 
         {/* Error Message */}
         {labelError && (
-          <div className="px-3 py-1 bg-red-50 border-t border-red-200">
-            <p className="text-xs text-red-600">{labelError}</p>
+          <div className="px-3 py-1.5 bg-destructive/5 border-b border-destructive/20">
+            <p className="text-xs text-destructive">{labelError}</p>
           </div>
         )}
 
         {/* Content */}
-        <div className="px-3 py-3 bg-white">
+        <div className="p-3">
+          <Label className="text-xs text-muted-foreground mb-1.5 block">
+            Value
+          </Label>
           {renderInput()}
         </div>
 
@@ -529,12 +562,16 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
             type="source"
             position={Position.Right}
             id="output"
-            className="w-2.5 h-2.5 !bg-blue-500 !border-2 !border-white rounded-full"
             style={{ 
               position: 'relative',
               left: 0,
               top: 0,
               transform: 'none',
+              background: '#5D688A',
+              width: 10,
+              height: 10,
+              border: '2px solid hsl(var(--background))',
+              boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.1)',
               cursor: 'crosshair'
             }}
           />

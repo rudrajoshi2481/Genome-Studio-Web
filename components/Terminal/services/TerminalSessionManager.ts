@@ -30,6 +30,7 @@ interface TerminalSession {
   buffer: string; // Store terminal output for persistence
   isAttached: boolean; // Track if terminal is currently attached to DOM
   dataHandler: ((data: string) => void) | null; // Track data handler for cleanup
+  reconnectAttempts: number; // Track reconnection attempts
 }
 
 class TerminalSessionManager {
@@ -119,7 +120,8 @@ class TerminalSessionManager {
         lastDimensions: { rows: 24, cols: 80 },
         buffer: '',
         isAttached: false,
-        dataHandler: null
+        dataHandler: null,
+        reconnectAttempts: 0
       };
 
       // Store terminal output for persistence
@@ -219,7 +221,7 @@ class TerminalSessionManager {
   /**
    * Connect WebSocket for a session
    */
-  async connectWebSocket(tabId: string, token: string, host: string, port: string, terminalType: string = 'tmux'): Promise<boolean> {
+  async connectWebSocket(tabId: string, token: string, host: string, port: string, terminalType: string = 'tmux', isReconnect = false): Promise<boolean> {
     const session = this.sessions.get(tabId);
     if (!session) return false;
 
@@ -232,8 +234,6 @@ class TerminalSessionManager {
 
     // Remove existing data handler to prevent duplicates
     if (session.dataHandler) {
-      // Note: XTerm doesn't provide a way to remove specific handlers,
-      // so we need to track and avoid adding multiple handlers
       session.dataHandler = null;
     }
 
@@ -247,21 +247,25 @@ class TerminalSessionManager {
         };
       }
       
-      const { rows, cols } = session.lastDimensions;
-      // Include tab_id and terminal_type in WebSocket URL for unique terminal instances
-      const wsUrl = `ws://${host}:${port}/api/v1/terminal/ws?token=${encodeURIComponent(token)}&rows=${rows}&cols=${cols}&tab_id=${encodeURIComponent(tabId)}&terminal_type=${encodeURIComponent(terminalType)}`;
+      const { rows: rawRows, cols: rawCols } = session.lastDimensions;
+      // Clamp to backend minimums (ge=10 for rows, ge=40 for cols) to avoid 422 rejection
+      const rows = Math.max(rawRows, 10);
+      const cols = Math.max(rawCols, 40);
+      // Use the browser's current hostname for WebSocket, falling back to config host
+      const wsHost = typeof window !== 'undefined' ? window.location.hostname : host;
+      const wsUrl = `ws://${wsHost}:${port}/api/v1/terminal/ws?token=${encodeURIComponent(token)}&rows=${rows}&cols=${cols}&tab_id=${encodeURIComponent(tabId)}&terminal_type=${encodeURIComponent(terminalType)}`;
       
       const ws = new WebSocket(wsUrl);
       
       return new Promise((resolve) => {
         ws.onopen = () => {
-          console.log(`Terminal WebSocket connected for tab ${tabId}`);
           session.websocket = ws;
           session.isConnected = true;
+          session.reconnectAttempts = 0;
           
-          // Don't clear terminal or show connection message - let it start clean
-          // session.terminal.clear();
-          // session.terminal.writeln('\x1b[32mTerminal connected successfully!\x1b[0m\r\n');
+          if (isReconnect && session.terminal && session.isAttached) {
+            session.terminal.writeln('\r\n\x1b[32mReconnected.\x1b[0m\r\n');
+          }
           
           resolve(true);
         };
@@ -273,18 +277,27 @@ class TerminalSessionManager {
         };
 
         ws.onclose = (event) => {
-          console.log(`Terminal WebSocket disconnected for tab ${tabId}, code: ${event.code}`);
           session.websocket = null;
           session.isConnected = false;
           
-          // Show disconnection message only for abnormal closures
-          if (event.code !== 1000 && session.terminal && session.isAttached) {
-            session.terminal.writeln('\r\n\x1b[33mConnection lost. Please refresh to reconnect.\x1b[0m\r\n');
+          // Attempt automatic reconnection for abnormal closures
+          if (event.code !== 1000 && session.reconnectAttempts < 3) {
+            session.reconnectAttempts++;
+            const delay = 2000 * session.reconnectAttempts;
+            
+            if (session.terminal && session.isAttached) {
+              session.terminal.writeln(`\r\n\x1b[33mReconnecting (attempt ${session.reconnectAttempts}/3)...\x1b[0m\r\n`);
+            }
+            
+            setTimeout(() => {
+              this.connectWebSocket(tabId, token, host, port, terminalType, true).catch(() => {});
+            }, delay);
+          } else if (event.code !== 1000 && session.terminal && session.isAttached) {
+            session.terminal.writeln('\r\n\x1b[31mConnection lost. Click refresh or restart the terminal to reconnect.\x1b[0m\r\n');
           }
         };
 
-        ws.onerror = (error) => {
-          console.error(`Terminal WebSocket error for tab ${tabId}:`, error);
+        ws.onerror = () => {
           session.websocket = null;
           session.isConnected = false;
           resolve(false);

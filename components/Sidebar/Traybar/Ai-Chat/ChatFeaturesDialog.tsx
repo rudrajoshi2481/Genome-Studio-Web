@@ -7,6 +7,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -16,9 +22,10 @@ import { Zap, Globe, Plus } from "lucide-react"
 
 interface ChatFeaturesDialogProps {
   children: React.ReactNode
+  tooltipText?: string
 }
 
-function ChatFeaturesDialog({ children }: ChatFeaturesDialogProps) {
+function ChatFeaturesDialog({ children, tooltipText = "Data sources & features" }: ChatFeaturesDialogProps) {
   const [databases, setDatabases] = useState({
     pubmed: true,
     uniprot: false,
@@ -76,8 +83,19 @@ function ChatFeaturesDialog({ children }: ChatFeaturesDialogProps) {
 
   return (
     <Dialog>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="min-w-[70vw] max-h-[80vh] overflow-y-auto">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              {children}
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            {tooltipText}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
             <Zap className="h-5 w-5 text-green-500" />
@@ -92,8 +110,8 @@ function ChatFeaturesDialog({ children }: ChatFeaturesDialogProps) {
         <div className="space-y-8">
           {/* Database Sources */}
           <section>
-            <h3 className="text-base font-semibold mb-2">Databases</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <h3 className="text-xs font-semibold mb-2">Databases</h3>
+            <p className="text-xs text-muted-foreground mb-4">
               Choose which scientific databases the AI can query.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -103,12 +121,12 @@ function ChatFeaturesDialog({ children }: ChatFeaturesDialogProps) {
                   <div
                     key={db.key}
                     className={`flex items-center justify-between p-3 rounded-lg border transition-all
-                      ${active ? "border-green-500 bg-green-50 shadow-sm" : "hover:border-muted-foreground/20 hover:shadow-sm"}`}
+                      ${active ? "border-green-500 bg-green-50 shadow-sm dark:border-green-800 dark:bg-green-950/30" : "hover:border-muted-foreground/20 hover:shadow-sm"}`}
                   >
                     <div className="flex items-center gap-3">
                       <img src={db.url} alt={db.name} className="h-6 w-6 object-contain rounded border bg-white" />
                       <div>
-                        <p className="font-medium text-sm">{db.name}</p>
+                        <p className="font-medium text-xs">{db.name}</p>
                         <p className="text-xs text-muted-foreground">{db.description}</p>
                       </div>
                     </div>
@@ -128,16 +146,16 @@ function ChatFeaturesDialog({ children }: ChatFeaturesDialogProps) {
 
           {/* Web Search */}
           <section>
-            <h3 className="text-base font-semibold mb-2 flex items-center gap-2">
+            <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
               <Globe className="h-4 w-4" />
               Web Search
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-xs text-muted-foreground mb-4">
               Allow AI to search the web for additional information.
             </p>
             <div
               className={`flex items-center justify-between p-3 rounded-lg border transition-all
-                ${webSearch ? "border-green-500 bg-green-50 shadow-sm" : "hover:border-muted-foreground/20 hover:shadow-sm"}`}
+                ${webSearch ? "border-green-500 bg-green-50 shadow-sm dark:border-green-800 dark:bg-green-950/30" : "hover:border-muted-foreground/20 hover:shadow-sm"}`}
             >
               <div>
                 <Label htmlFor="web-search" className="font-medium cursor-pointer">
@@ -160,11 +178,11 @@ function ChatFeaturesDialog({ children }: ChatFeaturesDialogProps) {
 
           {/* Features */}
           <section>
-            <h3 className="text-base font-semibold mb-2 flex items-center gap-2">
+            <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Additional Features
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-xs text-muted-foreground mb-4">
               Enhance AI capabilities with extra tools.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -174,7 +192,7 @@ function ChatFeaturesDialog({ children }: ChatFeaturesDialogProps) {
                   <div
                     key={feature.key}
                     className={`flex items-center justify-between p-3 rounded-lg border transition-all
-                      ${active ? "border-green-500 bg-green-50 shadow-sm" : "hover:border-muted-foreground/20 hover:shadow-sm"}`}
+                      ${active ? "border-green-500 bg-green-50 shadow-sm dark:border-green-800 dark:bg-green-950/30" : "hover:border-muted-foreground/20 hover:shadow-sm"}`}
                   >
                     <div>
                       <Label htmlFor={feature.key} className="font-medium cursor-pointer">

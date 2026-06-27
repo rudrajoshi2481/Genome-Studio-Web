@@ -1,141 +1,62 @@
 import React from 'react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Sparkles, Copy, Check } from 'lucide-react'
+import {
+  Message as AIMessageComponent,
+  MessageContent,
+  MessageResponse,
+  MessageActions,
+  MessageAction,
+} from '@/components/ai-elements/message'
 import { Badge } from '@/components/ui/badge'
-import { Bot } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Message } from './chatStore'
+import { Message as ChatMessage } from './chatStore'
 
 interface AIMessageProps {
-  message: Message
+  message: ChatMessage
 }
 
 function AIMessage({ message }: AIMessageProps) {
+  const [copied, setCopied] = React.useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
-    <div className="flex gap-3 px-4 py-3 group min-w-0 overflow-hidden hover:bg-muted/30 transition-colors">
-      {/* Minimal Avatar */}
-      <div className="flex-shrink-0 mt-1">
-        <div className="h-6 w-6 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-          <Bot className="h-3.5 w-3.5 text-white" />
+    <AIMessageComponent from="assistant" className="px-4 py-2">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary/80 to-primary/60 flex items-center justify-center">
+          <Sparkles className="h-3 w-3 text-primary-foreground" />
         </div>
+        <span className="text-xs font-medium text-foreground">Genome Studio AI</span>
+        {message.isStreaming && (
+          <Badge variant="secondary" className="text-[9px] px-1 py-0 animate-pulse">
+            streaming
+          </Badge>
+        )}
+        <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+          {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+          }) : ''}
+        </span>
       </div>
-
-      {/* Message Content */}
-      <div className="flex-1 min-w-0 overflow-hidden">
-        {/* Minimal Header */}
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-xs font-medium text-foreground">Genome Studio AI</span>
-          <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-            {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            }) : ''}
-          </span>
-        </div>
-
-        {/* Message content with markdown */}
-        <div className="min-w-0 overflow-hidden w-full">
-          <div className="prose prose-xs dark:prose-invert max-w-none w-full break-words">
-            <ReactMarkdown
-              components={{
-                code({ node, className, children, ...props }: any) {
-                  const match = /language-(\w+)/.exec(className || '');
-                  const inline = !match;
-                  
-                  return !inline ? (
-                    <SyntaxHighlighter
-                      style={oneDark as any}
-                      language={match[1]}
-                      PreTag="div"
-                      className="rounded-md !mt-2 !mb-2 overflow-x-auto max-w-full"
-                      customStyle={{
-                        fontSize: '0.75rem',
-                        lineHeight: '1.25',
-                        maxWidth: '100%',
-                        width: '100%',
-                        margin: 0,
-                        overflowWrap: 'break-word',
-                        wordBreak: 'break-word'
-                      }}
-                      {...props}
-                    >
-                      {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
-                  ) : (
-                    <code 
-                      className="bg-muted/70 px-1 py-0.5 rounded text-xs font-mono break-all" 
-                      {...props}
-                    >
-                      {children}
-                    </code>
-                  );
-                },
-                p: ({ children }) => (
-                  <p className="mb-1.5 last:mb-0 leading-relaxed text-xs text-justify break-words hyphens-auto">
-                    {children}
-                  </p>
-                ),
-                ul: ({ children }) => (
-                  <ul className="mb-1.5 last:mb-0 ml-3 space-y-0.5 text-xs">
-                    {children}
-                  </ul>
-                ),
-                ol: ({ children }) => (
-                  <ol className="mb-1.5 last:mb-0 ml-3 space-y-0.5 text-xs">
-                    {children}
-                  </ol>
-                ),
-                li: ({ children }) => (
-                  <li className="text-xs text-justify break-words hyphens-auto">
-                    {children}
-                  </li>
-                ),
-                h1: ({ children }) => (
-                  <h1 className="text-sm font-semibold mb-1.5 mt-2 first:mt-0 break-words">
-                    {children}
-                  </h1>
-                ),
-                h2: ({ children }) => (
-                  <h2 className="text-xs font-semibold mb-1.5 mt-2 first:mt-0 break-words">
-                    {children}
-                  </h2>
-                ),
-                h3: ({ children }) => (
-                  <h3 className="text-xs font-semibold mb-1 mt-1.5 first:mt-0 break-words">
-                    {children}
-                  </h3>
-                ),
-                blockquote: ({ children }) => (
-                  <blockquote className="border-l-2 border-muted-foreground/30 pl-2 italic mb-1.5 text-xs text-justify break-words hyphens-auto">
-                    {children}
-                  </blockquote>
-                ),
-                table: ({ children }) => (
-                  <div className="overflow-x-auto">
-                    <table className="text-xs border-collapse border border-muted min-w-full">
-                      {children}
-                    </table>
-                  </div>
-                ),
-                th: ({ children }) => (
-                  <th className="text-xs border border-muted px-2 py-1 bg-muted/50 text-left">
-                    {children}
-                  </th>
-                ),
-                td: ({ children }) => (
-                  <td className="text-xs border border-muted px-2 py-1 break-words">
-                    {children}
-                  </td>
-                ),
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
-          </div>
-        </div>
-      </div>
-    </div>
+      <MessageContent className="text-xs leading-relaxed whitespace-normal [&_h1]:text-xs [&_h1]:font-semibold [&_h1]:my-1 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:my-1 [&_h3]:text-xs [&_h3]:font-medium [&_h3]:my-0.5 [&_p]:text-xs [&_p]:my-1 [&_p]:leading-relaxed [&_ul]:text-xs [&_ul]:my-1 [&_ol]:text-xs [&_ol]:my-1 [&_li]:text-xs [&_li]:my-0.5 [&_code]:text-[11px] [&_pre]:text-[11px] [&_pre]:my-1 [&_pre]:rounded-md [&_pre]:p-2 [&_blockquote]:text-xs [&_blockquote]:my-1 [&_blockquote]:pl-2 [&_a]:text-xs [&_hr]:my-1 [&_table]:text-xs [&_th]:text-xs [&_td]:text-xs [&_td]:p-1">
+        <MessageResponse>{message.content}</MessageResponse>
+      </MessageContent>
+      {!message.isStreaming && message.content && (
+        <MessageActions className="mt-1">
+          <MessageAction
+            tooltip="Copy"
+            onClick={handleCopy}
+            size="icon-sm"
+          >
+            {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+          </MessageAction>
+        </MessageActions>
+      )}
+    </AIMessageComponent>
   )
 }
 

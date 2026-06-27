@@ -1,17 +1,13 @@
 "use client"
 
-import React, { useEffect, useState, useMemo } from 'react'
-import { FlipVertical2, RefreshCcw, Code2, Trash2, Edit, Copy, Search, Star, X, Filter, ChevronDown, ChevronUp } from 'lucide-react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
+import { RefreshCcw, Search, Star, X, Filter, ChevronDown, ChevronUp, ArrowDownUp, Folder, FolderOpen } from 'lucide-react'
 import CustomNode from './CustomNode/CustomNode'
+import NodeCard from './NodeCard'
 import { useAuthStore } from '@/lib/stores/auth-store'
+import { useDebounce } from '@/lib/hooks/useDebounce'
 import { fetchCustomNodes, deleteCustomNode, duplicateCustomNode, toggleFavoriteNode, getFavoriteNodes, CustomNode as CustomNodeType } from '@/lib/services/custom-node-service'
 import { toast } from 'sonner'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,10 +15,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+
+type SortOption = 'name' | 'date' | 'favorites'
+
+const NODES_PER_PAGE = 30
 
 
 function Nodebar() {
@@ -38,10 +45,15 @@ function Nodebar() {
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedSearchQuery = useDebounce(searchQuery, 200)
   const [favoriteNodes, setFavoriteNodes] = useState<Set<string>>(new Set())
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState('all')
   const [isTagsOpen, setIsTagsOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<SortOption>('name')
+  const [visibleCount, setVisibleCount] = useState(NODES_PER_PAGE)
+  const [isDataTypesOpen, setIsDataTypesOpen] = useState(false)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   // Ensure component only renders on client after hydration
   useEffect(() => {
@@ -262,13 +274,13 @@ function Nodebar() {
     
     let filtered = customNodes
     
-    // Filter by search query
-    if (searchQuery) {
+    // Filter by search query (debounced)
+    if (debouncedSearchQuery) {
       filtered = filtered.filter(node =>
-        (node as any).name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        node.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        node.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ((node as any).tags && (node as any).tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase())))
+        (node as any).name?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        node.title?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        node.description?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        ((node as any).tags && (node as any).tags.some((tag: string) => tag.toLowerCase().includes(debouncedSearchQuery.toLowerCase())))
       )
     }
     
@@ -284,8 +296,31 @@ function Nodebar() {
       )
     }
     
-    return filtered
-  }, [customNodes, searchQuery, activeTab, favoriteNodes, selectedTags, isMounted])
+    // Sort filtered nodes
+    const sorted = [...filtered]
+    switch (sortBy) {
+      case 'name':
+        sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+        break
+      case 'date':
+        sorted.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0).getTime()
+          const dateB = new Date(b.created_at || 0).getTime()
+          return dateB - dateA
+        })
+        break
+      case 'favorites':
+        sorted.sort((a, b) => {
+          const aFav = favoriteNodes.has(a.id.toString()) ? 0 : 1
+          const bFav = favoriteNodes.has(b.id.toString()) ? 0 : 1
+          if (aFav !== bFav) return aFav - bFav
+          return (a.title || '').localeCompare(b.title || '')
+        })
+        break
+    }
+    
+    return sorted
+  }, [customNodes, debouncedSearchQuery, activeTab, favoriteNodes, selectedTags, isMounted, sortBy])
   
   // Toggle tag selection
   const toggleTag = (tag: string) => {
@@ -300,18 +335,53 @@ function Nodebar() {
     })
   }
 
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(NODES_PER_PAGE)
+  }, [debouncedSearchQuery, activeTab, selectedTags, sortBy])
+
+  // Toggle group collapse
+  const toggleGroupCollapse = (group: string) => {
+    setCollapsedGroups(prev => {
+      const newGroups = new Set(prev)
+      if (newGroups.has(group)) {
+        newGroups.delete(group)
+      } else {
+        newGroups.add(group)
+      }
+      return newGroups
+    })
+  }
+
+  // Group filtered nodes by their first tag (or "Untagged")
+  const groupedNodes = useMemo(() => {
+    const groups: Record<string, CustomNodeType[]> = {}
+    filteredNodes.forEach(node => {
+      const nodeTags = (node as any).tags
+      const groupKey = (nodeTags && Array.isArray(nodeTags) && nodeTags.length > 0) ? nodeTags[0] : 'Untagged'
+      if (!groups[groupKey]) groups[groupKey] = []
+      groups[groupKey].push(node)
+    })
+    return groups
+  }, [filteredNodes])
+
+  // Paginated nodes for flat (non-grouped) view
+  const visibleNodes = useMemo(() => {
+    return filteredNodes.slice(0, visibleCount)
+  }, [filteredNodes, visibleCount])
+
   // Prevent hydration mismatch by not rendering until client-side
   if (!isClient) {
     return (
       <div className="h-[calc(100vh-56px)] flex flex-col border-r border-gray-200">
         <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-gray-50">
-          <h3 className="text-sm font-medium">Nodebar</h3>
+          <h3 className="text-xs font-medium">Nodebar</h3>
           <button className="p-1 rounded hover:bg-gray-200" disabled>
             <RefreshCcw className="w-4 h-4" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          <div className="text-center py-4 text-gray-500 text-sm">Loading...</div>
+          <div className="text-center py-4 text-gray-500 text-xs">Loading...</div>
         </div>
       </div>
     )
@@ -343,7 +413,7 @@ function Nodebar() {
       
       {/* Nodebar header with refresh button */}
       <div className="flex items-center justify-between px-3 py-2 border-b">
-        <h3 className="text-sm font-semibold">Nodebar</h3>
+        <h3 className="text-xs font-semibold">Nodebar</h3>
         <Button 
           variant="ghost"
           size="icon"
@@ -356,130 +426,144 @@ function Nodebar() {
         </Button>
       </div>
 
-      {/* Data Type Nodes Section */}
-      <div className="border-b border-gray-200 bg-gray-50">
-        <div className="p-2">
-          <h4 className="text-xs font-semibold text-gray-600 mb-2">DATA TYPES</h4>
-          <div className="grid grid-cols-2 gap-2">
-            {/* String Node */}
-            <div
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                  type: 'dataType',
-                  dataType: 'string',
-                  label: 'String'
-                }));
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              className="p-2 bg-green-100 border border-green-300 rounded cursor-move hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-1">
-                <span className="text-sm">📝</span>
-                <span className="text-xs font-medium">String</span>
+      {/* Data Type Nodes Section - Collapsible */}
+      <Collapsible open={isDataTypesOpen} onOpenChange={setIsDataTypesOpen} className="border-b border-gray-200 bg-gray-50">
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="w-full justify-between px-3 py-2 h-auto hover:bg-accent/50 rounded-none"
+          >
+            <h4 className="text-xs font-semibold text-gray-600">DATA TYPES</h4>
+            {isDataTypesOpen ? (
+              <ChevronUp className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="p-2 pt-0">
+            <div className="grid grid-cols-2 gap-2">
+              {/* String Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'string',
+                    label: 'String'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 bg-green-100 border border-green-300 rounded cursor-move hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">📝</span>
+                  <span className="text-xs font-medium">String</span>
+                </div>
               </div>
-            </div>
 
-            {/* Integer Node */}
-            <div
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                  type: 'dataType',
-                  dataType: 'int',
-                  label: 'Integer'
-                }));
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              className="p-2 bg-blue-100 border border-blue-300 rounded cursor-move hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-1">
-                <span className="text-sm">🔢</span>
-                <span className="text-xs font-medium">Integer</span>
+              {/* Integer Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'int',
+                    label: 'Integer'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 bg-blue-100 border border-blue-300 rounded cursor-move hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">🔢</span>
+                  <span className="text-xs font-medium">Integer</span>
+                </div>
               </div>
-            </div>
 
-            {/* Float Node */}
-            <div
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                  type: 'dataType',
-                  dataType: 'float',
-                  label: 'Float'
-                }));
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              className="p-2 bg-cyan-100 border border-cyan-300 rounded cursor-move hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-1">
-                <span className="text-sm">🔢</span>
-                <span className="text-xs font-medium">Float</span>
+              {/* Float Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'float',
+                    label: 'Float'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 bg-cyan-100 border border-cyan-300 rounded cursor-move hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">🔢</span>
+                  <span className="text-xs font-medium">Float</span>
+                </div>
               </div>
-            </div>
 
-            {/* Boolean Node */}
-            <div
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                  type: 'dataType',
-                  dataType: 'bool',
-                  label: 'Boolean'
-                }));
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              className="p-2 bg-purple-100 border border-purple-300 rounded cursor-move hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-1">
-                <span className="text-sm">✓</span>
-                <span className="text-xs font-medium">Boolean</span>
+              {/* Boolean Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'bool',
+                    label: 'Boolean'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 bg-purple-100 border border-purple-300 rounded cursor-move hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">✓</span>
+                  <span className="text-xs font-medium">Boolean</span>
+                </div>
               </div>
-            </div>
 
-            {/* List Node */}
-            <div
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                  type: 'dataType',
-                  dataType: 'list',
-                  label: 'List'
-                }));
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              className="p-2 bg-orange-100 border border-orange-300 rounded cursor-move hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-1">
-                <span className="text-sm">📋</span>
-                <span className="text-xs font-medium">List</span>
+              {/* List Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'list',
+                    label: 'List'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 bg-orange-100 border border-orange-300 rounded cursor-move hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">📋</span>
+                  <span className="text-xs font-medium">List</span>
+                </div>
               </div>
-            </div>
 
-            {/* Dictionary Node */}
-            <div
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                  type: 'dataType',
-                  dataType: 'dict',
-                  label: 'Dictionary'
-                }));
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              className="p-2 bg-pink-100 border border-pink-300 rounded cursor-move hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-1">
-                <span className="text-sm">📚</span>
-                <span className="text-xs font-medium">Dict</span>
+              {/* Dictionary Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'dict',
+                    label: 'Dictionary'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 bg-pink-100 border border-pink-300 rounded cursor-move hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">📚</span>
+                  <span className="text-xs font-medium">Dict</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
       
-      {/* Search Bar */}
-      <div className="p-3 border-b">
+      {/* Search Bar + Sort */}
+      <div className="p-3 border-b space-y-2">
         <div className="relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -498,6 +582,19 @@ function Nodebar() {
               <X className="h-3 w-3" />
             </Button>
           )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+            <SelectTrigger size="sm" className="h-7 text-xs flex-1">
+              <ArrowDownUp className="h-3 w-3 mr-1" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Sort by Name</SelectItem>
+              <SelectItem value="date">Sort by Date</SelectItem>
+              <SelectItem value="favorites">Sort by Favorites</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       
@@ -574,194 +671,143 @@ function Nodebar() {
             <TabsContent value="all" className="mt-0 px-3 pb-3">
               <div className="flex flex-col gap-2 mt-3">
                 {isLoading ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">Loading...</div>
+                  <div className="text-center py-8 text-muted-foreground text-xs">Loading...</div>
                 ) : filteredNodes.length > 0 ? (
-                  filteredNodes.map((node) => (
-                  <ContextMenu key={node.id || node.node_id}>
-                    <ContextMenuTrigger>
-                      <div
-                        className="relative flex items-center gap-2 px-3 py-2.5 border rounded-lg hover:bg-accent/50 group cursor-grab transition-colors"
-                        draggable
-                        onDragStart={(event) => {
-                          // Set the drag data with the custom node information
-                          console.log('🎯 Nodebar: Drag start:', node);
-                          event.dataTransfer.setData('application/reactflow', JSON.stringify(node));
-                          event.dataTransfer.effectAllowed = 'move';
-                        }}
-                      >
-                        <Code2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-1.5">
-                            <span className="text-sm font-medium break-words">{node.title}</span>
-                            {(node as any).tags && Array.isArray((node as any).tags) && (node as any).tags.length > 0 && (
-                              <Badge variant="secondary" className="text-[10px] h-4 px-1 shrink-0">
-                                {(node as any).tags[0]}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {node.description ? 
-                              (node.description.length > 35 ? 
-                                `${node.description.substring(0, 35)}...` : 
-                                node.description) : 
-                              `${node.language} function`}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleFavorite((node.id || node.node_id).toString())
-                          }}
-                        >
-                          <Star 
-                            className={`h-3.5 w-3.5 ${
-                              favoriteNodes.has((node.id || node.node_id).toString()) 
-                                ? 'fill-yellow-400 text-yellow-400' 
-                                : 'text-muted-foreground'
-                            }`} 
+                  <>
+                    {/* Result count */}
+                    <div className="text-[10px] text-muted-foreground px-1 pb-1">
+                      Showing {visibleNodes.length} of {filteredNodes.length} node{filteredNodes.length !== 1 ? 's' : ''}
+                    </div>
+                    {/* Grouped view when no search and multiple tags exist */}
+                    {!debouncedSearchQuery && selectedTags.size === 0 && Object.keys(groupedNodes).length > 1 ? (
+                      Object.keys(groupedNodes).sort().map(groupName => {
+                        const groupNodes = groupedNodes[groupName]
+                        const isCollapsed = collapsedGroups.has(groupName)
+                        return (
+                          <Collapsible key={groupName} open={!isCollapsed} onOpenChange={() => toggleGroupCollapse(groupName)}>
+                            <CollapsibleTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-between px-2 py-1.5 h-auto hover:bg-accent/50"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  {isCollapsed ? (
+                                    <Folder className="h-3.5 w-3.5 text-muted-foreground" />
+                                  ) : (
+                                    <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                                  )}
+                                  <span className="text-xs font-semibold">{groupName}</span>
+                                  <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                                    {groupNodes.length}
+                                  </Badge>
+                                </div>
+                                {isCollapsed ? (
+                                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                ) : (
+                                  <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="flex flex-col gap-2 pt-1">
+                                {groupNodes.map((node) => (
+                                  <NodeCard
+                                    key={node.id || node.node_id}
+                                    node={node}
+                                    isFavorite={favoriteNodes.has((node.id || node.node_id).toString())}
+                                    isDeleting={isDeleting}
+                                    onToggleFavorite={toggleFavorite}
+                                    onEdit={handleEditNode}
+                                    onDuplicate={handleDuplicateNode}
+                                    onDelete={handleDeleteNode}
+                                  />
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        )
+                      })
+                    ) : (
+                      <>
+                        {visibleNodes.map((node) => (
+                          <NodeCard
+                            key={node.id || node.node_id}
+                            node={node}
+                            isFavorite={favoriteNodes.has((node.id || node.node_id).toString())}
+                            isDeleting={isDeleting}
+                            onToggleFavorite={toggleFavorite}
+                            onEdit={handleEditNode}
+                            onDuplicate={handleDuplicateNode}
+                            onDelete={handleDeleteNode}
                           />
-                        </Button>
-                        {isDeleting === node.id?.toString() || isDeleting === node.node_id ? (
-                          <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
-                            <RefreshCcw className="h-4 w-4 animate-spin" />
-                          </div>
-                        ) : null}
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem 
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => handleEditNode(node)}
+                        ))}
+                        {visibleCount < filteredNodes.length && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-xs"
+                            onClick={() => setVisibleCount(prev => prev + NODES_PER_PAGE)}
+                          >
+                            Show more ({filteredNodes.length - visibleCount} remaining)
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-xs">
+                    {debouncedSearchQuery || selectedTags.size > 0 
+                      ? 'No nodes match your filters' 
+                      : 'No custom nodes found. Create one using the button above.'}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="favorites" className="mt-0 px-3 pb-3">
+              <div className="flex flex-col gap-2 mt-3">
+                {filteredNodes.length > 0 ? (
+                  <>
+                    <div className="text-[10px] text-muted-foreground px-1 pb-1">
+                      Showing {Math.min(visibleCount, filteredNodes.length)} of {filteredNodes.length} favorite node{filteredNodes.length !== 1 ? 's' : ''}
+                    </div>
+                    {visibleNodes.map((node) => (
+                      <NodeCard
+                        key={node.id || node.node_id}
+                        node={node}
+                        isFavorite={favoriteNodes.has((node.id || node.node_id).toString())}
+                        isDeleting={isDeleting}
+                        onToggleFavorite={toggleFavorite}
+                        onEdit={handleEditNode}
+                        onDuplicate={handleDuplicateNode}
+                        onDelete={handleDeleteNode}
+                      />
+                    ))}
+                    {visibleCount < filteredNodes.length && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => setVisibleCount(prev => prev + NODES_PER_PAGE)}
                       >
-                        <Edit className="w-4 h-4" />
-                        <span>Edit</span>
-                      </ContextMenuItem>
-                      <ContextMenuItem 
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => handleDuplicateNode(node.node_id || node.id)}
-                      >
-                        <Copy className="w-4 h-4" />
-                        <span>Duplicate</span>
-                      </ContextMenuItem>
-                      <ContextMenuItem 
-                        className="flex items-center gap-2 cursor-pointer text-red-500 focus:text-red-500"
-                        onClick={() => handleDeleteNode(node.node_id || node.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Delete</span>
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  {searchQuery || selectedTags.size > 0 
-                    ? 'No nodes match your filters' 
-                    : 'No custom nodes found. Create one using the button above.'}
-                </div>
-              )}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="favorites" className="mt-0 px-3 pb-3">
-            <div className="flex flex-col gap-2 mt-3">
-              {filteredNodes.length > 0 ? (
-                filteredNodes.map((node) => (
-                  <ContextMenu key={node.id || node.node_id}>
-                    <ContextMenuTrigger>
-                      <div
-                        className="relative flex items-center gap-2 px-3 py-2.5 border rounded-lg hover:bg-accent/50 group cursor-grab transition-colors"
-                        draggable
-                        onDragStart={(event) => {
-                          console.log('🎯 Nodebar: Drag start:', node);
-                          event.dataTransfer.setData('application/reactflow', JSON.stringify(node));
-                          event.dataTransfer.effectAllowed = 'move';
-                        }}
-                      >
-                        <Code2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-1.5">
-                            <span className="text-sm font-medium break-words">{node.title}</span>
-                            {(node as any).tags && Array.isArray((node as any).tags) && (node as any).tags.length > 0 && (
-                              <Badge variant="secondary" className="text-[10px] h-4 px-1 shrink-0">
-                                {(node as any).tags[0]}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {node.description ? 
-                              (node.description.length > 35 ? 
-                                `${node.description.substring(0, 35)}...` : 
-                                node.description) : 
-                              `${node.language} function`}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleFavorite((node.id || node.node_id).toString())
-                          }}
-                        >
-                          <Star 
-                            className={`h-3.5 w-3.5 ${
-                              favoriteNodes.has((node.id || node.node_id).toString()) 
-                                ? 'fill-yellow-400 text-yellow-400' 
-                                : 'text-muted-foreground'
-                            }`} 
-                          />
-                        </Button>
-                        {isDeleting === node.id?.toString() || isDeleting === node.node_id ? (
-                          <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
-                            <RefreshCcw className="h-4 w-4 animate-spin" />
-                          </div>
-                        ) : null}
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem 
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => handleEditNode(node)}
-                      >
-                        <Edit className="w-4 h-4" />
-                        <span>Edit</span>
-                      </ContextMenuItem>
-                      <ContextMenuItem 
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => handleDuplicateNode(node.node_id || node.id)}
-                      >
-                        <Copy className="w-4 h-4" />
-                        <span>Duplicate</span>
-                      </ContextMenuItem>
-                      <ContextMenuItem 
-                        className="flex items-center gap-2 cursor-pointer text-red-500 focus:text-red-500"
-                        onClick={() => handleDeleteNode(node.node_id || node.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Delete</span>
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  <Star className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                  <p>No favorite nodes yet</p>
-                  <p className="text-xs mt-1">Star nodes to add them here</p>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+                        Show more ({filteredNodes.length - visibleCount} remaining)
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-xs">
+                    <Star className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                    <p>No favorite nodes yet</p>
+                    <p className="text-xs mt-1">Star nodes to add them here</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
         
         {!isAuthenticated && (
-          <div className="text-center py-8 px-4 text-muted-foreground text-sm">
+          <div className="text-center py-8 px-4 text-muted-foreground text-xs">
             <p>Please log in to view your custom nodes.</p>
           </div>
         )}

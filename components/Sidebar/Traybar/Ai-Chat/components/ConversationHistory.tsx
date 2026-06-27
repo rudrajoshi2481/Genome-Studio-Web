@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Plus, MessageSquare, Clock, Zap } from 'lucide-react';
+import { Plus, MessageSquare, Clock, Zap, FlaskConical, Code2, BarChart3, Dna, ChevronDown, ChevronUp } from 'lucide-react';
 import { useChatStore, Conversation } from './chatStore';
+import { getApiBaseUrl } from '@/config/server';
 
 interface ConversationHistoryProps {
   onNewConversation: () => void;
@@ -15,16 +16,21 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
     conversations, 
     setCurrentConversation, 
     setConversations,
-    isLoading 
+    isLoading,
+    setLoading
   } = useChatStore();
 
+  const [showAll, setShowAll] = useState(false);
+
   useEffect(() => {
-    fetchConversations();
+    fetchConversations(false);
   }, []);
 
-  const fetchConversations = async () => {
+  const fetchConversations = async (fetchAll: boolean) => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/v1/ai-agent/conversations', {
+      const url = `${getApiBaseUrl()}/ai-chat/conversations${fetchAll ? '?all=true' : ''}`;
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -36,7 +42,15 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
       }
     } catch (error) {
       console.error('Failed to fetch conversations:', error);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleToggleShowAll = () => {
+    const next = !showAll;
+    setShowAll(next);
+    fetchConversations(next);
   };
 
   const handleConversationClick = (conversation: Conversation) => {
@@ -57,13 +71,13 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
   const getAgentIcon = (agentType: string) => {
     switch (agentType) {
       case 'research':
-        return '🔬';
+        return FlaskConical;
       case 'coding':
-        return '💻';
+        return Code2;
       case 'analysis':
-        return '📊';
+        return BarChart3;
       default:
-        return '🧬';
+        return Dna;
     }
   };
 
@@ -83,9 +97,9 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header with New Conversation Button */}
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">AI Conversations</h2>
+      <div className="p-3 border-b">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-semibold">AI Conversations</h2>
           <Button 
             onClick={onNewConversation}
             size="sm"
@@ -95,7 +109,7 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
             New Chat
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Continue your previous conversations or start a new one
         </p>
       </div>
@@ -110,8 +124,8 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
           ) : conversations.length === 0 ? (
             <div className="text-center py-8">
               <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-              <h3 className="text-sm font-medium mb-1">No conversations yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">
+              <h3 className="text-xs font-medium mb-1">No conversations yet</h3>
+              <p className="text-xs text-muted-foreground mb-4">
                 Start your first AI conversation
               </p>
               <Button onClick={onNewConversation} size="sm">
@@ -129,9 +143,9 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="text-lg">{getAgentIcon(conversation.agent_type)}</span>
+                      {(() => { const AgentIcon = getAgentIcon(conversation.agent_type); return <AgentIcon className="size-4 text-muted-foreground shrink-0" />; })()}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm truncate">
+                        <h3 className="font-medium text-xs truncate">
                           {conversation.title}
                         </h3>
                         <p className="text-xs text-muted-foreground">
@@ -165,6 +179,26 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
                 </CardContent>
               </Card>
             ))
+          )}
+          {conversations.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleShowAll}
+              className="w-full text-xs text-muted-foreground hover:text-foreground"
+            >
+              {showAll ? (
+                <>
+                  <ChevronUp className="size-3 mr-1" />
+                  Show Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="size-3 mr-1" />
+                  Show All
+                </>
+              )}
+            </Button>
           )}
         </div>
       </ScrollArea>

@@ -181,15 +181,15 @@ export const UploadDialog: React.FC<UploadDialogProps> = ({
               <Upload className="h-5 w-5" />
               Upload Files
             </DialogTitle>
-            <DialogDescription className="text-sm">
+            <DialogDescription className="text-xs">
               Select files or folders to upload to the target directory.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-hidden flex flex-col gap-4 min-h-0">
             <div className="space-y-2 shrink-0">
-              <Label className="text-sm font-medium">Target Directory</Label>
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border text-sm">
+              <Label className="text-xs font-medium">Target Directory</Label>
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border text-xs">
                 <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
                 <code className="font-mono truncate">
                   {targetPath}
@@ -217,7 +217,7 @@ export const UploadDialog: React.FC<UploadDialogProps> = ({
                   isDragOver ? "text-primary" : "text-muted-foreground"
                 )} />
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">
+                  <p className="text-xs font-medium">
                     {isDragOver ? "Drop here" : "Drag and drop files or folders"}
                   </p>
                   <p className="text-xs text-muted-foreground">or</p>
@@ -250,7 +250,7 @@ export const UploadDialog: React.FC<UploadDialogProps> = ({
             {selectedFiles.length > 0 && (
               <div className="flex-1 flex flex-col min-h-0 space-y-2">
                 <div className="flex items-center justify-between shrink-0">
-                  <Label className="text-sm font-medium">Selected Files</Label>
+                  <Label className="text-xs font-medium">Selected Files</Label>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="text-xs">
                       {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}
@@ -275,7 +275,7 @@ export const UploadDialog: React.FC<UploadDialogProps> = ({
                       <div className="flex items-center flex-1 min-w-0 gap-2">
                         <File className="h-4 w-4 text-muted-foreground shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm truncate">
+                          <p className="text-xs truncate">
                             {(file as any).webkitRelativePath || file.name}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -305,7 +305,7 @@ export const UploadDialog: React.FC<UploadDialogProps> = ({
             )}
 
             {selectedFiles.length === 0 && (
-              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+              <div className="flex items-center justify-center py-8 text-xs text-muted-foreground">
                 <AlertCircle className="h-4 w-4 mr-2" />
                 No files selected
               </div>

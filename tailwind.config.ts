@@ -10,8 +10,8 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-poppins)", "system-ui"],
-        serif: ["var(--font-garamond)", "Georgia"],
-        heading: ["var(--font-garamond)", "Georgia"],
+        serif: ["var(--font-poppins)", "system-ui"],
+        heading: ["var(--font-poppins)", "system-ui"],
       },
     },
   },
