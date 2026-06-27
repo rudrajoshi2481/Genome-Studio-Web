@@ -24,6 +24,13 @@ export interface WorkflowExecutionResponse {
   message: string;
 }
 
+export interface SingleNodeExecutionResponse {
+  status: string;
+  execution_id: string;
+  node_id: string;
+  message: string;
+}
+
 export interface WorkflowValidationResult {
   is_valid: boolean;
   errors: string[];
@@ -57,7 +64,16 @@ export interface NodeExecutionResult {
     source: string;
   }>;
   output_variables: Record<string, any>;
+  output_html?: Record<string, any>;
+  unified_outputs?: Array<{
+    type: string;
+    content: any;
+    order: number;
+    var_name?: string;
+    traceback?: string;
+  }>;
   error_message?: string;
+  error_traceback?: string;
 }
 
 class WorkflowManagerAPI {
@@ -120,9 +136,9 @@ class WorkflowManagerAPI {
   }
 
   /**
-   * Execute single node
+   * Execute single node (async — returns execution_id, stream via WebSocket)
    */
-  async executeSingleNode(request: SingleNodeExecutionRequest): Promise<NodeExecutionResult> {
+  async executeSingleNode(request: SingleNodeExecutionRequest): Promise<SingleNodeExecutionResponse> {
     console.log('🌐 WorkflowManagerAPI: executeSingleNode called');
     console.log('📤 WorkflowManagerAPI: Request payload:', JSON.stringify(request, null, 2));
     console.log('🔗 WorkflowManagerAPI: Request URL:', `${this.baseUrl}/execute-single-node`);

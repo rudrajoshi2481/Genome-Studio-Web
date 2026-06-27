@@ -1,9 +1,10 @@
 "use client"
 
 import React, { useMemo, useEffect, useRef, useState } from 'react';
-import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals, useReactFlow } from 'reactflow';
+import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals, useReactFlow, Node } from 'reactflow';
 import { cn } from "@/lib/utils" // Import cn from shadcn utils if available, or define it
 import { workflowManagerAPI } from '@/services/WorkflowManagerAPI';
+import { workflowWebSocket, LogStreamMessage, OutputStreamMessage, StatusUpdateMessage } from '@/services/WorkflowWebSocket';
 import { toast } from 'sonner';
 import TerminalOutput from '@/components/Sidebar/Nodebar/CustomNode/TerminalOutput';
 import { RichOutputViewer } from './RichOutputViewer';
@@ -197,7 +198,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     }
   }, [id, nodeData.inputs?.length, nodeData.outputs?.length, updateNodeInternals]);
 
-  // Handle single node execution
+  // Handle single node execution with WebSocket streaming
   const handleRunNode = async () => {
     if (!nodeData.filePath) {
       toast.error('No file path specified for node execution');
@@ -206,30 +207,147 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
 
     try {
       setIsExecuting(true);
+      // Clear old outputs immediately so user sees a reset node
+      setUnifiedOutputs([]);
+      setNodes((nds: Node[]) =>
+        nds.map((n: Node) => {
+          if (n.id !== id) return n;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              status: 'running',
+              logs: [],
+              output_html: {},
+              unified_outputs: [],
+              error_message: undefined,
+              error_traceback: undefined,
+            },
+          };
+        })
+      );
       toast.info(`Executing node: ${nodeData.title}`);
 
       const requestPayload = {
         file_path: nodeData.filePath,
         node_id: id
       };
-      
-      const result = await workflowManagerAPI.executeSingleNode(requestPayload);
 
-      if (result.status === 'completed') {
-        toast.success(`Node "${nodeData.title}" completed successfully`);
-        
-        if (onExecutionComplete) {
-          onExecutionComplete();
-        }
-      } else if (result.status === 'failed') {
-        toast.error(`Node "${nodeData.title}" failed: ${result.error_message}`);
-      } else {
-        console.warn('⚠️ CustomNode: Unexpected execution status:', result.status);
+      // Start execution — backend returns execution_id immediately
+      const result = await workflowManagerAPI.executeSingleNode(requestPayload);
+      const execId = result.execution_id;
+
+      // Subscribe to WebSocket for real-time streaming
+      let wsConnected = false;
+      let hasFinished = false;
+
+      workflowWebSocket.subscribeToExecution(execId, {
+        onConnect: () => {
+          wsConnected = true;
+        },
+        onLog: (msg: LogStreamMessage) => {
+          if (msg.node_id !== id) return;
+          // Append log to this node's data in real-time
+          setNodes((nds: Node[]) =>
+            nds.map((n: Node) => {
+              if (n.id !== id) return n;
+              const currentLogs = (n.data.logs as Array<Record<string, unknown>>) || [];
+              const currentOutputs = (n.data.unified_outputs as Array<Record<string, unknown>>) || [];
+              return {
+                ...n,
+                data: {
+                  ...n.data,
+                  logs: [...currentLogs, msg.log],
+                  unified_outputs: [...currentOutputs, { type: 'text', content: msg.log.message, order: currentOutputs.length }],
+                },
+              };
+            })
+          );
+        },
+        onOutput: (msg: OutputStreamMessage) => {
+          if (msg.node_id !== id) return;
+          // Append rich output to this node's data in real-time
+          setNodes((nds: Node[]) =>
+            nds.map((n: Node) => {
+              if (n.id !== id) return n;
+              const currentOutputs = (n.data.unified_outputs as Array<Record<string, unknown>>) || [];
+              const order = msg.output.order ?? currentOutputs.length;
+              const newOutput: Record<string, unknown> = {
+                type: msg.output.html ? 'rich' : 'text',
+                content: msg.output.html || msg.output.text || '',
+                order,
+              };
+              let dataUpdate: Record<string, unknown> = {
+                unified_outputs: [...currentOutputs, newOutput],
+              };
+              if (msg.output.html) {
+                const currentHtml = (n.data.output_html as Record<string, unknown>) || {};
+                dataUpdate.output_html = { ...currentHtml, [`output_${order}`]: msg.output.html };
+              }
+              return {
+                ...n,
+                data: { ...n.data, ...dataUpdate },
+              };
+            })
+          );
+        },
+        onStatus: (msg: StatusUpdateMessage) => {
+          // Handle terminal statuses (completed/failed) with node_id
+          if (msg.node_id === id && (msg.status === 'completed' || msg.status === 'failed')) {
+            if (hasFinished) return;
+            hasFinished = true;
+            setIsExecuting(false);
+
+            // Update node with final status and any result data from the message
+            setNodes((nds: Node[]) =>
+              nds.map((n: Node) => {
+                if (n.id !== id) return n;
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    status: msg.status,
+                    error_message: msg.error_message || undefined,
+                    error_traceback: msg.error_traceback || undefined,
+                    duration_seconds: (msg as unknown as Record<string, unknown>).duration_seconds as number | undefined,
+                    lastExecution: {
+                      timestamp: new Date().toISOString(),
+                      status: msg.status,
+                      duration_seconds: (msg as unknown as Record<string, unknown>).duration_seconds as number | undefined,
+                      output_variables: (msg as unknown as Record<string, unknown>).output_variables as Record<string, unknown> | undefined,
+                      output_html: (msg as unknown as Record<string, unknown>).output_html as Record<string, unknown> | undefined || {},
+                      unified_outputs: (msg as unknown as Record<string, unknown>).unified_outputs as Array<Record<string, unknown>> | undefined || n.data.unified_outputs || [],
+                      error_message: msg.error_message,
+                      error_traceback: msg.error_traceback,
+                    },
+                  },
+                };
+              })
+            );
+
+            if (msg.status === 'completed') {
+              toast.success(`Node "${nodeData.title}" completed successfully`);
+            } else {
+              toast.error(`Node "${nodeData.title}" failed: ${msg.error_message || 'Unknown error'}`);
+            }
+
+            // Unsubscribe from WebSocket
+            workflowWebSocket.unsubscribeFromExecution(execId);
+          }
+        },
+        onError: (error: Event) => {
+          console.error('CustomNode: WebSocket error:', error);
+        },
+      });
+
+      // Wait for WebSocket to connect (up to 2s)
+      const startTime = Date.now();
+      while (!wsConnected && Date.now() - startTime < 2000) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
     } catch (error) {
       toast.error(`Failed to execute node: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
       setIsExecuting(false);
     }
   };
@@ -283,7 +401,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     };
     
     // Add the duplicate to the canvas
-    setNodes((nds) => [...nds, duplicateNode]);
+    setNodes((nds: Node[]) => [...nds, duplicateNode]);
     
     toast.success(`Duplicated "${nodeData.title}"`);
   };
