@@ -15,7 +15,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Focus, Trash2, Copy, Save, Eye, Code, Lock, Unlock, ChevronRight, Terminal } from 'lucide-react';
+import { Focus, Trash2, Copy, Save, Eye, Code, Lock, Unlock, ChevronRight, Terminal, Square } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { createCustomNode } from '@/lib/services/custom-node-service';
@@ -131,6 +131,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   const [isExecuting, setIsExecuting] = useState(false);
   const [unifiedOutputs, setUnifiedOutputs] = useState<UnifiedOutput[]>([]);
   const [isLocked, setIsLocked] = useState(false); // Lock state: false = draggable, true = locked (no drag)
+  const executionIdRef = useRef<string | null>(null); // Track execution_id for stop functionality
   
   // Extract unified outputs from node data (combines logs + rich outputs + errors in execution order)
   useEffect(() => {
@@ -236,6 +237,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       // Start execution — backend returns execution_id immediately
       const result = await workflowManagerAPI.executeSingleNode(requestPayload);
       const execId = result.execution_id;
+      executionIdRef.current = execId;
 
       // Subscribe to WebSocket for real-time streaming
       let wsConnected = false;
@@ -351,6 +353,41 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       setIsExecuting(false);
     }
   };
+
+  // Handle stopping a running node execution
+  const handleStopNode = async () => {
+    const execId = executionIdRef.current;
+    if (!execId) {
+      toast.error('No active execution to stop');
+      return;
+    }
+
+    try {
+      await workflowManagerAPI.stopExecution(execId);
+      workflowWebSocket.unsubscribeFromExecution(execId);
+      executionIdRef.current = null;
+      setIsExecuting(false);
+
+      // Update node status to cancelled
+      setNodes((nds: Node[]) =>
+        nds.map((n: Node) => {
+          if (n.id !== id) return n;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              status: 'cancelled',
+            },
+          };
+        })
+      );
+
+      toast.success(`Stopped node "${nodeData.title}"`);
+    } catch (error) {
+      toast.error(`Failed to stop node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   // Context menu handlers
   const handleFocusNode = () => {
     // Focus on this node by centering it in the viewport
@@ -797,10 +834,11 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         )}
       </div>
       
-      {/* Run button at bottom */}
+      {/* Run/Stop buttons at bottom */}
       <div className="px-3 py-2 border-t border-border">
+        <div className="flex gap-2">
         <button 
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm py-1 px-3 rounded flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-sm py-1 px-3 rounded flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleRunNode}
           disabled={isExecuting}
         >
@@ -818,6 +856,16 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
             </>
           )}
         </button>
+        {isExecuting && (
+          <button
+            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm py-1 px-3 rounded flex items-center justify-center"
+            onClick={handleStopNode}
+          >
+            <Square className="h-3 w-3 mr-1 fill-current" />
+            Stop
+          </button>
+        )}
+        </div>
         
         {/* Unified Output section - Shows logs, rich outputs, and errors in execution order */}
         {unifiedOutputs && unifiedOutputs.length > 0 && (() => {
