@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useChatStore, type ChatMentionItem, type UploadedFile } from '../components/chatStore';
 import { wsService } from './wsService';
 import { useTabStore } from '@/components/FileTabs/useTabStore';
+import { getAllCanvasStates } from '@/components/Editorwindow_new/editors/canvas/canvasStateStore';
 
 export interface SendMessageOptions {
   mentions?: ChatMentionItem[];
@@ -26,6 +27,8 @@ export const useChatWebSocket = () => {
     currentConversationId,
     isNewChat,
     setTokenUsage,
+    setContextWindow,
+    setContextTokens,
     stopGeneration,
     setCurrentReasoningId,
   } = useChatStore();
@@ -470,6 +473,24 @@ export const useChatWebSocket = () => {
         case 'tool_execution_start':
           break;
         case 'canvas_update': {
+          // Handle open_flow action: open the file in the editor tab store
+          if (message.action === 'open_flow' && message.filePath) {
+            try {
+              const tabState = useTabStore.getState();
+              const filePath = message.filePath;
+              const fileName = filePath.split('/').pop() || 'workflow.flow';
+              // Check if tab already exists to avoid duplicates
+              const existingTab = tabState.getAllTabs().find(tab => tab.path === filePath);
+              if (!existingTab) {
+                const newTabId = tabState.addTab(filePath, fileName, '');
+                console.log('[AI Chat] Opened flow file in tab:', filePath, 'active:', newTabId ? 'yes' : 'no');
+              }
+            } catch (e) {
+              console.error('[AI Chat] Failed to open flow file:', e);
+            }
+            // Don't break — also dispatch canvasUpdateEvent so the Canvas
+            // component can react to the open_flow action if needed
+          }
           // Dispatch a custom window event that Canvas.tsx listens for
           // This allows gradual canvas updates without hard refreshes
           window.dispatchEvent(new CustomEvent('canvasUpdateEvent', {
@@ -542,31 +563,30 @@ export const useChatWebSocket = () => {
         }
         case 'tool_result':
         case 'tool_execution_complete': {
-          const resultMessages = sessionGetMessages();
-          const toolMsg = resultMessages.find(
-            m => (m.type === 'tool' || m.type === 'tool_code') && m.metadata?.toolMessageId === message.tool_message_id && m.isRunning
+          sessionUpdateMessages(msgs =>
+            msgs.map(m => {
+              if (
+                (m.type === 'tool' || m.type === 'tool_code') &&
+                m.metadata?.toolMessageId === message.tool_message_id &&
+                m.isRunning
+              ) {
+                return {
+                  ...m,
+                  isRunning: false,
+                  result: m.result || message.output || message.result || message.content || '',
+                  toolResult: {
+                    status: message.error ? 'error' : 'success',
+                    error: message.error || message.tool_result?.error,
+                  },
+                  metadata: {
+                    ...m.metadata,
+                    savedFiles: message.saved_files,
+                  },
+                };
+              }
+              return m;
+            })
           );
-          if (toolMsg) {
-            sessionUpdateMessages(msgs =>
-              msgs.map(m =>
-                m.id === toolMsg.id
-                  ? {
-                      ...m,
-                      isRunning: false,
-                      result: m.result || message.output || message.result || message.content || '',
-                      toolResult: {
-                        status: message.error ? 'error' : 'success',
-                        error: message.error || message.tool_result?.error,
-                      },
-                      metadata: {
-                        ...m.metadata,
-                        savedFiles: message.saved_files,
-                      },
-                    }
-                  : m
-              )
-            );
-          }
           if (message.saved_files && message.saved_files.length > 0) {
             const pendingFiles = message.saved_files.map((f: any) => ({
               id: `${f.file_id}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -580,6 +600,21 @@ export const useChatWebSocket = () => {
               additions: f.additions,
               deletions: f.deletions,
             }));
+            // Auto-load each saved file as a tab (not activated, so it
+            // doesn't disrupt the user's current view)
+            try {
+              const tabState = useTabStore.getState();
+              for (const f of message.saved_files) {
+                const fp = f.file_path as string;
+                if (!fp) continue;
+                const existing = tabState.getAllTabs().find(tab => tab.path === fp);
+                if (!existing) {
+                  tabState.addTab(fp, f.filename, '');
+                }
+              }
+            } catch (e) {
+              console.error('[AI Chat] Failed to auto-load file tabs:', e);
+            }
             if (isActiveSession || !msgSessionId) {
               useChatStore.getState().addPendingFiles(pendingFiles);
             } else {
@@ -595,7 +630,7 @@ export const useChatWebSocket = () => {
           // Safety net: if all tools done, finalize streaming/loading state
           {
             const postMessages = sessionGetMessages();
-            const stillRunning = postMessages.some(m => m.type === 'tool' && m.isRunning);
+            const stillRunning = postMessages.some(m => (m.type === 'tool' || m.type === 'tool_code') && m.isRunning);
             if (!stillRunning) {
               sessionUpdateMessages(msgs =>
                 msgs.map(m => {
@@ -708,6 +743,12 @@ export const useChatWebSocket = () => {
             cacheReadTokens: message.cache_read_tokens || 0,
             cacheWriteTokens: message.cache_write_tokens || 0,
           };
+          if (message.context_window) {
+            setContextWindow(message.context_window);
+          }
+          if (message.context_tokens !== undefined) {
+            setContextTokens(message.context_tokens);
+          }
           if (isActiveSession || !msgSessionId) {
             setTokenUsage(usage);
           } else {
@@ -768,6 +809,12 @@ export const useChatWebSocket = () => {
           break;
         case 'compaction':
         case 'reactive_compact':
+          if (message.context_window) {
+            setContextWindow(message.context_window);
+          }
+          if (message.context_tokens !== undefined) {
+            setContextTokens(message.context_tokens);
+          }
           sessionAddMessage({
             type: 'system',
             role: 'system',
@@ -974,6 +1021,41 @@ export const useChatWebSocket = () => {
         console.error('[AI Chat] Failed to collect open tabs:', e);
       }
 
+      // Collect live canvas state for any open .flow files so the backend
+      // agent gets the current (unsaved) nodes/edges instead of stale file data
+      let canvasState: Record<string, { nodes: any[]; edges: any[] }> | undefined;
+      try {
+        const allCanvasStates = getAllCanvasStates();
+        if (allCanvasStates.size > 0) {
+          canvasState = {};
+          for (const [flowPath, state] of allCanvasStates) {
+            // Only include flow files that are in open_tabs to avoid sending stale data
+            if (openTabs?.some(t => t.path === flowPath)) {
+              canvasState[flowPath] = {
+                nodes: state.nodes.map(n => ({
+                  id: n.id,
+                  type: n.type,
+                  position: n.position,
+                  data: n.data,
+                })),
+                edges: state.edges.map(e => ({
+                  id: e.id,
+                  source: e.source,
+                  target: e.target,
+                  sourceHandle: e.sourceHandle,
+                  targetHandle: e.targetHandle,
+                })),
+              };
+            }
+          }
+          if (Object.keys(canvasState).length === 0) {
+            canvasState = undefined;
+          }
+        }
+      } catch (e) {
+        console.error('[AI Chat] Failed to collect canvas state:', e);
+      }
+
       wsService.sendMessage({
         type: 'chat',
         content,
@@ -990,6 +1072,7 @@ export const useChatWebSocket = () => {
         root_path: activeRootPath,
         keep_intermediate_files: options?.keepIntermediateFiles,
         open_tabs: openTabs,
+        canvas_state: canvasState,
       });
 
       if (isNew) {
@@ -1068,6 +1151,13 @@ export const useChatWebSocket = () => {
     // Read fresh state to get correct session ID for this tab
     const state = useChatStore.getState();
     const sessionIdToSend = state.currentConversationId || state.activeSessionId || undefined;
+    // Show the command as a user message in the chat
+    const argsStr = commandArgs && commandArgs.length > 0 ? ' ' + commandArgs.join(' ') : '';
+    addMessage({
+      type: 'human',
+      role: 'user',
+      content: `/${command}${argsStr}`
+    });
     // Add a thinking message immediately so the PonderingIndicator shows
     addMessage({
       type: 'thinking',

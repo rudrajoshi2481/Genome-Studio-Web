@@ -40,18 +40,17 @@
   color: inherit !important;
 }
 
-/* 
-/* Add this to your global CSS file */
+/* Prevent node content from intercepting resize handle events */
 .react-flow__node.node-resizing {
   pointer-events: none;
 }
 
-.node-resizing .react-resizable-handle {
+.node-resizing .react-flow__resize-control {
   pointer-events: auto !important;
 }
 
 /* Make resize handles more visible */
-.react-resizable-handle {
+.react-flow__resize-control {
   background-color: rgba(0, 120, 255, 0.4);
   border-radius: 50%;
   width: 10px !important;
@@ -59,7 +58,7 @@
   z-index: 10;
 }
 
-.react-resizable-handle:hover {
+.react-flow__resize-control:hover {
   background-color: rgba(0, 120, 255, 0.7);
 }
 

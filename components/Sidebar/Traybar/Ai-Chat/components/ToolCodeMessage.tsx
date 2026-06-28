@@ -55,7 +55,7 @@ function ToolCodeMessage({ message, isLast, onStopCommand }: ToolCodeMessageProp
 
   return (
     <div className="px-3 mt-4 py-0.5 group/tool">
-      <Tool defaultOpen={true}>
+      <Tool defaultOpen={false}>
         <ToolHeader
           title={toolName}
           type="dynamic-tool"

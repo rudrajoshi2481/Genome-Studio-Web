@@ -47,6 +47,21 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
   const explanation = toolArgs?.explanation || "";
   const needsApproval = message.confirmation?.state === "approval-requested";
 
+  const filePathTools = ["read_file", "edit_file", "write_file", "list_directory", "grep_search", "glob_find", "notebook_edit", "lsp_tool"];
+  const filePath = filePathTools.includes(toolName)
+    ? toolArgs?.filepath || toolArgs?.path || toolArgs?.notebook_path || toolArgs?.file_path || ""
+    : "";
+
+  const canvasSubtitleTools: Record<string, (args: Record<string, any>) => string> = {
+    canvas_add_node: (a) => a.title || "",
+    canvas_add_edge: (a) => a.source_node_id && a.target_node_id ? `${a.source_node_id} → ${a.target_node_id}` : "",
+    canvas_remove_node: (a) => a.node_id || "",
+    canvas_remove_nodes: (a) => a.node_ids || "",
+    canvas_get_node_details: (a) => a.node_id || "",
+    canvas_search_nodes: (a) => a.query || "",
+  };
+  const canvasSubtitle = canvasSubtitleTools[toolName] ? canvasSubtitleTools[toolName](toolArgs) : "";
+
   const headerTitle = toolName;
 
   const [copied, setCopied] = useState(false);
@@ -91,7 +106,8 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
       <Tool defaultOpen={needsApproval}>
         <ToolHeader
           title={headerTitle}
-          command={isCommandTool ? command : undefined}
+          command={isCommandTool ? command : canvasSubtitle || undefined}
+          filePath={filePath || undefined}
           type="dynamic-tool"
           state={toolState as any}
           toolName={toolName}

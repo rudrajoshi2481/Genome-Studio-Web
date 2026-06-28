@@ -332,7 +332,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
             <>
               {messages.map((msg, idx) => renderMessage(msg, idx))}
               {isLoadingConvs && !messages.some(m => m.isStreaming) && !messages.some(m => m.type === 'thinking') && (() => {
-                const hasRunningTools = messages.some(m => m.type === 'tool' && m.isRunning);
+                const hasRunningTools = messages.some(m => (m.type === 'tool' || m.type === 'tool_code') && m.isRunning);
                 const spinnerMode: SpinnerMode = hasRunningTools ? 'tool-use' : 'requesting';
                 return (
                   <PonderingIndicator

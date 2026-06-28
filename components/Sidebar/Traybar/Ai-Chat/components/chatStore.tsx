@@ -151,6 +151,7 @@ interface ChatSession {
   isTemporary: boolean
   tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }
   contextWindow: number
+  contextTokens: number
   isLoading: boolean
   queuedMessages: QueueMessageItem[]
   queuedTodos: QueueTodoItem[]
@@ -180,6 +181,7 @@ interface ChatState {
   showConversationHistory: boolean
   tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }
   contextWindow: number
+  contextTokens: number
   queuedMessages: QueueMessageItem[]
   queuedTodos: QueueTodoItem[]
   mentions: ChatMentionItem[]
@@ -206,6 +208,7 @@ interface ChatState {
   updateReasoningMessage: (id: string, content: string, isStreaming?: boolean) => void
   setTokenUsage: (usage: { inputTokens: number; outputTokens: number; totalTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }) => void
   setContextWindow: (size: number) => void
+  setContextTokens: (tokens: number) => void
   addQueuedMessage: (message: QueueMessageItem) => void
   removeQueuedMessage: (id: string) => void
   updateQueuedMessage: (id: string, updates: Partial<QueueMessageItem>) => void
@@ -266,6 +269,7 @@ export const useChatStore = create<ChatState>()(
   showConversationHistory: true,
   tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
   contextWindow: 4096,
+  contextTokens: 0,
   queuedMessages: [],
   queuedTodos: [],
   mentions: [],
@@ -387,6 +391,9 @@ export const useChatStore = create<ChatState>()(
   setContextWindow: (size) =>
     set({ contextWindow: size }),
 
+  setContextTokens: (tokens) =>
+    set({ contextTokens: tokens }),
+
   addQueuedMessage: (message) =>
     set((state) => ({ queuedMessages: [...state.queuedMessages, message] })),
 
@@ -486,6 +493,7 @@ export const useChatStore = create<ChatState>()(
           pendingFiles: existing.pendingFiles || [],
           tokenUsage: existing.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
           contextWindow: existing.contextWindow || 4096,
+          contextTokens: existing.contextTokens || 0,
           isLoading: existing.isLoading || false,
           queuedMessages: existing.queuedMessages || [],
           queuedTodos: existing.queuedTodos || [],
@@ -503,7 +511,7 @@ export const useChatStore = create<ChatState>()(
       }
       const newSession: ChatSession = {
         id, title, messages: msgs || [], pendingFiles: [], isTemporary: id.startsWith('temp-'),
-        tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }, contextWindow: 4096, isLoading: false,
+        tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }, contextWindow: 4096, contextTokens: 0, isLoading: false,
         queuedMessages: [], queuedTodos: [], mentions: [], uploadedFiles: [], promptSuggestions: [],
         permissionMode: 'default' as 'default' | 'bypass' | 'always', allowedTools: [],
         currentStreamingMessageId: null, currentReasoningId: null, showFilePanel: false,
@@ -516,6 +524,7 @@ export const useChatStore = create<ChatState>()(
         pendingFiles: [],
         tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
         contextWindow: 4096,
+        contextTokens: 0,
         isLoading: false,
         queuedMessages: [],
         queuedTodos: [],
@@ -550,6 +559,7 @@ export const useChatStore = create<ChatState>()(
             pendingFiles: session.pendingFiles || [],
             tokenUsage: session.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
             contextWindow: session.contextWindow || 4096,
+            contextTokens: session.contextTokens || 0,
             isLoading: session.isLoading || false,
             queuedMessages: session.queuedMessages || [],
             queuedTodos: session.queuedTodos || [],
@@ -573,6 +583,7 @@ export const useChatStore = create<ChatState>()(
         pendingFiles: [] as PendingFile[],
         tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
         contextWindow: 4096,
+        contextTokens: 0,
         isLoading: false,
         queuedMessages: [] as QueueMessageItem[],
         queuedTodos: [] as QueueTodoItem[],
@@ -604,6 +615,7 @@ export const useChatStore = create<ChatState>()(
             pendingFiles: state.pendingFiles,
             tokenUsage: state.tokenUsage,
             contextWindow: state.contextWindow,
+            contextTokens: state.contextTokens,
             isLoading: state.isLoading,
             queuedMessages: state.queuedMessages,
             queuedTodos: state.queuedTodos,
@@ -629,6 +641,7 @@ export const useChatStore = create<ChatState>()(
       pendingFiles: targetSession?.pendingFiles || [],
       tokenUsage: targetSession?.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       contextWindow: targetSession?.contextWindow || 4096,
+      contextTokens: targetSession?.contextTokens || 0,
       isLoading: targetSession?.isLoading || false,
       queuedMessages: targetSession?.queuedMessages || [],
       queuedTodos: targetSession?.queuedTodos || [],
@@ -665,6 +678,7 @@ export const useChatStore = create<ChatState>()(
               pendingFiles: state.pendingFiles,
               tokenUsage: state.tokenUsage,
               contextWindow: state.contextWindow,
+              contextTokens: state.contextTokens,
               isLoading: state.isLoading,
               queuedMessages: state.queuedMessages,
               queuedTodos: state.queuedTodos,
@@ -792,6 +806,7 @@ export const useChatStore = create<ChatState>()(
             state.messages = activeSession.messages;
             state.tokenUsage = activeSession.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
             state.contextWindow = activeSession.contextWindow || 4096;
+            state.contextTokens = activeSession.contextTokens || 0;
             state.isLoading = false;
             state.currentConversationId = activeSession.currentConversationId ?? (state.activeSessionId.startsWith('temp-') ? null : state.activeSessionId);
             state.isNewChat = activeSession.isNewChat ?? state.activeSessionId.startsWith('temp-');

@@ -35,6 +35,7 @@ export type ToolPart = ToolUIPart | DynamicToolUIPart;
 export type ToolHeaderProps = {
   title?: string;
   command?: string;
+  filePath?: string;
   actions?: ReactNode;
   className?: string;
 } & (
@@ -77,6 +78,7 @@ export const ToolHeader = ({
   className,
   title,
   command,
+  filePath,
   actions,
   type,
   state,
@@ -85,6 +87,13 @@ export const ToolHeader = ({
 }: ToolHeaderProps) => {
   const derivedName =
     type === "dynamic-tool" ? toolName : type.split("-").slice(1).join("-");
+
+  const fileParts = filePath ? (() => {
+    const parts = filePath.split("/");
+    const name = parts[parts.length - 1] || filePath;
+    const dir = parts.slice(0, -1).join("/");
+    return { name, dir };
+  })() : null;
 
   return (
     <CollapsibleTrigger
@@ -99,6 +108,16 @@ export const ToolHeader = ({
         <span className="font-bold text-xs shrink-0">{title ?? derivedName}</span>
         {command && (
           <span className="font-mono text-xs text-muted-foreground truncate">{command}</span>
+        )}
+        {fileParts && (
+          <span className="flex items-center gap-0.5 min-w-0">
+            {fileParts.dir && (
+              <span dir="rtl" className="font-mono text-xs text-muted-foreground truncate min-w-0">
+                <span dir="ltr" className="inline-block">{fileParts.dir}/</span>
+              </span>
+            )}
+            <span className="font-mono text-xs text-foreground/70 truncate shrink-0">{fileParts.name}</span>
+          </span>
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">

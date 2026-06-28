@@ -26,18 +26,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import {
-  Context,
-  ContextTrigger,
-  ContextContent,
-  ContextContentHeader,
-  ContextContentBody,
-  ContextInputUsage,
-  ContextOutputUsage,
-  ContextReasoningUsage,
-  ContextCacheUsage,
-  ContextContentFooter,
-} from '@/components/ai-elements/context'
 import { getApiBaseUrl } from '@/config/server'
 import ChatMentionInput, { type ChatMention } from './components/ChatMentionInput'
 import { SlashCommandSuggestion, type SlashCommand } from './components/SlashCommandSuggestion'
@@ -50,6 +38,12 @@ interface OllamaModel {
   digest?: string
   modified_at?: string
   context_length?: number
+  capabilities?: {
+    context_length?: number
+    supports_tools?: boolean
+    supports_vision?: boolean
+    supports_reasoning?: boolean
+  }
 }
 
 interface OllamaModelsResponse {
@@ -93,6 +87,7 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
     isLoading: storeLoading,
     tokenUsage,
     contextWindow,
+    contextTokens,
     setContextWindow,
     addQueuedMessage,
     uploadedFiles,
@@ -182,8 +177,9 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
 
   useEffect(() => {
     const model = ollamaModels.find(m => m.name === selectedModel)
-    if (model?.context_length) {
-      setContextWindow(model.context_length)
+    const ctxLen = model?.context_length || model?.capabilities?.context_length
+    if (ctxLen) {
+      setContextWindow(ctxLen)
     }
   }, [selectedModel, ollamaModels, setContextWindow])
 
@@ -193,8 +189,9 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
       localStorage.setItem(SELECTED_MODEL_KEY, value)
     } catch {}
     const model = ollamaModels.find(m => m.name === value)
-    if (model?.context_length) {
-      setContextWindow(model.context_length)
+    const ctxLen = model?.context_length || model?.capabilities?.context_length
+    if (ctxLen) {
+      setContextWindow(ctxLen)
     }
   }
 
@@ -248,6 +245,8 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
         break
       case '/compact':
       case 'compact':
+      case '/compaction':
+      case 'compaction':
         if (onSendCommand) {
           onSendCommand('compact', [], selectedModel)
         }
@@ -262,7 +261,7 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
         break
       default:
         if (onSendCommand) {
-          onSendCommand(cmdName.replace(/^\//, ''), [], selectedModel)
+          onSendCommand(cmdName.replace(/^\/+/, ''), [], selectedModel)
         }
         clearInput()
         break
@@ -571,31 +570,9 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
           </PromptInputTools>
 
           <div className="flex items-center gap-1 shrink-0">
-            <Context
-              usedTokens={tokenUsage.totalTokens}
-              maxTokens={contextWindow}
-              usage={{
-                inputTokens: tokenUsage.inputTokens,
-                outputTokens: tokenUsage.outputTokens,
-                totalTokens: tokenUsage.totalTokens,
-                inputTokenDetails: {
-                  cacheReadTokens: tokenUsage.cacheReadTokens || 0,
-                  cacheWriteTokens: tokenUsage.cacheWriteTokens || 0,
-                  noCacheTokens: Math.max(0, tokenUsage.inputTokens - (tokenUsage.cacheReadTokens || 0) - (tokenUsage.cacheWriteTokens || 0)),
-                },
-                outputTokenDetails: { reasoningTokens: 0, textTokens: 0 },
-              }}
-              modelId={selectedModel}
-            >
-              <ContextTrigger className="h-7 px-2 text-xs gap-1.5" />
-              <ContextContent side="top" align="center">
-                <ContextContentHeader />
-                <ContextContentBody>
-                  <ContextInputUsage />
-                  <ContextOutputUsage />
-                </ContextContentBody>
-              </ContextContent>
-            </Context>
+            <span className="font-mono text-xs text-muted-foreground px-2">
+              {new Intl.NumberFormat("en-US", { notation: "compact" }).format(contextTokens || tokenUsage.totalTokens || 0)} / {new Intl.NumberFormat("en-US", { notation: "compact" }).format(contextWindow)}
+            </span>
 
             <Button
               size="sm"

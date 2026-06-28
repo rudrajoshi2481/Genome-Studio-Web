@@ -62,7 +62,7 @@ export const Context = ({
 const ContextIcon = () => {
   const { usedTokens, maxTokens } = useContextValue();
   const circumference = 2 * Math.PI * ICON_RADIUS;
-  const usedPercent = Math.min(usedTokens / maxTokens, 1);
+  const usedPercent = maxTokens > 0 ? Math.min(usedTokens / maxTokens, 1) : 0;
   const dashOffset = circumference * (1 - usedPercent);
 
   const color = usedPercent > 0.9 ? "#ef4444" : usedPercent > 0.7 ? "#f59e0b" : "#22c55e";
@@ -135,11 +135,7 @@ export const ContextContentHeader = ({
   ...props
 }: ContextContentHeaderProps) => {
   const { usedTokens, maxTokens } = useContextValue();
-  const usedPercent = usedTokens / maxTokens;
-  const displayPct = new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 1,
-    style: "percent",
-  }).format(usedPercent);
+  const usedPercent = maxTokens > 0 ? Math.min(usedTokens / maxTokens, 1) : 0;
   const used = new Intl.NumberFormat("en-US", {
     notation: "compact",
   }).format(usedTokens);
@@ -147,12 +143,22 @@ export const ContextContentHeader = ({
     notation: "compact",
   }).format(maxTokens);
 
+  const barColor = usedPercent > 0.9 ? "#ef4444" : usedPercent > 0.7 ? "#f59e0b" : "#22c55e";
+
   return (
     <div className={cn("w-full p-3", className)} {...props}>
       {children ?? (
-        <p className="font-mono text-xs text-muted-foreground text-center">
-          {used} / {total}
-        </p>
+        <div className="space-y-1.5">
+          <p className="font-mono text-xs text-muted-foreground text-center">
+            {used} / {total}
+          </p>
+          <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${usedPercent * 100}%`, backgroundColor: barColor }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

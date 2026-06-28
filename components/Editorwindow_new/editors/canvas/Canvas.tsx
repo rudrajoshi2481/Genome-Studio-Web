@@ -34,6 +34,7 @@ import {
   createEmptyFlow,
   isValidFlowFormat
 } from './utils/file-parser';
+import { setCanvasState } from './canvasStateStore';
 
 interface CanvasProps {
   tabId: string;
@@ -58,6 +59,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
   const [isInitialLoad, setIsInitialLoad] = useState(true); // Flag to prevent dirty on initial load
   const [savedViewport, setSavedViewport] = useState<{ x: number; y: number; zoom: number } | null>(null);
   const wasActiveRef = useRef(isActive); // Track previous active state
+  const wsNodesAddedRef = useRef(false); // Track if nodes were added via WebSocket while loading
   
   // Reset isInitialLoad when tab becomes active (e.g. switching back to a hidden tab)
   // ReactFlow recalculates dimensions when a hidden element becomes visible,
@@ -235,6 +237,8 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       const { action, node, edge, node_id } = detail;
 
       if (action === 'add_node' && node) {
+        // Track that nodes were added via WebSocket (prevents loadFileContent from overwriting)
+        wsNodesAddedRef.current = true;
         // Add the node with filePath for consistency
         const newNode = {
           ...node,
@@ -252,6 +256,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
         setDirty(tabId, true);
         updateTab(tabId, { isDirty: true });
       } else if (action === 'add_edge' && edge) {
+        wsNodesAddedRef.current = true;
         setEdges((eds) => {
           // Avoid duplicate edges
           if (eds.some((e) => e.id === edge.id)) return eds;
@@ -264,7 +269,35 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
         setEdges((eds) => eds.filter((e) => e.source !== node_id && e.target !== node_id));
         setDirty(tabId, true);
         updateTab(tabId, { isDirty: true });
+      } else if (action === 'edit_node' && detail.node_id && detail.updates) {
+        const editId = detail.node_id;
+        const updates = detail.updates;
+        setNodes((nds) =>
+          nds.map((n) => {
+            if (n.id !== editId) return n;
+            const updated = { ...n };
+            // Update position if provided
+            if (updates.position) {
+              updated.position = {
+                ...n.position,
+                ...(updates.position.x !== undefined ? { x: updates.position.x } : {}),
+                ...(updates.position.y !== undefined ? { y: updates.position.y } : {}),
+              };
+            }
+            // Update data fields
+            updated.data = { ...n.data };
+            for (const key of ['title', 'description', 'language', 'source_code', 'function_name', 'inputs', 'outputs', 'tags']) {
+              if (key in updates) {
+                updated.data[key] = updates[key];
+              }
+            }
+            return updated;
+          })
+        );
+        setDirty(tabId, true);
+        updateTab(tabId, { isDirty: true });
       } else if (action === 'clear') {
+        wsNodesAddedRef.current = false;
         setNodes([]);
         setEdges([]);
         setDirty(tabId, true);
@@ -278,6 +311,12 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
     };
   }, [filePath, tabId, setNodes, setEdges, setDirty, updateTab]);
 
+  // Sync live canvas state to the module-level store so the AI Chat
+  // WebSocket hook can send the current (unsaved) nodes/edges to the backend.
+  useEffect(() => {
+    setCanvasState(filePath, nodes, edges);
+  }, [filePath, nodes, edges]);
+
   // Load file content
   const loadFileContent = useCallback(async () => {
     if (!filePath) return;
@@ -287,7 +326,19 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       setError(null);
       setIsInitialLoad(true);
       
+      // Reset the WebSocket-added flag before loading
+      wsNodesAddedRef.current = false;
+      
       const fileContent = await editorAPI.getFileContent(filePath);
+      
+      // If nodes were added via WebSocket while we were loading the file,
+      // skip overwriting the canvas state — the live WebSocket nodes take priority
+      if (wsNodesAddedRef.current) {
+        console.log('Canvas: Skipping file load overwrite — nodes were added via WebSocket during load');
+        setIsLoading(false);
+        setIsInitialLoad(false);
+        return;
+      }
       
       // Parse workflow content using the new file parser
       if (fileContent.content) {
