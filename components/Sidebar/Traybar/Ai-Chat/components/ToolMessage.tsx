@@ -1,102 +1,279 @@
-import React from 'react'
+"use client";
+
+import React, { useState, useCallback } from "react";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
+  Terminal,
+  TerminalHeader,
+  TerminalTitle,
+  TerminalStatus,
+  TerminalActions,
+  TerminalCopyButton,
+  TerminalContent,
+} from "@/components/ai-elements/terminal";
 import {
-  Terminal as TerminalIcon,
-  FileEdit,
-  Wrench,
-  ChevronDown,
-  CheckCircle2,
-  Loader2,
-  AlertCircle,
-} from 'lucide-react'
-import { Message } from './chatStore'
+  Tool,
+  ToolHeader,
+  ToolContent,
+  ToolInput,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
+import {
+  Sources,
+  SourcesTrigger,
+  SourcesContent,
+  Source,
+} from "@/components/ai-elements/sources";
+import { Check, X, ChevronDown, Zap, ShieldCheck, CheckCircle2, Copy, Square } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Message } from "./chatStore";
 
 interface ToolMessageProps {
-  message: Message
+  message: Message;
+  isLast?: boolean;
+  onStopCommand?: (toolMessageId: string) => void;
+  onApprove?: (id: string, approvalMode?: 'once' | 'always' | 'yolo') => void;
+  onReject?: (id: string) => void;
 }
 
-function ToolMessage({ message }: ToolMessageProps) {
-  const toolName = message.metadata?.toolName || message.toolName || 'tool'
-  const toolArgs = message.metadata?.toolArgs || {}
-  const isRunning = message.isRunning
-  const rawOutput = message.result || ''
-  const hasError = message.toolResult?.error
+function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: ToolMessageProps) {
+  const toolName = message.metadata?.toolName || message.toolName || "tool";
+  const toolArgs = message.metadata?.toolArgs || {};
+  const isRunning = message.isRunning;
+  const rawOutput = message.result || "";
+  const hasError = message.toolResult?.error;
 
-  const isCommandTool = toolName === 'run_command'
-  const command = toolArgs?.command || ''
-  const explanation = toolArgs?.explanation || ''
+  const isCommandTool = toolName === "run_command";
+  const isWebSearch = toolName === "web_search" || toolName === "web_fetch";
+  const command = toolArgs?.command || "";
+  const explanation = toolArgs?.explanation || "";
+  const needsApproval = message.confirmation?.state === "approval-requested";
 
-  const getIcon = () => {
-    if (isCommandTool) return TerminalIcon
-    if (toolName === 'file_edit') return FileEdit
-    return Wrench
+  const [copied, setCopied] = useState(false);
+
+  const toolState = isRunning
+    ? "input-available"
+    : hasError
+      ? "output-error"
+      : "output-available";
+
+  const parseSearchResults = (output: string): Array<{ href: string; title: string }> => {
+    const results: Array<{ href: string; title: string }> = [];
+    for (const line of output.split("\n")) {
+      const match = line.match(/^-\s*(.+?):\s*(https?:\/\/.+)$/);
+      if (match) {
+        results.push({ title: match[1].trim(), href: match[2].trim() });
+      }
+    }
+    return results;
+  };
+
+  const handleTerminalCopy = useCallback(() => {
+    console.log("Terminal output copied");
+  }, []);
+
+  const handleTerminalClear = useCallback(() => {
+    console.log("Terminal cleared");
+  }, []);
+
+  const handleCopyOutput = useCallback(() => {
+    const textToCopy = rawOutput || message.content || "";
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [rawOutput, message.content]);
+
+  const isToolComplete = !isRunning && !needsApproval && (rawOutput || hasError);
+
+  // --- Terminal rendering for run_command ---
+  if (isCommandTool) {
+    return (
+      <div className="px-3 py-0.5 group/tool">
+        {explanation && (
+          <p className="text-xs text-foreground mb-1 leading-relaxed">{explanation}</p>
+        )}
+        <Terminal
+          autoScroll={true}
+          isStreaming={isRunning}
+          onClear={handleTerminalClear}
+          output={rawOutput || (isRunning ? "" : "(no output)")}
+          className="max-h-64"
+        >
+          <TerminalHeader>
+            <TerminalTitle>{command || "Terminal"}</TerminalTitle>
+            <div className="flex items-center gap-1">
+              <TerminalStatus />
+              <TerminalActions>
+                {isRunning && onStopCommand && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => onStopCommand(message.metadata?.toolMessageId || message.id)}
+                    title="Stop command"
+                  >
+                    <Square className="size-2.5" />
+                  </Button>
+                )}
+                <TerminalCopyButton onCopy={handleTerminalCopy} />
+              </TerminalActions>
+            </div>
+          </TerminalHeader>
+          <TerminalContent />
+        </Terminal>
+        {isLast && isToolComplete && (
+          <div className="flex items-center gap-0.5 mt-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+              onClick={handleCopyOutput}
+            >
+              {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
   }
 
-  const Icon = getIcon()
+  // --- Sources rendering for web_search ---
+  const searchResults = isWebSearch && rawOutput ? parseSearchResults(rawOutput) : [];
 
-  const statusBadge = isRunning ? (
-    <Loader2 className="size-3 animate-spin text-muted-foreground" />
-  ) : hasError ? (
-    <AlertCircle className="size-3 text-red-600" />
-  ) : (
-    <CheckCircle2 className="size-3 text-green-600" />
-  )
-
+  // --- Generic tool rendering using ai-elements Tool ---
   return (
-    <div className="px-3 py-0.5">
+    <div className="px-3 py-0.5 group/tool">
       {explanation && (
-        <p className="text-xs text-muted-foreground mb-1.5 leading-relaxed">{explanation}</p>
+        <p className="text-xs text-foreground mb-1 leading-relaxed">{explanation}</p>
       )}
-      <Collapsible defaultOpen={isRunning} className="group not-prose mb-2 w-full rounded-md border">
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 p-2">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-            <div className="flex flex-col min-w-0 flex-1">
-              {isCommandTool && command ? (
-                <span className="font-mono text-xs truncate">{command}</span>
-              ) : (
-                <span className="font-medium text-xs">
-                  {toolName === 'file_edit' ? 'File Edit' : toolName}
-                </span>
-              )}
-            </div>
-            {statusBadge}
-          </div>
-          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 space-y-2 p-2.5 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in">
-          {isCommandTool && rawOutput ? (
-            <div className="flex flex-col overflow-hidden rounded-md border bg-zinc-950 text-zinc-100 max-h-48">
-              <div className="flex items-center justify-between border-b border-zinc-800 px-2.5 py-1.5">
-                <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <TerminalIcon className="size-3" />
-                  Output
-                </div>
-              </div>
-              <div className="max-h-48 overflow-auto p-2.5 font-mono text-xs leading-relaxed">
-                <pre className="whitespace-pre-wrap break-words">
-                  <code>{rawOutput}</code>
-                </pre>
-              </div>
-            </div>
-          ) : rawOutput ? (
-            <div className="rounded-md bg-muted/50 p-2 text-[11px]">
-              {hasError && (
-                <p className="text-destructive mb-1.5">{hasError}</p>
-              )}
-              <pre className="whitespace-pre-wrap break-words font-mono">
-                {rawOutput}
-              </pre>
-            </div>
-          ) : null}
-        </CollapsibleContent>
-      </Collapsible>
+      <Tool defaultOpen={needsApproval}>
+        <ToolHeader
+          title={toolName}
+          type="dynamic-tool"
+          state={toolState as any}
+          toolName={toolName}
+        />
+        <ToolContent className="space-y-2">
+          {Object.keys(toolArgs).length > 0 && (
+            <ToolInput input={toolArgs} />
+          )}
+          {rawOutput && (
+            <ToolOutput
+              output={rawOutput}
+              errorText={hasError || undefined}
+            />
+          )}
+          {searchResults.length > 0 && (
+            <Sources>
+              <SourcesTrigger count={searchResults.length} />
+              <SourcesContent>
+                {searchResults.map((source, idx) => (
+                  <Source
+                    key={`${source.href}-${idx}`}
+                    href={source.href}
+                    title={source.title}
+                  />
+                ))}
+              </SourcesContent>
+            </Sources>
+          )}
+        </ToolContent>
+      </Tool>
+      {needsApproval && (
+        <ApprovalButtons messageId={message.id} onApprove={onApprove} onReject={onReject} />
+      )}
+      {isLast && isToolComplete && (
+        <div className="flex items-center gap-0.5 mt-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+            onClick={handleCopyOutput}
+          >
+            {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
+          </Button>
+        </div>
+      )}
     </div>
-  )
+  );
 }
 
-export default ToolMessage
+function ApprovalButtons({ messageId, onApprove, onReject }: {
+  messageId: string;
+  onApprove?: (id: string, approvalMode?: 'once' | 'always' | 'yolo') => void;
+  onReject?: (id: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 pt-1.5">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-6 text-xs gap-1"
+        onClick={() => onReject?.(messageId)}
+      >
+        <X className="size-2.5" />
+        Decline
+      </Button>
+      <div className="flex items-center">
+        <Button
+          size="sm"
+          className="h-6 text-xs gap-1 rounded-r-none"
+          onClick={() => onApprove?.(messageId, 'once')}
+        >
+          <Check className="size-2.5" />
+          Accept
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              className="h-6 w-6 p-0 rounded-l-none border-l border-primary-foreground/20"
+              aria-label="More approval options"
+            >
+              <ChevronDown className="size-2.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => onApprove?.(messageId, 'once')}>
+                <CheckCircle2 className="size-3.5" />
+                <div className="flex flex-col">
+                  <span className="font-medium">Just once</span>
+                  <span className="text-[10px] text-muted-foreground">Ask again next time</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onApprove?.(messageId, 'always')}>
+                <ShieldCheck className="size-3.5" />
+                <div className="flex flex-col">
+                  <span className="font-medium">Always allow</span>
+                  <span className="text-[10px] text-muted-foreground">Auto-approve this tool</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => onApprove?.(messageId, 'yolo')}>
+                <Zap className="size-3.5" />
+                <div className="flex flex-col">
+                  <span className="font-medium">YOLO mode</span>
+                  <span className="text-[10px] text-muted-foreground">Auto-approve everything</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+export default ToolMessage;

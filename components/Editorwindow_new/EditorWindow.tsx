@@ -1,4 +1,5 @@
 import React, { memo, useCallback } from 'react'
+import { Dna, FolderOpen, Terminal, GitBranch } from 'lucide-react'
 import { useTabStore } from '@/components/FileTabs/useTabStore'
 import { useDialogStore } from '@/components/FileTabs/useDialogStore'
 import DialogProvider from '../FileTabs/DialogProvider'
@@ -47,8 +48,34 @@ const EditorWindowContent = memo(() => {
           </div>
         ))
       ) : (
-        <div className='flex items-center justify-center h-full text-gray-500 flex-col overflow-hidden'>
-          {/* Add skeleton */}
+        <div className="flex flex-1 items-center justify-center h-full overflow-hidden bg-gray-50/50">
+          <div className="flex flex-col items-center gap-6 text-center px-8 max-w-md">
+            <Dna className="w-12 h-12 text-gray-400" strokeWidth={1.5} />
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-gray-700 tracking-tight">
+                No File Open
+              </h2>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Open a file from the explorer to start editing, or create a new workflow to begin analyzing your data.
+              </p>
+            </div>
+            <div className="flex items-center gap-4 text-xs text-gray-400 pt-2">
+              <span className="flex items-center gap-1.5">
+                <FolderOpen className="w-3.5 h-3.5" />
+                Browse files
+              </span>
+              <span className="text-gray-300">·</span>
+              <span className="flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5" />
+                Open terminal
+              </span>
+              <span className="text-gray-300">·</span>
+              <span className="flex items-center gap-1.5">
+                <GitBranch className="w-3.5 h-3.5" />
+                Git status
+              </span>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -104,7 +131,7 @@ const EditorWindow = () => {
       <DialogProvider>
         <div className="h-full w-full flex flex-col overflow-hidden">  
           {/* Tab bar */}
-          <div className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0">
+          <div className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0 tab-scroll-container">
             {isMounted && allTabs.map(tab => (
               <FileTab 
                 key={tab.id}

@@ -146,7 +146,7 @@ export type QueueItemProps = ComponentProps<"div">;
 export const QueueItem = memo(({ className, ...props }: QueueItemProps) => (
   <div
     className={cn(
-      "rounded-md bg-background p-2 text-xs shadow-xs transition-colors hover:bg-accent/50",
+      "group/queue-item rounded-md bg-background p-2 text-xs shadow-xs transition-colors hover:bg-accent/50",
       className
     )}
     {...props}

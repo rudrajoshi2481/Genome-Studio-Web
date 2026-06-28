@@ -1,63 +1,82 @@
-import React from 'react'
-import { Sparkles, Copy, Check } from 'lucide-react'
-import {
-  Message as AIMessageComponent,
-  MessageContent,
-  MessageResponse,
-  MessageActions,
-  MessageAction,
-} from '@/components/ai-elements/message'
-import { Badge } from '@/components/ui/badge'
-import { Message as ChatMessage } from './chatStore'
+"use client";
+
+import React, { useState, useCallback } from "react";
+import { Copy, Check, RefreshCw, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Message as ChatMessage } from "./chatStore";
+import { Markdown } from "./Markdown";
+import { PonderingIndicator } from "./PonderingIndicator";
 
 interface AIMessageProps {
-  message: ChatMessage
+  message: ChatMessage;
+  isLast?: boolean;
+  isLoading?: boolean;
+  onRegenerate?: () => void;
+  onDelete?: (id: string) => void;
 }
 
-function AIMessage({ message }: AIMessageProps) {
-  const [copied, setCopied] = React.useState(false)
+function AIMessage({ message, isLast, isLoading, onRegenerate, onDelete }: AIMessageProps) {
+  const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(message.content)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(message.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [message.content]);
+
+  const handleDelete = useCallback(() => {
+    if (onDelete) onDelete(message.id);
+  }, [message.id, onDelete]);
 
   return (
-    <AIMessageComponent from="assistant" className="px-4 py-2">
-      <div className="flex items-center gap-2 mb-1">
-        <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary/80 to-primary/60 flex items-center justify-center">
-          <Sparkles className="h-3 w-3 text-primary-foreground" />
-        </div>
-        <span className="text-xs font-medium text-foreground">Genome Studio AI</span>
-        {message.isStreaming && (
-          <Badge variant="secondary" className="text-[9px] px-1 py-0 animate-pulse">
-            streaming
-          </Badge>
-        )}
-        <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-          {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-          }) : ''}
-        </span>
+    <div className="flex flex-col gap-1 my-1 px-3 group/msg">
+      <div className={cn(
+        "px-3 py-2 w-full",
+      )}>
+        {message.content ? (
+          <Markdown>{message.content}</Markdown>
+        ) : message.isStreaming ? (
+          <PonderingIndicator compact mode="responding" />
+        ) : null}
       </div>
-      <MessageContent className="text-xs leading-relaxed whitespace-normal [&_h1]:text-xs [&_h1]:font-semibold [&_h1]:my-1 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:my-1 [&_h3]:text-xs [&_h3]:font-medium [&_h3]:my-0.5 [&_p]:text-xs [&_p]:my-1 [&_p]:leading-relaxed [&_ul]:text-xs [&_ul]:my-1 [&_ol]:text-xs [&_ol]:my-1 [&_li]:text-xs [&_li]:my-0.5 [&_code]:text-[11px] [&_pre]:text-[11px] [&_pre]:my-1 [&_pre]:rounded-md [&_pre]:p-2 [&_blockquote]:text-xs [&_blockquote]:my-1 [&_blockquote]:pl-2 [&_a]:text-xs [&_hr]:my-1 [&_table]:text-xs [&_th]:text-xs [&_td]:text-xs [&_td]:p-1">
-        <MessageResponse>{message.content}</MessageResponse>
-      </MessageContent>
       {!message.isStreaming && message.content && (
-        <MessageActions className="mt-1">
-          <MessageAction
-            tooltip="Copy"
-            onClick={handleCopy}
-            size="icon-sm"
-          >
-            {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-          </MessageAction>
-        </MessageActions>
+        <div className="flex items-center gap-0.5">
+          {isLast && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+              onClick={handleCopy}
+            >
+              {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
+            </Button>
+          )}
+          {onRegenerate && isLast && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+              onClick={onRegenerate}
+              disabled={isLoading}
+            >
+              <RefreshCw className="size-2.5" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+              onClick={handleDelete}
+            >
+              <Trash2 className="size-2.5" />
+            </Button>
+          )}
+        </div>
       )}
-    </AIMessageComponent>
-  )
+    </div>
+  );
 }
 
-export default AIMessage
+export default AIMessage;

@@ -46,7 +46,7 @@ function Appbar() {
   };
 
   return (
-    <div className="p-2 border-b flex justify-between items-center relative">
+    <div className="p-1  border-b flex justify-between items-center relative">
       <div className=''>
         <span className="font-semibold text-xs">Genome Studio<span className="text-xs text-muted-foreground ml-2">v1.0.0</span></span>
       </div>

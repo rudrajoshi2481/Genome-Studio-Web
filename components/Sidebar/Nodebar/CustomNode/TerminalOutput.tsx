@@ -32,9 +32,9 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
   })) || [];
 
   return (
-    <div className="w-full rounded-md border border-zinc-700/60 bg-zinc-950 overflow-hidden">
+    <div className="w-full rounded-md border border-zinc-200 bg-white overflow-hidden">
       {/* Terminal header bar */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 border-b border-zinc-700/60">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-50 border-b border-zinc-200">
         <span className="text-[11px] font-medium text-zinc-500 font-mono">output</span>
         {isRunning && (
           <span className="ml-auto flex items-center gap-1 text-[11px] text-green-400 font-mono">
@@ -56,7 +56,7 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
         }}
       >
         {displayOutputs.length === 0 && !isRunning && (
-          <div className="text-zinc-600 text-[11px] italic">No output yet…</div>
+          <div className="text-zinc-400 text-[11px] italic">No output yet…</div>
         )}
 
         {displayOutputs.map((output, index) => {
@@ -64,9 +64,9 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
             return (
               <div
                 key={index}
-                className="text-zinc-300 whitespace-pre-wrap break-words"
+                className="text-zinc-800 whitespace-pre-wrap break-words"
               >
-                <span className="text-zinc-600 select-none">›</span>{' '}{output.content}
+                <span className="text-zinc-400 select-none">›</span>{' '}{output.content}
               </div>
             );
           }
@@ -105,7 +105,7 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
             return (
               <div
                 key={index}
-                className="rich-terminal-output mt-1.5 rounded-md bg-zinc-900 border border-zinc-700/60 p-2"
+                className="rich-terminal-output mt-1.5 rounded-md bg-zinc-50 border border-zinc-200 p-2"
               >
                 <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
               </div>
@@ -134,19 +134,19 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
           margin: 4px 0;
           font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
           font-size: 11px;
-          color: #d4d4d8;
+          color: #3f3f46;
         }
         .rich-terminal-output code {
           background: transparent;
           padding: 0;
           font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
           font-size: 11px;
-          color: #d4d4d8;
+          color: #3f3f46;
         }
         .rich-terminal-output img {
           max-width: 100%;
           height: auto;
-          border: 1px solid #3f3f46;
+          border: 1px solid #e4e4e7;
           margin: 8px 0;
           display: block;
           border-radius: 4px;
@@ -155,33 +155,33 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
           width: 100%;
           border-collapse: collapse;
           font-size: 11px;
-          border: 1px solid #3f3f46;
+          border: 1px solid #e4e4e7;
           margin: 8px 0;
-          background: #18181b;
+          background: #ffffff;
         }
         .rich-terminal-output .dataframe thead th {
-          background: #27272a;
+          background: #f4f4f5;
           padding: 6px 10px;
           text-align: left;
-          border: 1px solid #3f3f46;
+          border: 1px solid #e4e4e7;
           font-weight: 600;
           font-size: 10px;
-          color: #e4e4e7;
+          color: #3f3f46;
         }
         .rich-terminal-output .dataframe tbody td {
           padding: 5px 10px;
-          border: 1px solid #3f3f46;
+          border: 1px solid #e4e4e7;
           font-size: 10px;
-          color: #d4d4d8;
+          color: #3f3f46;
         }
         .rich-terminal-output .dataframe tbody th {
-          background: #27272a;
+          background: #f4f4f5;
           padding: 5px 10px;
           text-align: left;
-          border: 1px solid #3f3f46;
+          border: 1px solid #e4e4e7;
           font-weight: 500;
           font-size: 10px;
-          color: #e4e4e7;
+          color: #3f3f46;
         }
       `}</style>
     </div>

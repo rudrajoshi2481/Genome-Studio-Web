@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils"
 import { useNodeStore } from './nodeStore'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import TagInput from './TagInput'
-import { CopyToChatGPT } from './CopyToChatGPT'
 import CustomizeDialog from './CustomizeDialog'
 import { toast } from "sonner"
 import {
@@ -499,9 +498,10 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       {/* Create/Edit Node Dialog */}
       <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
         {!hideCreateButton && !isEditMode && (
-          <div className="flex items-center gap-2 m-5">
+          <div className="flex items-center gap-2 px-3 py-2">
             <DialogTrigger asChild>
-              <Button>
+              <Button size="sm" className="h-7 text-xs gap-1.5">
+                <PlusIcon className="h-3.5 w-3.5" />
                 Create Custom Node
               </Button>
             </DialogTrigger>
@@ -509,8 +509,8 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             {/* Customize Button */}
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline" size="icon" title="Customize">
-                  <Settings className="h-4 w-4" />
+                <Button variant="outline" size="icon" className="h-7 w-7" title="Customize">
+                  <Settings className="h-3.5 w-3.5" />
                 </Button>
               </DialogTrigger>
               <CustomizeDialog />
@@ -518,7 +518,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           </div>
         )}
         
-        <DialogContent className="flex flex-col w-[80vw] h-[80vh] max-w-[80vw] gap-0 p-0 overflow-hidden">
+        <DialogContent className="flex flex-col w-[70vw] h-[80vh] min-w-[70vw] gap-0 p-0 overflow-hidden">
         <DialogHeader className="px-6 py-3 border-b shrink-0">
           <DialogTitle className="text-lg">{isEditMode ? 'Edit Custom Node' : 'Create Custom Node'}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -594,15 +594,6 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                       <div className="px-4 py-1.5 border-b flex items-center justify-between shrink-0">
                         <h3 className="font-semibold text-xs">Node Code</h3>
                         <div className="flex items-center gap-2">
-                          <CopyToChatGPT
-                            code={code}
-                            language={nodeLanguage}
-                            nodeName={nodeName}
-                            description={description}
-                            variant="outline"
-                            size="sm"
-                            className="h-8"
-                          />
                           <Button 
                             variant="outline" 
                             size="sm"

@@ -1,4 +1,5 @@
 import { host, port } from '@/config/server';
+import { useChatStore } from '../components/chatStore';
 
 interface WebSocketMessage {
   type: string;
@@ -39,7 +40,11 @@ class WebSocketService {
         this.ws.onopen = () => {
           console.log('WebSocket connected to:', wsUrl);
           this.reconnectAttempts = 0;
-          // Don't send connection message to avoid unknown message type error
+          // Re-send YOLO mode if it was active before reconnection
+          const { permissionMode } = useChatStore.getState();
+          if (permissionMode === 'bypass') {
+            this.sendMessage({ type: 'set_permission_mode', mode: 'bypass' });
+          }
           resolve();
         };
         

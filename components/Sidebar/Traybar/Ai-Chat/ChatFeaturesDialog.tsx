@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
@@ -13,76 +13,111 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Zap, Globe, Plus } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Zap, Server, Bot, Terminal, BookOpen, Cpu, CheckCircle2, XCircle, Loader2, Database, CheckCheck, Save, Search } from "lucide-react"
+import { getApiBaseUrl } from "@/config/server"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { useChatStore } from "./components/chatStore"
 
 interface ChatFeaturesDialogProps {
   children: React.ReactNode
   tooltipText?: string
 }
 
-function ChatFeaturesDialog({ children, tooltipText = "Data sources & features" }: ChatFeaturesDialogProps) {
-  const [databases, setDatabases] = useState({
-    pubmed: true,
-    uniprot: false,
-    alphafold: false,
-    pubchem: false,
-    ncbi: true,
-    geo: false,
-    ensembl: false,
-    reactome: false,
-  })
+interface ProviderInfo {
+  id: string
+  name: string
+  base_url: string
+  configured: boolean
+  available: boolean
+}
 
-  const [webSearch, setWebSearch] = useState(false)
+interface AgentInfo {
+  name: string
+  description?: string
+}
 
-  const [additionalFeatures, setAdditionalFeatures] = useState({
-    codeGeneration: true,
-    dataVisualization: false,
-    workflowSuggestions: true,
-    realTimeAnalysis: false,
-  })
+interface SkillInfo {
+  name: string
+  description?: string
+}
 
-  const handleDatabaseToggle = (database: string) => {
-    setDatabases((prev) => ({
-      ...prev,
-      [database]: !prev[database as keyof typeof prev],
-    }))
-  }
+interface CommandInfo {
+  name: string
+  description?: string
+}
 
-  const handleFeatureToggle = (feature: string) => {
-    setAdditionalFeatures((prev) => ({
-      ...prev,
-      [feature]: !prev[feature as keyof typeof prev],
-    }))
-  }
+interface KnowledgeStats {
+  total_entries?: number
+  categories?: Record<string, number>
+  [key: string]: any
+}
 
-  const databaseOptions = [
-    { key: "pubmed", name: "PubMed", description: "Biomedical literature database", url: "https://pubmed.ncbi.nlm.nih.gov/favicon.ico" },
-    { key: "uniprot", name: "UniProt", description: "Protein sequence and annotation", url: "https://www.uniprot.org/favicon.ico" },
-    { key: "alphafold", name: "AlphaFold", description: "Protein structure predictions", url: "https://www.deepmind.com/favicon.ico" },
-    { key: "pubchem", name: "PubChem", description: "Chemical information database", url: "https://pubchem.ncbi.nlm.nih.gov/favicon.ico" },
-    { key: "ncbi", name: "NCBI", description: "National Center for Biotechnology Information", url: "https://www.ncbi.nlm.nih.gov/favicon.ico" },
-    { key: "geo", name: "GEO", description: "Gene Expression Omnibus", url: "https://www.ncbi.nlm.nih.gov/favicon.ico" },
-    { key: "ensembl", name: "Ensembl", description: "Genome annotation database", url: "https://useast.ensembl.org/favicon.ico" },
-    { key: "reactome", name: "Reactome", description: "Pathway knowledge base", url: "https://reactome.org/favicon.ico" },
-  ]
+interface InstructionFile {
+  path?: string
+  name?: string
+  content?: string
+}
 
-  const featureOptions = [
-    { key: "codeGeneration", name: "Code Generation", description: "Generate analysis scripts and workflows" },
-    { key: "dataVisualization", name: "Data Visualization", description: "Create charts and plots from data" },
-    { key: "workflowSuggestions", name: "Workflow Suggestions", description: "Recommend analysis pipelines" },
-    { key: "realTimeAnalysis", name: "Real-time Analysis", description: "Live data processing and monitoring" },
-  ]
+interface DatabaseInfo {
+  id: string
+  name: string
+  description: string
+  category: string
+}
 
-  const activeSources = Object.values(databases).filter(Boolean).length + (webSearch ? 1 : 0)
-  const activeFeatures = Object.values(additionalFeatures).filter(Boolean).length
+function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: ChatFeaturesDialogProps) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [providers, setProviders] = useState<ProviderInfo[]>([])
+  const [agents, setAgents] = useState<AgentInfo[]>([])
+  const [skills, setSkills] = useState<SkillInfo[]>([])
+  const [commands, setCommands] = useState<CommandInfo[]>([])
+  const [knowledgeStats, setKnowledgeStats] = useState<KnowledgeStats | null>(null)
+  const [instructions, setInstructions] = useState<InstructionFile[]>([])
+  const [databases, setDatabases] = useState<DatabaseInfo[]>([])
+  const [dbSearch, setDbSearch] = useState("")
+  const [error, setError] = useState<string | null>(null)
+
+  const { enabledDatabases, toggleDatabase, setEnabledDatabases, keepIntermediateFiles, setKeepIntermediateFiles } = useChatStore()
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [provRes, agRes, skRes, cmdRes, knRes, instRes, dbRes] = await Promise.allSettled([
+        fetch(`${getApiBaseUrl()}/ai-chat/providers`).then(r => r.ok ? r.json() : null),
+        fetch(`${getApiBaseUrl()}/ai-chat/agents`).then(r => r.ok ? r.json() : []),
+        fetch(`${getApiBaseUrl()}/ai-chat/skills`).then(r => r.ok ? r.json() : []),
+        fetch(`${getApiBaseUrl()}/ai-chat/commands`).then(r => r.ok ? r.json() : []),
+        fetch(`${getApiBaseUrl()}/ai-chat/knowledge/stats`).then(r => r.ok ? r.json() : null),
+        fetch(`${getApiBaseUrl()}/ai-chat/knowledge/instructions`).then(r => r.ok ? r.json() : []),
+        fetch(`${getApiBaseUrl()}/ai-chat/databases`).then(r => r.ok ? r.json() : []),
+      ])
+
+      if (provRes.status === 'fulfilled' && provRes.value) setProviders(provRes.value.providers || [])
+      if (agRes.status === 'fulfilled') setAgents(agRes.value || [])
+      if (skRes.status === 'fulfilled') setSkills(skRes.value || [])
+      if (cmdRes.status === 'fulfilled') setCommands(cmdRes.value || [])
+      if (knRes.status === 'fulfilled') setKnowledgeStats(knRes.value)
+      if (instRes.status === 'fulfilled') setInstructions(instRes.value || [])
+      if (dbRes.status === 'fulfilled') setDatabases(dbRes.value || [])
+    } catch (err) {
+      setError("Failed to fetch backend status")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (open) fetchAll()
+  }, [open, fetchAll])
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -95,135 +130,291 @@ function ChatFeaturesDialog({ children, tooltipText = "Data sources & features" 
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[70vw] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
             <Zap className="h-5 w-5 text-green-500" />
-            Chat Features & Data Sources
+            AI Chat Settings
           </DialogTitle>
           <DialogDescription>
-            Configure which databases and features the AI can access during conversations.
+            Backend status, bioinformatics databases, agents, skills, commands, and knowledge base.
           </DialogDescription>
         </DialogHeader>
-        
 
-        <div className="space-y-8">
-          {/* Database Sources */}
-          <section>
-            <h3 className="text-xs font-semibold mb-2">Databases</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Choose which scientific databases the AI can query.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {databaseOptions.map((db) => {
-                const active = databases[db.key as keyof typeof databases]
-                return (
+        {loading && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {error && (
+          <div className="text-xs text-red-500 text-center py-4">{error}</div>
+        )}
+
+        {!loading && !error && (
+          <div className="space-y-6">
+            {/* Provider Status */}
+            <section>
+              <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+                <Server className="h-4 w-4" />
+                LLM Providers
+              </h3>
+              <div className="space-y-2">
+                {providers.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No providers configured.</p>
+                )}
+                {providers.map((p) => (
                   <div
-                    key={db.key}
+                    key={p.id}
                     className={`flex items-center justify-between p-3 rounded-lg border transition-all
-                      ${active ? "border-green-500 bg-green-50 shadow-sm dark:border-green-800 dark:bg-green-950/30" : "hover:border-muted-foreground/20 hover:shadow-sm"}`}
+                      ${p.available ? "border-green-500 bg-green-50 dark:border-green-800 dark:bg-green-950/30" : "border-muted"}`}
                   >
                     <div className="flex items-center gap-3">
-                      <img src={db.url} alt={db.name} className="h-6 w-6 object-contain rounded border bg-white" />
+                      <Cpu className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-medium text-xs">{db.name}</p>
-                        <p className="text-xs text-muted-foreground">{db.description}</p>
+                        <p className="font-medium text-xs">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.base_url}</p>
                       </div>
                     </div>
-                    <Switch
-                      id={db.key}
-                      checked={active}
-                      onCheckedChange={() => handleDatabaseToggle(db.key)}
-                      aria-label={`Toggle ${db.name}`}
-                    />
+                    {p.available ? (
+                      <Badge variant="outline" className="text-xs text-green-600 gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> Online
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs text-red-500 gap-1">
+                        <XCircle className="h-3 w-3" /> Offline
+                      </Badge>
+                    )}
                   </div>
-                )
-              })}
-            </div>
-          </section>
-
-          <Separator />
-
-          {/* Web Search */}
-          <section>
-            <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
-              <Globe className="h-4 w-4" />
-              Web Search
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Allow AI to search the web for additional information.
-            </p>
-            <div
-              className={`flex items-center justify-between p-3 rounded-lg border transition-all
-                ${webSearch ? "border-green-500 bg-green-50 shadow-sm dark:border-green-800 dark:bg-green-950/30" : "hover:border-muted-foreground/20 hover:shadow-sm"}`}
-            >
-              <div>
-                <Label htmlFor="web-search" className="font-medium cursor-pointer">
-                  Enable Web Search
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Search academic papers, docs, and recent research
-                </p>
+                ))}
               </div>
-              <Switch
-                id="web-search"
-                checked={webSearch}
-                onCheckedChange={() => setWebSearch(!webSearch)}
-                aria-label="Toggle web search"
-              />
-            </div>
-          </section>
+            </section>
 
-          <Separator />
+            <Separator />
 
-          {/* Features */}
-          <section>
-            <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Additional Features
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Enhance AI capabilities with extra tools.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {featureOptions.map((feature) => {
-                const active = additionalFeatures[feature.key as keyof typeof additionalFeatures]
-                return (
-                  <div
-                    key={feature.key}
-                    className={`flex items-center justify-between p-3 rounded-lg border transition-all
-                      ${active ? "border-green-500 bg-green-50 shadow-sm dark:border-green-800 dark:bg-green-950/30" : "hover:border-muted-foreground/20 hover:shadow-sm"}`}
-                  >
-                    <div>
-                      <Label htmlFor={feature.key} className="font-medium cursor-pointer">
-                        {feature.name}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">{feature.description}</p>
-                    </div>
-                    <Switch
-                      id={feature.key}
-                      checked={active}
-                      onCheckedChange={() => handleFeatureToggle(feature.key)}
-                      aria-label={`Toggle ${feature.name}`}
-                    />
+            {/* Bioinformatics Databases */}
+            <section>
+              <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                Bioinformatics Databases ({databases.length})
+              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-muted-foreground">
+                  Toggle which databases the AI can query. {enabledDatabases.length} of {databases.length} enabled.
+                </p>
+                {databases.length > 0 && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-[10px] px-2 gap-1"
+                      onClick={() => setEnabledDatabases(databases.map(d => d.id))}
+                      disabled={enabledDatabases.length === databases.length}
+                    >
+                      <CheckCheck className="h-3 w-3" />
+                      Enable All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-[10px] px-2 gap-1"
+                      onClick={() => setEnabledDatabases([])}
+                      disabled={enabledDatabases.length === 0}
+                    >
+                      <XCircle className="h-3 w-3" />
+                      Disable All
+                    </Button>
                   </div>
-                )
-              })}
-            </div>
-          </section>
+                )}
+              </div>
+              {databases.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No databases available.</p>
+              ) : (
+                <>
+                <div className="relative mb-3">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={dbSearch}
+                    onChange={(e) => setDbSearch(e.target.value)}
+                    placeholder="Search databases..."
+                    className="h-8 text-xs pl-8"
+                  />
+                </div>
+                {databases.filter(db => {
+                  const q = dbSearch.toLowerCase()
+                  return db.name.toLowerCase().includes(q) ||
+                         db.description.toLowerCase().includes(q) ||
+                         db.category.toLowerCase().includes(q)
+                }).length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2">No databases match "{dbSearch}".</p>
+                ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {databases.filter(db => {
+                    const q = dbSearch.toLowerCase()
+                    return db.name.toLowerCase().includes(q) ||
+                           db.description.toLowerCase().includes(q) ||
+                           db.category.toLowerCase().includes(q)
+                  }).map((db) => {
+                    const active = enabledDatabases.includes(db.id)
+                    return (
+                      <div
+                        key={db.id}
+                        className={`flex items-center justify-between p-2.5 rounded-lg border transition-all
+                          ${active ? "border-green-500 bg-green-50 dark:border-green-800 dark:bg-green-950/30" : "hover:border-muted-foreground/20"}`}
+                      >
+                        <div className="min-w-0 flex-1 mr-2">
+                          <p className="font-medium text-xs">{db.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{db.description}</p>
+                          <Badge variant="outline" className="text-[10px] mt-0.5">{db.category}</Badge>
+                        </div>
+                        <Switch
+                          checked={active}
+                          onCheckedChange={() => toggleDatabase(db.id)}
+                          aria-label={`Toggle ${db.name}`}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+                )}
+                </>
+              )}
+            </section>
 
-          <Separator />
+            <Separator />
 
-          {/* Summary */}
-          <section className="flex items-center justify-between">
-            <Badge variant="outline" className="text-xs px-2 py-1">
-              {activeSources} Data Sources Active
-            </Badge>
-            <Badge variant="outline" className="text-xs px-2 py-1">
-              {activeFeatures} Features Enabled
-            </Badge>
-          </section>
-        </div>
+            {/* Agents */}
+            <section>
+              <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+                <Bot className="h-4 w-4" />
+                Agents ({agents.length})
+              </h3>
+              {agents.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No custom agents loaded.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {agents.map((a) => (
+                    <div key={a.name} className="p-2.5 rounded-lg border">
+                      <p className="font-medium text-xs">{a.name}</p>
+                      {a.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{a.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <Separator />
+
+            {/* Skills */}
+            <section>
+              <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Skills ({skills.length})
+              </h3>
+              {skills.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No skills loaded.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {skills.map((s) => (
+                    <div key={s.name} className="p-2.5 rounded-lg border">
+                      <p className="font-medium text-xs">{s.name}</p>
+                      {s.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{s.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <Separator />
+
+            {/* Commands */}
+            <section>
+              <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+                <Terminal className="h-4 w-4" />
+                Slash Commands ({commands.length})
+              </h3>
+              {commands.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No commands loaded.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {commands.map((c) => (
+                    <div key={c.name} className="p-2.5 rounded-lg border">
+                      <p className="font-medium text-xs font-mono">/{c.name}</p>
+                      {c.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{c.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <Separator />
+
+            {/* Knowledge Base */}
+            <section>
+              <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Knowledge Base
+              </h3>
+              {knowledgeStats ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {knowledgeStats.total_entries ?? 0} entries
+                    </Badge>
+                    {knowledgeStats.categories && Object.entries(knowledgeStats.categories).map(([cat, count]) => (
+                      <Badge key={cat} variant="outline" className="text-xs">
+                        {cat}: {count as number}
+                      </Badge>
+                    ))}
+                  </div>
+                  {instructions.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground mb-1">Instruction files:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {instructions.map((f, i) => (
+                          <Badge key={i} variant="outline" className="text-xs font-mono">
+                            {f.name || f.path}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Knowledge base not available.</p>
+              )}
+            </section>
+
+            <Separator />
+
+            {/* Session Settings */}
+            <section>
+              <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Session Settings
+              </h3>
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="min-w-0 flex-1 mr-2">
+                  <p className="font-medium text-xs">Keep Intermediate Files</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Preserve fetched data, query results, and other intermediate files (JSON, CSV, HTML, etc.) in the session folder instead of deleting them on cleanup.
+                  </p>
+                </div>
+                <Switch
+                  checked={keepIntermediateFiles}
+                  onCheckedChange={setKeepIntermediateFiles}
+                  aria-label="Keep intermediate files"
+                />
+              </div>
+            </section>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

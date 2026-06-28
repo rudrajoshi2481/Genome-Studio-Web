@@ -1,13 +1,9 @@
 "use client";
 
-import React from 'react';
-import {
-  ChainOfThought,
-  ChainOfThoughtHeader,
-  ChainOfThoughtContent,
-  ChainOfThoughtStep,
-} from '@/components/ai-elements/chain-of-thought';
-import { Message } from './chatStore';
+import React, { useState, useEffect } from "react";
+import { Brain, ChevronDown, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Message } from "./chatStore";
 
 interface ReasoningMessageProps {
   message: Message;
@@ -16,29 +12,24 @@ interface ReasoningMessageProps {
 function ReasoningMessage({ message }: ReasoningMessageProps) {
   const isStreaming = message.reasoning?.isStreaming ?? message.isStreaming ?? false;
   const orderedSteps = (message.reasoning?.orderedSteps || []).filter(
-    s => s.kind === 'text' ? s.text.trim().length > 0 : true
+    (s) => (s.kind === "text" ? s.text.trim().length > 0 : true)
   );
 
-  // Fallback to content-based text steps if orderedSteps not available
-  const reasoningContent = (message.reasoning?.content || message.content || '').trim();
+  const reasoningContent = (message.reasoning?.content || message.content || "").trim();
   const textSteps = reasoningContent
-    .split('\n')
+    .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const hasContent = orderedSteps.some(s => s.kind === 'text' && s.text.trim()) || textSteps.length > 0;
+  const hasContent =
+    orderedSteps.some((s) => s.kind === "text" && s.text.trim()) || textSteps.length > 0;
 
-  if (!hasContent) {
-    return null;
-  }
-
-  const showStreaming = isStreaming;
-
-  // Track elapsed seconds while thinking
-  const [elapsed, setElapsed] = React.useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const startRef = React.useRef<number | null>(null);
-  React.useEffect(() => {
-    if (showStreaming) {
+  const [isOpen, setIsOpen] = useState(isStreaming);
+
+  useEffect(() => {
+    if (isStreaming) {
       if (startRef.current === null) {
         startRef.current = Date.now();
       }
@@ -53,52 +44,68 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
         setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
       }
     }
-  }, [showStreaming]);
+  }, [isStreaming]);
 
-  // Auto-collapse when streaming finishes, but let user toggle manually
-  const [isOpen, setIsOpen] = React.useState(showStreaming);
-  React.useEffect(() => {
-    if (showStreaming) {
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
-    }
-  }, [showStreaming]);
+  useEffect(() => {
+    setIsOpen(isStreaming);
+  }, [isStreaming]);
 
-  const lastStepIdx = orderedSteps.length > 0 ? orderedSteps.length - 1 : -1;
+  if (!hasContent) {
+    return null;
+  }
 
   return (
-    <div className="px-3 py-0.5">
-      <ChainOfThought open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
-        <ChainOfThoughtHeader className="text-xs">
-          {showStreaming ? `Thinking... ${elapsed}s` : `Thinking ${elapsed}s`}
-        </ChainOfThoughtHeader>
-        <ChainOfThoughtContent className="mt-1 space-y-1.5">
+    <div className="px-3 py-1">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+      >
+        {isOpen ? (
+          <ChevronDown className="size-3 shrink-0" />
+        ) : (
+          <ChevronRight className="size-3 shrink-0" />
+        )}
+        <Brain className="size-3 shrink-0 text-muted-foreground" />
+        {isStreaming ? (
+          <span className="font-medium animate-pulse text-muted-foreground">Reasoning</span>
+        ) : (
+          <span className="font-medium text-muted-foreground">Reasoning</span>
+        )}
+        {elapsed > 0 && (
+          <span className="text-muted-foreground/50 tabular-nums">{elapsed}s</span>
+        )}
+      </button>
+      {isOpen && (
+        <div className="mt-1 ml-4 pl-2 border-l border-border/50 space-y-1">
           {orderedSteps.length > 0 ? (
             orderedSteps.map((step, idx) => {
-              if (step.kind === 'text') {
-                const lines = step.text.split('\n').map(s => s.trim()).filter(Boolean);
+              if (step.kind === "text") {
+                const lines = step.text.split("\n").map((s) => s.trim()).filter(Boolean);
                 return lines.map((line, lineIdx) => (
-                  <ChainOfThoughtStep
+                  <div
                     key={`${step.id}-${lineIdx}`}
-                    label={line}
-                    status={showStreaming && idx === lastStepIdx && lineIdx === lines.length - 1 ? 'active' : 'complete'}
-                  />
+                    className={cn(
+                      "text-xs text-muted-foreground leading-relaxed flex items-start gap-1.5",
+                    )}
+                  >
+<span>{line}</span>
+                  </div>
                 ));
               }
               return null;
             })
           ) : (
             textSteps.map((step, idx) => (
-              <ChainOfThoughtStep
+              <div
                 key={`reasoning-${idx}`}
-                label={step}
-                status={isStreaming && idx === textSteps.length - 1 ? 'active' : 'complete'}
-              />
+                className="text-xs text-muted-foreground leading-relaxed flex items-start gap-1.5"
+              >
+<span>{step}</span>
+              </div>
             ))
           )}
-        </ChainOfThoughtContent>
-      </ChainOfThought>
+        </div>
+      )}
     </div>
   );
 }

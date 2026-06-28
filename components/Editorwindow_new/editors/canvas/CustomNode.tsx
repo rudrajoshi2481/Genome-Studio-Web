@@ -294,31 +294,42 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           );
         },
         onStatus: (msg: StatusUpdateMessage) => {
-          // Handle terminal statuses (completed/failed) with node_id
-          if (msg.node_id === id && (msg.status === 'completed' || msg.status === 'failed')) {
+          // Handle terminal statuses (completed/failed/cancelled) with node_id
+          if (msg.node_id === id && (msg.status === 'completed' || msg.status === 'failed' || msg.status === 'cancelled')) {
             if (hasFinished) return;
             hasFinished = true;
             setIsExecuting(false);
 
-            // Update node with final status and any result data from the message
+            // Update node with final status and complete result data from the backend
+            // Replace streamed logs/outputs with the complete set from the final message
+            // to fix gaps from missed WebSocket messages during reconnects
             setNodes((nds: Node[]) =>
               nds.map((n: Node) => {
                 if (n.id !== id) return n;
+                const finalMsg = msg as unknown as Record<string, unknown>;
+                const finalUnifiedOutputs = finalMsg.unified_outputs as Array<Record<string, unknown>> | undefined;
+                const finalOutputHtml = finalMsg.output_html as Record<string, unknown> | undefined;
                 return {
                   ...n,
                   data: {
                     ...n.data,
                     status: msg.status,
+                    // Replace with complete outputs from backend (fixes missing logs from WS gaps)
+                    logs: finalUnifiedOutputs
+                      ? finalUnifiedOutputs.filter((o) => o.type === 'text').map((o) => ({ timestamp: new Date().toISOString(), level: 'INFO', message: o.content as string, source: 'stdout' }))
+                      : n.data.logs,
+                    output_html: finalOutputHtml || n.data.output_html || {},
+                    unified_outputs: finalUnifiedOutputs || n.data.unified_outputs || [],
                     error_message: msg.error_message || undefined,
                     error_traceback: msg.error_traceback || undefined,
-                    duration_seconds: (msg as unknown as Record<string, unknown>).duration_seconds as number | undefined,
+                    duration_seconds: finalMsg.duration_seconds as number | undefined,
                     lastExecution: {
                       timestamp: new Date().toISOString(),
                       status: msg.status,
-                      duration_seconds: (msg as unknown as Record<string, unknown>).duration_seconds as number | undefined,
-                      output_variables: (msg as unknown as Record<string, unknown>).output_variables as Record<string, unknown> | undefined,
-                      output_html: (msg as unknown as Record<string, unknown>).output_html as Record<string, unknown> | undefined || {},
-                      unified_outputs: (msg as unknown as Record<string, unknown>).unified_outputs as Array<Record<string, unknown>> | undefined || n.data.unified_outputs || [],
+                      duration_seconds: finalMsg.duration_seconds as number | undefined,
+                      output_variables: finalMsg.output_variables as Record<string, unknown> | undefined,
+                      output_html: finalOutputHtml || {},
+                      unified_outputs: finalUnifiedOutputs || [],
                       error_message: msg.error_message,
                       error_traceback: msg.error_traceback,
                     },
@@ -329,12 +340,15 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
 
             if (msg.status === 'completed') {
               toast.success(`Node "${nodeData.title}" completed successfully`);
+            } else if (msg.status === 'cancelled') {
+              toast.info(`Node "${nodeData.title}" execution cancelled`);
             } else {
               toast.error(`Node "${nodeData.title}" failed: ${msg.error_message || 'Unknown error'}`);
             }
 
             // Unsubscribe from WebSocket
             workflowWebSocket.unsubscribeFromExecution(execId);
+            executionIdRef.current = null;
           }
         },
         onError: (error: Event) => {
@@ -600,12 +614,30 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       {(() => {
         const isRunning = isExecuting || nodeData.status === 'running';
         const isCompleted = !isRunning && (nodeData.status === 'completed' || nodeData.lastExecution?.status === 'success');
-        const stripeColor = isRunning ? 'rgba(255, 255, 255, 0.25)' : isCompleted ? 'rgba(34, 197, 94, 0.15)' : null;
+        const lang = (nodeData.language || 'python').toLowerCase();
+        const langBgClass = isRunning ? '' : isCompleted ? '' : (
+          lang === 'python' ? 'bg-blue-500/10' :
+          lang === 'r' ? 'bg-green-500/10' :
+          (lang === 'bash' || lang === 'shell') ? 'bg-orange-500/10' :
+          'bg-muted'
+        );
+        const stripeColor = isRunning ? 'rgba(255, 255, 255, 0.25)' : isCompleted ? 'rgba(34, 197, 94, 0.15)' : (
+          lang === 'python' ? 'rgba(59, 130, 246, 0.12)' :
+          lang === 'r' ? 'rgba(34, 197, 94, 0.12)' :
+          (lang === 'bash' || lang === 'shell') ? 'rgba(249, 115, 22, 0.12)' :
+          'rgba(107, 114, 128, 0.08)'
+        );
+        const langBadgeClass = isRunning ? '' : (
+          lang === 'python' ? 'bg-blue-500/10 text-blue-700 border-blue-500/20' :
+          lang === 'r' ? 'bg-green-500/10 text-green-700 border-green-500/20' :
+          (lang === 'bash' || lang === 'shell') ? 'bg-orange-500/10 text-orange-700 border-orange-500/20' :
+          'bg-background text-muted-foreground'
+        );
         return (
         <div
           className={cn(
             "border-b border-border px-4 py-2 flex items-center justify-between relative overflow-hidden",
-            isRunning ? "bg-yellow-500/80 stripe-flow" : "bg-muted",
+            isRunning ? "bg-yellow-500/80 stripe-flow" : langBgClass,
             isRunning && "text-white"
           )}
           style={stripeColor ? {
@@ -616,7 +648,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         <div className="font-medium text-sm text-foreground relative z-10">{nodeData.title || 'Untitled Node'}</div>
         {/* <div className="font-medium text-sm text-foreground">{nodeData.function_name || 'Untitled Node'}</div> */}
         <div className="flex items-center gap-2 relative z-10">
-          <div className="text-xs px-2 py-0.5 bg-background rounded-full text-muted-foreground">
+          <div className={cn("text-xs px-2 py-0.5 rounded-full border", isRunning ? "bg-background text-white" : langBadgeClass)}>
             {nodeData.language || 'python'}
           </div>
           <button 

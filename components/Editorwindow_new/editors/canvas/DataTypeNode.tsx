@@ -148,6 +148,26 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
     }
   }
 
+  // Get background class for data type header
+  function getDataTypeBgClass(dataType: DataType): string {
+    switch (dataType) {
+      case 'string':
+        return 'bg-green-500/10';
+      case 'int':
+        return 'bg-blue-500/10';
+      case 'float':
+        return 'bg-cyan-500/10';
+      case 'bool':
+        return 'bg-purple-500/10';
+      case 'list':
+        return 'bg-orange-500/10';
+      case 'dict':
+        return 'bg-pink-500/10';
+      default:
+        return 'bg-muted';
+    }
+  }
+
   // Get diagonal stripe pattern color for data type header
   function getDataTypeStripeColor(dataType: DataType): string {
     switch (dataType) {
@@ -482,7 +502,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         >
         {/* Header */}
         <div 
-          className="bg-muted border-b border-border px-3 py-2 flex items-center justify-between relative overflow-hidden"
+          className={cn("border-b border-border px-3 py-2 flex items-center justify-between relative overflow-hidden", getDataTypeBgClass(nodeData.dataType))}
           style={{
             backgroundImage: `repeating-linear-gradient(135deg, transparent, transparent 6px, ${getDataTypeStripeColor(nodeData.dataType)} 6px, ${getDataTypeStripeColor(nodeData.dataType)} 12px)`,
             backgroundSize: '200% 100%',

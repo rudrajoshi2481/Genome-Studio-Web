@@ -1,23 +1,26 @@
+"use client";
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Plus, MessageSquare, Clock, Zap, FlaskConical, Code2, BarChart3, Dna, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, MessageSquare, Clock, Zap, FlaskConical, Code2, BarChart3, Dna, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { useChatStore, Conversation } from './chatStore';
 import { getApiBaseUrl } from '@/config/server';
+import { cn } from '@/lib/utils';
 
 interface ConversationHistoryProps {
   onNewConversation: () => void;
 }
 
 const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversation }) => {
-  const { 
-    conversations, 
-    setCurrentConversation, 
+  const {
+    conversations,
+    setCurrentConversation,
     setConversations,
     isLoading,
-    setLoading
+    setLoading,
+    currentConversationId,
   } = useChatStore();
 
   const [showAll, setShowAll] = useState(false);
@@ -35,7 +38,7 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setConversations(data);
@@ -61,7 +64,7 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
+
     if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${diffInHours}h ago`;
     if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
@@ -96,105 +99,121 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header with New Conversation Button */}
       <div className="p-3 border-b">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold">AI Conversations</h2>
-          <Button 
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="size-3.5 text-primary" />
+            <h2 className="text-xs font-semibold">Conversations</h2>
+          </div>
+          <Button
             onClick={onNewConversation}
             size="sm"
-            className="flex items-center gap-2"
+            variant="outline"
+            className="h-6 text-[10px] gap-1"
           >
-            <Plus className="w-4 h-4" />
-            New Chat
+            <Plus className="size-3" />
+            New
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Continue your previous conversations or start a new one
+        <p className="text-[10px] text-muted-foreground">
+          Continue a previous conversation
         </p>
       </div>
 
-      {/* Conversations List */}
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-3">
+        <div className="p-2 space-y-1.5">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
             </div>
           ) : conversations.length === 0 ? (
             <div className="text-center py-8">
-              <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-              <h3 className="text-xs font-medium mb-1">No conversations yet</h3>
-              <p className="text-xs text-muted-foreground mb-4">
+              <div className="flex items-center justify-center mb-2">
+                <div className="size-10 rounded-full bg-muted/50 flex items-center justify-center">
+                  <MessageSquare className="size-5 text-muted-foreground" />
+                </div>
+              </div>
+              <h3 className="text-[10px] font-medium mb-1">No conversations yet</h3>
+              <p className="text-[10px] text-muted-foreground mb-3">
                 Start your first AI conversation
               </p>
-              <Button onClick={onNewConversation} size="sm">
-                <Plus className="w-4 h-4 mr-2" />
+              <Button onClick={onNewConversation} size="sm" className="h-6 text-[10px]">
+                <Plus className="size-3 mr-1" />
                 Start Chatting
               </Button>
             </div>
           ) : (
-            conversations.map((conversation) => (
-              <Card 
-                key={conversation.id}
-                className="cursor-pointer hover:shadow-md transition-shadow duration-200 border-l-4 border-l-primary/20 hover:border-l-primary"
-                onClick={() => handleConversationClick(conversation)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {(() => { const AgentIcon = getAgentIcon(conversation.agent_type); return <AgentIcon className="size-4 text-muted-foreground shrink-0" />; })()}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-xs truncate">
-                          {conversation.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {getAgentName(conversation.agent_type)}
-                        </p>
+            conversations.map((conversation) => {
+              const AgentIcon = getAgentIcon(conversation.agent_type);
+              const isActive = currentConversationId === conversation.id;
+              return (
+                <button
+                  key={conversation.id}
+                  onClick={() => handleConversationClick(conversation)}
+                  className={cn(
+                    "w-full text-left rounded-lg p-2 transition-all duration-150 group/conv",
+                    "border hover:shadow-sm",
+                    isActive
+                      ? "bg-primary/5 border-primary/30"
+                      : "bg-card border-border/50 hover:border-border hover:bg-muted/30",
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className={cn(
+                      "shrink-0 size-6 rounded-md flex items-center justify-center mt-0.5",
+                      isActive ? "bg-primary/15" : "bg-muted/50 group-hover/conv:bg-muted",
+                    )}>
+                      <AgentIcon className={cn("size-3", isActive ? "text-primary" : "text-muted-foreground")} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-[11px] truncate leading-tight">
+                        {conversation.title}
+                      </h3>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">
+                        {getAgentName(conversation.agent_type)}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 text-[9px] text-muted-foreground">
+                        <span className="flex items-center gap-0.5">
+                          <MessageSquare className="size-2.5" />
+                          {conversation.message_count}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                          <Zap className="size-2.5" />
+                          {conversation.total_tokens_used > 1000
+                            ? `${(conversation.total_tokens_used / 1000).toFixed(1)}k`
+                            : conversation.total_tokens_used}
+                        </span>
+                        <span className="flex items-center gap-0.5 ml-auto">
+                          <Clock className="size-2.5" />
+                          {formatDate(conversation.last_message_at || conversation.updated_at)}
+                        </span>
                       </div>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {conversation.status}
-                    </Badge>
+                    {conversation.status && conversation.status !== 'active' && (
+                      <Badge variant="secondary" className="text-[8px] px-1 py-0 shrink-0">
+                        {conversation.status}
+                      </Badge>
+                    )}
                   </div>
-                </CardHeader>
-                
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1">
-                        <MessageSquare className="w-3 h-3" />
-                        <span>{conversation.message_count}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Zap className="w-3 h-3" />
-                        <span>{conversation.total_tokens_used}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      <span>{formatDate(conversation.last_message_at || conversation.updated_at)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                </button>
+              );
+            })
           )}
           {conversations.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={handleToggleShowAll}
-              className="w-full text-xs text-muted-foreground hover:text-foreground"
+              className="w-full text-[10px] text-muted-foreground hover:text-foreground h-6 mt-1"
             >
               {showAll ? (
                 <>
-                  <ChevronUp className="size-3 mr-1" />
+                  <ChevronUp className="size-3 mr-0.5" />
                   Show Less
                 </>
               ) : (
                 <>
-                  <ChevronDown className="size-3 mr-1" />
+                  <ChevronDown className="size-3 mr-0.5" />
                   Show All
                 </>
               )}

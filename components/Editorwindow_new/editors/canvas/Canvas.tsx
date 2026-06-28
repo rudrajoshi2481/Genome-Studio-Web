@@ -16,7 +16,6 @@ import {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 
 import { useEditorContext } from '../../context/EditorContext';
 import { useTabStore } from '@/components/FileTabs/useTabStore';
@@ -49,6 +48,13 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [executionStatus, setExecutionStatus] = useState<WorkflowExecutionStatus | null>(null);
+  const [showMinimap, setShowMinimap] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('canvas_show_minimap');
+      if (stored !== null) return stored === 'true';
+    }
+    return true;
+  });
   const [isInitialLoad, setIsInitialLoad] = useState(true); // Flag to prevent dirty on initial load
   const [savedViewport, setSavedViewport] = useState<{ x: number; y: number; zoom: number } | null>(null);
   const wasActiveRef = useRef(isActive); // Track previous active state
@@ -420,8 +426,6 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       setDirty(tabId, false);
       updateTab(tabId, { isDirty: false });
       
-      toast.success('Workflow saved successfully');
-      
       // Do NOT reload file after save — this prevents flashing and races with backend
       // The node positions are already updated in the canvas state
     } catch (error) {
@@ -513,12 +517,10 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
 
   const handleStop = useCallback(() => {
     console.log('⏹️ Canvas: Stopping workflow');
-    toast.info('Stopping workflow...');
   }, []);
 
   const handleReset = useCallback(async () => {
     console.log('🔄 Canvas: Resetting workflow - clearing all execution data');
-    toast.info('Resetting workflow...');
 
     try {
       // Clear execution data from all nodes
@@ -597,12 +599,10 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       setDirty(tabId, false);
       updateTab(tabId, { isDirty: false });
       
-      toast.success('Workflow reset successfully - all logs and execution data cleared');
       console.log('✅ Canvas: Workflow reset and saved successfully');
       
     } catch (error) {
       console.error('❌ Canvas: Error resetting workflow:', error);
-      toast.error('Failed to reset workflow');
     }
   }, [nodes, edges, filePath, reactFlowInstance, setNodes, setExecutionStatus, updateContent, setSaved, setDirty, updateTab, tabId]);
 
@@ -646,6 +646,8 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
         filePath={filePath}
         fileName={filePath?.split('/').pop() || 'workflow'}
         tabId={tabId}
+        showMinimap={showMinimap}
+        onToggleMinimap={setShowMinimap}
         onExecutionStatusChange={setExecutionStatus}
         onRealtimeLog={handleRealtimeLog}
         onRealtimeOutput={handleRealtimeOutput}
@@ -653,7 +655,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
         onRealtimeProgress={handleRealtimeProgress}
       />
       
-      <div className={`flex-1 relative ${isTabDirty ? 'ring-2 ring-yellow-400 ring-inset' : ''}`}>
+      <div className={`flex-1 relative bg-transparent ${isTabDirty ? 'ring-2 ring-yellow-400 ring-inset' : ''}`}>
         <ReactFlow
           nodes={nodesWithDeleteHandler}
           edges={edges}
@@ -669,14 +671,14 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
               localStorage.setItem(`canvas_viewport_${tabId}`, JSON.stringify(vp));
             }
           }}
-          className="bg-background"
+          style={{ backgroundColor: 'transparent' }}
           proOptions={{ hideAttribution: false }}
           noDragClassName="noDrag"
           noWheelClassName="noDrag"
         >
           <Controls />
-          <MiniMap />
-          <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+          {showMinimap && <MiniMap />}
+          <Background variant={BackgroundVariant.Dots} gap={12} size={1} color="#ccc" />
         </ReactFlow>
       </div>
     </div>

@@ -22,6 +22,41 @@ interface NodeCardProps {
   onDelete: (nodeId: string | number) => void
 }
 
+function getLanguageStyle(language: string): { iconColor: string; borderColor: string; badgeClass: string; stripeColor: string } {
+  const lang = (language || 'python').toLowerCase()
+  switch (lang) {
+    case 'python':
+      return {
+        iconColor: 'text-blue-600',
+        borderColor: 'border-l-2 border-l-blue-500/60',
+        badgeClass: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
+        stripeColor: 'rgba(59, 130, 246, 0.06)',
+      }
+    case 'r':
+      return {
+        iconColor: 'text-green-600',
+        borderColor: 'border-l-2 border-l-green-500/60',
+        badgeClass: 'bg-green-500/10 text-green-700 border-green-500/20',
+        stripeColor: 'rgba(34, 197, 94, 0.06)',
+      }
+    case 'bash':
+    case 'shell':
+      return {
+        iconColor: 'text-orange-600',
+        borderColor: 'border-l-2 border-l-orange-500/60',
+        badgeClass: 'bg-orange-500/10 text-orange-700 border-orange-500/20',
+        stripeColor: 'rgba(249, 115, 22, 0.06)',
+      }
+    default:
+      return {
+        iconColor: 'text-gray-600',
+        borderColor: 'border-l-2 border-l-gray-500/60',
+        badgeClass: 'bg-gray-500/10 text-gray-700 border-gray-500/20',
+        stripeColor: 'rgba(107, 114, 128, 0.06)',
+      }
+  }
+}
+
 function NodeCard({
   node,
   isFavorite,
@@ -34,19 +69,23 @@ function NodeCard({
   const nodeId = node.id || node.node_id
   const nodeTags = (node as any).tags
   const isBeingDeleted = isDeleting === node.id?.toString() || isDeleting === node.node_id
+  const langStyle = getLanguageStyle(node.language)
 
   return (
     <ContextMenu key={nodeId}>
       <ContextMenuTrigger>
         <div
-          className="relative flex items-center gap-2 px-3 py-2.5 border rounded-lg hover:bg-accent/50 group cursor-grab transition-colors"
+          className={`relative flex items-center gap-2 px-3 py-2.5 border rounded-lg hover:bg-accent/50 group cursor-grab transition-all ${langStyle.borderColor}`}
+          style={{
+            backgroundImage: `repeating-linear-gradient(135deg, transparent, transparent 6px, ${langStyle.stripeColor} 6px, ${langStyle.stripeColor} 12px)`,
+          }}
           draggable
           onDragStart={(event) => {
             event.dataTransfer.setData('application/reactflow', JSON.stringify(node));
             event.dataTransfer.effectAllowed = 'move';
           }}
         >
-          <Code2 className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Code2 className={`h-4 w-4 shrink-0 ${langStyle.iconColor}`} />
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-1.5">
               <span className="text-xs font-medium break-words">{node.title}</span>
@@ -56,13 +95,18 @@ function NodeCard({
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-muted-foreground line-clamp-1">
-              {node.description ?
-                (node.description.length > 35 ?
-                  `${node.description.substring(0, 35)}...` :
-                  node.description) :
-                `${node.language} function`}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className={`text-[9px] h-3.5 px-1 shrink-0 ${langStyle.badgeClass}`}>
+                {node.language || 'python'}
+              </Badge>
+              <p className="text-xs text-muted-foreground line-clamp-1">
+                {node.description ?
+                  (node.description.length > 35 ?
+                    `${node.description.substring(0, 35)}...` :
+                    node.description) :
+                  'No description'}
+              </p>
+            </div>
           </div>
           <Button
             variant="ghost"

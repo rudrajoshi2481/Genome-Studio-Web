@@ -233,22 +233,22 @@ export default function CustomizeDialog() {
   }
 
   return (
-    <DialogContent className="min-w-[70vw] min-h-[80vh] flex flex-col">
-      <DialogHeader className="pb-4 border-b">
+    <DialogContent className="min-w-[70vw] max-w-[90vw] h-[80vh] max-h-[85vh] flex flex-col overflow-hidden p-0 gap-0">
+      <DialogHeader className="px-6 py-3 border-b shrink-0">
         <DialogTitle>Customize</DialogTitle>
         <DialogDescription>
           Download or upload custom nodes
         </DialogDescription>
       </DialogHeader>
       
-      <Tabs defaultValue="download" className="flex-1 flex flex-col">
+      <Tabs defaultValue="download" className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <TabsList className="w-full grid grid-cols-2">
           <TabsTrigger value="download">Download Nodes</TabsTrigger>
           <TabsTrigger value="upload">Upload Nodes</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="download" className="flex-1 mt-4 overflow-hidden">
-          <div className="h-full flex flex-col">
+        <TabsContent value="download" className="flex-1 mt-0 overflow-hidden flex flex-col min-h-0 px-6 py-4">
+          <div className="h-full flex flex-col min-h-0">
             {/* Search and Filters */}
             <div className="space-y-3 mb-4">
               <div className="flex items-center gap-2">
@@ -335,7 +335,7 @@ export default function CustomizeDialog() {
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto pr-2">
+            <div className="flex-1 overflow-y-auto pr-2 min-h-0">
               {isLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -347,7 +347,7 @@ export default function CustomizeDialog() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   {filteredNodes.map((node) => {
                     const nodeId = (node.id || node.node_id).toString()
                     const isSelected = selectedNodes.has(nodeId)
@@ -404,8 +404,8 @@ export default function CustomizeDialog() {
           </div>
         </TabsContent>
         
-        <TabsContent value="upload" className="flex-1 mt-4 overflow-hidden">
-          <div className="h-full flex flex-col">
+        <TabsContent value="upload" className="flex-1 mt-0 overflow-hidden flex flex-col min-h-0 px-6 py-4">
+          <div className="h-full flex flex-col min-h-0">
             {previewNodes.length === 0 ? (
               // Upload interface
               <div className="flex-1 flex items-center justify-center">
@@ -542,8 +542,8 @@ export default function CustomizeDialog() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto pr-2">
-                  <div className="grid grid-cols-5 gap-3">
+                <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     {previewNodes.map((node, index) => {
                       const isSelected = selectedPreviewNodes.has(index)
                       const nodeTags = Array.isArray(node.tags) ? node.tags : []

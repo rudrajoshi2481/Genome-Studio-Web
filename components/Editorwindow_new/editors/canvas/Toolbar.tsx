@@ -1,11 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, Save, Play, Square, RotateCcw, CheckCircle, AlertCircle, RefreshCw, Network, GitBranch, Loader2 } from 'lucide-react';
+import { Download, Save, Play, Square, RotateCcw, CheckCircle, AlertCircle, RefreshCw, Network, GitBranch, Loader2, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Node, Edge, useReactFlow } from 'reactflow';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { serializeFlowData, convertToFlowNodes, convertToFlowEdges } from './utils/file-parser';
 import { workflowManagerAPI, WorkflowExecutionStatus } from '@/services/WorkflowManagerAPI';
 import { workflowWebSocket, LogStreamMessage, OutputStreamMessage, StatusUpdateMessage, ProgressUpdateMessage } from '@/services/WorkflowWebSocket';
@@ -46,6 +56,8 @@ interface ToolbarProps {
   filePath?: string;
   fileName?: string;
   tabId?: string;
+  showMinimap?: boolean;
+  onToggleMinimap?: (show: boolean) => void;
   onExecutionStatusChange?: (status: WorkflowExecutionStatus | null) => void;
   onRealtimeLog?: (update: RealtimeLogUpdate) => void;
   onRealtimeOutput?: (update: RealtimeOutputUpdate) => void;
@@ -65,6 +77,8 @@ function Toolbar({
   filePath,
   fileName = 'workflow',
   tabId,
+  showMinimap = true,
+  onToggleMinimap,
   onExecutionStatusChange,
   onRealtimeLog,
   onRealtimeOutput,
@@ -76,6 +90,21 @@ function Toolbar({
   const [executionId, setExecutionId] = useState<string | null>(null);
   const { updateTab } = useTabStore();
   const [executionStatus, setExecutionStatus] = useState<WorkflowExecutionStatus | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [localMinimap, setLocalMinimap] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('canvas_show_minimap');
+      if (stored !== null) return stored === 'true';
+    }
+    return showMinimap;
+  });
+
+  useEffect(() => {
+    onToggleMinimap?.(localMinimap);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('canvas_show_minimap', String(localMinimap));
+    }
+  }, [localMinimap]);
 
   const updateExecutingState = (executing: boolean) => {
     setIsExecuting(executing);
@@ -140,25 +169,19 @@ function Toolbar({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-
-      toast.success(`Downloaded ${fileName}.flow`);
     } catch (error) {
       console.error('Error downloading flow:', error);
-      toast.error('Failed to download flow file');
     }
   };
 
   const handleSave = () => {
     if (onSave) {
       onSave();
-    } else {
-      toast.info('Save functionality not implemented');
     }
   };
 
   const handleRun = async () => {
     if (!filePath) {
-      toast.error('No file path specified for execution');
       return;
     }
 
@@ -166,7 +189,6 @@ function Toolbar({
       updateExecutingState(true);
       hasFinishedRef.current = false;
       setProgress(null);
-      toast.info('Starting workflow execution...');
 
       const validation = await workflowManagerAPI.validateWorkflow(filePath);
       if (!validation.is_valid) {
@@ -187,7 +209,6 @@ function Toolbar({
 
       const result = await workflowManagerAPI.executeWorkflow(requestPayload);
       setExecutionId(result.execution_id);
-      toast.success('Workflow execution started!');
 
       // Subscribe to execution updates via WebSocket (per-execution handlers)
       workflowWebSocket.subscribeToExecution(result.execution_id, {
@@ -225,7 +246,6 @@ function Toolbar({
             hasFinishedRef.current = true;
             updateExecutingState(false);
             setProgress(null);
-            toast.success('Workflow execution completed!');
             // Unsubscribe after completion
             workflowWebSocket.unsubscribeFromExecution(result.execution_id);
           } else if (msg.status === 'failed' && !msg.node_id) {
@@ -278,13 +298,11 @@ function Toolbar({
 
   const handleStop = async () => {
     if (!executionId) {
-      toast.error('No active execution to stop');
       return;
     }
 
     try {
       await workflowManagerAPI.stopExecution(executionId);
-      toast.success('Workflow execution stopped');
       updateExecutingState(false);
       setExecutionId(null);
       setExecutionStatus(null);
@@ -325,9 +343,7 @@ function Toolbar({
         hasFinishedRef.current = true;
         updateExecutingState(false);
         setProgress(null);
-        if (status.status === 'completed') {
-          toast.success('Workflow execution completed!');
-        } else if (status.status === 'failed') {
+        if (status.status === 'failed') {
           toast.error(`Workflow execution failed: ${status.error_message || 'Unknown error'}`);
         }
       }
@@ -342,8 +358,6 @@ function Toolbar({
   const handleReset = () => {
     if (onReset) {
       onReset();
-    } else {
-      toast.info('Reset functionality not implemented');
     }
   };
 
@@ -512,8 +526,58 @@ function Toolbar({
             </TooltipTrigger>
             <TooltipContent>{edges.length} connections</TooltipContent>
           </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSettings(true)}
+                className="h-8 w-8"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Node Settings</TooltipContent>
+          </Tooltip>
         </div>
       </div>
+
+      {/* Settings Dialog */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>
+              Configure canvas settings
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 max-h-[55vh] overflow-y-auto">
+            {/* General Settings */}
+            <div className="space-y-3 p-3 border rounded-md bg-muted/30">
+              <h4 className="text-sm font-medium">General Settings</h4>
+              <div className="flex items-center justify-between">
+                <label htmlFor="show-minimap" className="text-xs cursor-pointer">
+                  Show Minimap
+                </label>
+                <Switch
+                  id="show-minimap"
+                  checked={localMinimap}
+                  onCheckedChange={setLocalMinimap}
+                />
+              </div>
+            </div>
+
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" size="sm">Done</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }

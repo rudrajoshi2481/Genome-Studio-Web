@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
-import { RefreshCcw, Search, Star, X, Filter, ChevronDown, ChevronUp, ArrowDownUp, Folder, FolderOpen } from 'lucide-react'
+import { RefreshCcw, Search, Star, X, Filter, ChevronDown, ChevronUp, ArrowDownUp, Folder, FolderOpen, Plus, Settings, Type, Hash, ToggleLeft, List as ListIcon, Braces } from 'lucide-react'
 import CustomNode from './CustomNode/CustomNode'
+import CustomizeDialog from './CustomNode/CustomizeDialog'
 import NodeCard from './NodeCard'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useDebounce } from '@/lib/hooks/useDebounce'
@@ -14,6 +15,10 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -52,8 +57,9 @@ function Nodebar() {
   const [isTagsOpen, setIsTagsOpen] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('name')
   const [visibleCount, setVisibleCount] = useState(NODES_PER_PAGE)
-  const [isDataTypesOpen, setIsDataTypesOpen] = useState(false)
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isDataTypesOpen, setIsDataTypesOpen] = useState(true)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   // Ensure component only renders on client after hydration
   useEffect(() => {
@@ -340,9 +346,9 @@ function Nodebar() {
     setVisibleCount(NODES_PER_PAGE)
   }, [debouncedSearchQuery, activeTab, selectedTags, sortBy])
 
-  // Toggle group collapse
-  const toggleGroupCollapse = (group: string) => {
-    setCollapsedGroups(prev => {
+  // Toggle group expansion
+  const toggleGroupExpand = (group: string) => {
+    setExpandedGroups(prev => {
       const newGroups = new Set(prev)
       if (newGroups.has(group)) {
         newGroups.delete(group)
@@ -351,6 +357,16 @@ function Nodebar() {
       }
       return newGroups
     })
+  }
+
+  // Expand all tag groups
+  const expandAllGroups = () => {
+    setExpandedGroups(new Set(Object.keys(groupedNodes)))
+  }
+
+  // Collapse all tag groups
+  const collapseAllGroups = () => {
+    setExpandedGroups(new Set())
   }
 
   // Group filtered nodes by their first tag (or "Untagged")
@@ -389,8 +405,13 @@ function Nodebar() {
 
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col border-r border-gray-200">
-      {/* Header with custom node creator */}
-      <CustomNode onSaveSuccess={loadCustomNodes} />
+      {/* Create dialog - controlled from header button */}
+      <CustomNode 
+        onSaveSuccess={loadCustomNodes} 
+        isOpen={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        hideCreateButton={true}
+      />
       
       {/* Edit dialog - without create button */}
       {editingNode && (
@@ -411,157 +432,46 @@ function Nodebar() {
         />
       )}
       
-      {/* Nodebar header with refresh button */}
+      {/* Nodebar header with create, customize, and refresh buttons */}
       <div className="flex items-center justify-between px-3 py-2 border-b">
         <h3 className="text-xs font-semibold">Nodebar</h3>
-        <Button 
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7" 
-          onClick={loadCustomNodes}
-          disabled={isLoading}
-          title="Refresh nodes"
-        >
-          <RefreshCcw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="default"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={() => setIsCreateDialogOpen(true)}
+            title="Create Custom Node"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Create
+          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                title="Customize"
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </Button>
+            </DialogTrigger>
+            <CustomizeDialog />
+          </Dialog>
+          <Button 
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7" 
+            onClick={loadCustomNodes}
+            disabled={isLoading}
+            title="Refresh nodes"
+          >
+            <RefreshCcw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
-      {/* Data Type Nodes Section - Collapsible */}
-      <Collapsible open={isDataTypesOpen} onOpenChange={setIsDataTypesOpen} className="border-b border-gray-200 bg-gray-50">
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            className="w-full justify-between px-3 py-2 h-auto hover:bg-accent/50 rounded-none"
-          >
-            <h4 className="text-xs font-semibold text-gray-600">DATA TYPES</h4>
-            {isDataTypesOpen ? (
-              <ChevronUp className="h-3 w-3 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            )}
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="p-2 pt-0">
-            <div className="grid grid-cols-2 gap-2">
-              {/* String Node */}
-              <div
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                    type: 'dataType',
-                    dataType: 'string',
-                    label: 'String'
-                  }));
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                className="p-2 bg-green-100 border border-green-300 rounded cursor-move hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">📝</span>
-                  <span className="text-xs font-medium">String</span>
-                </div>
-              </div>
-
-              {/* Integer Node */}
-              <div
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                    type: 'dataType',
-                    dataType: 'int',
-                    label: 'Integer'
-                  }));
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                className="p-2 bg-blue-100 border border-blue-300 rounded cursor-move hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">🔢</span>
-                  <span className="text-xs font-medium">Integer</span>
-                </div>
-              </div>
-
-              {/* Float Node */}
-              <div
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                    type: 'dataType',
-                    dataType: 'float',
-                    label: 'Float'
-                  }));
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                className="p-2 bg-cyan-100 border border-cyan-300 rounded cursor-move hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">🔢</span>
-                  <span className="text-xs font-medium">Float</span>
-                </div>
-              </div>
-
-              {/* Boolean Node */}
-              <div
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                    type: 'dataType',
-                    dataType: 'bool',
-                    label: 'Boolean'
-                  }));
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                className="p-2 bg-purple-100 border border-purple-300 rounded cursor-move hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">✓</span>
-                  <span className="text-xs font-medium">Boolean</span>
-                </div>
-              </div>
-
-              {/* List Node */}
-              <div
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                    type: 'dataType',
-                    dataType: 'list',
-                    label: 'List'
-                  }));
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                className="p-2 bg-orange-100 border border-orange-300 rounded cursor-move hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">📋</span>
-                  <span className="text-xs font-medium">List</span>
-                </div>
-              </div>
-
-              {/* Dictionary Node */}
-              <div
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
-                    type: 'dataType',
-                    dataType: 'dict',
-                    label: 'Dictionary'
-                  }));
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                className="p-2 bg-pink-100 border border-pink-300 rounded cursor-move hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">📚</span>
-                  <span className="text-xs font-medium">Dict</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-      
       {/* Search Bar + Sort */}
       <div className="p-3 border-b space-y-2">
         <div className="relative">
@@ -640,7 +550,161 @@ function Nodebar() {
           </CollapsibleContent>
         </Collapsible>
       )}
-      
+
+      {/* Data Type Nodes Section - Always Open */}
+      <Collapsible open={isDataTypesOpen} onOpenChange={setIsDataTypesOpen} className="border-b border-gray-200 bg-gray-50">
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="w-full justify-between px-3 py-2 h-auto hover:bg-accent/50 rounded-none"
+          >
+            <h4 className="text-xs font-semibold text-gray-600">DATA TYPES</h4>
+            {isDataTypesOpen ? (
+              <ChevronUp className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="p-2 pt-0">
+            <div className="grid grid-cols-2 gap-2">
+              {/* String Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'string',
+                    label: 'String'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 border rounded cursor-move hover:shadow-md transition-all bg-green-500/10 border-green-500/20 hover:border-green-500/40"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(34, 197, 94, 0.08) 6px, rgba(34, 197, 94, 0.08) 12px)',
+                }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Type className="h-3.5 w-3.5 text-green-700 shrink-0" />
+                  <span className="text-xs font-medium text-green-700">String</span>
+                </div>
+              </div>
+
+              {/* Integer Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'int',
+                    label: 'Integer'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 border rounded cursor-move hover:shadow-md transition-all bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(59, 130, 246, 0.08) 6px, rgba(59, 130, 246, 0.08) 12px)',
+                }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Hash className="h-3.5 w-3.5 text-blue-700 shrink-0" />
+                  <span className="text-xs font-medium text-blue-700">Integer</span>
+                </div>
+              </div>
+
+              {/* Float Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'float',
+                    label: 'Float'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 border rounded cursor-move hover:shadow-md transition-all bg-cyan-500/10 border-cyan-500/20 hover:border-cyan-500/40"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(6, 182, 212, 0.08) 6px, rgba(6, 182, 212, 0.08) 12px)',
+                }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Hash className="h-3.5 w-3.5 text-cyan-700 shrink-0" />
+                  <span className="text-xs font-medium text-cyan-700">Float</span>
+                </div>
+              </div>
+
+              {/* Boolean Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'bool',
+                    label: 'Boolean'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 border rounded cursor-move hover:shadow-md transition-all bg-purple-500/10 border-purple-500/20 hover:border-purple-500/40"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(168, 85, 247, 0.08) 6px, rgba(168, 85, 247, 0.08) 12px)',
+                }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <ToggleLeft className="h-3.5 w-3.5 text-purple-700 shrink-0" />
+                  <span className="text-xs font-medium text-purple-700">Boolean</span>
+                </div>
+              </div>
+
+              {/* List Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'list',
+                    label: 'List'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 border rounded cursor-move hover:shadow-md transition-all bg-orange-500/10 border-orange-500/20 hover:border-orange-500/40"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(249, 115, 22, 0.08) 6px, rgba(249, 115, 22, 0.08) 12px)',
+                }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <ListIcon className="h-3.5 w-3.5 text-orange-700 shrink-0" />
+                  <span className="text-xs font-medium text-orange-700">List</span>
+                </div>
+              </div>
+
+              {/* Dictionary Node */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'dict',
+                    label: 'Dictionary'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 border rounded cursor-move hover:shadow-md transition-all bg-pink-500/10 border-pink-500/20 hover:border-pink-500/40"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(236, 72, 153, 0.08) 6px, rgba(236, 72, 153, 0.08) 12px)',
+                }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Braces className="h-3.5 w-3.5 text-pink-700 shrink-0" />
+                  <span className="text-xs font-medium text-pink-700">Dict</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
       {/* Nodebar content with tabs */}
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
@@ -680,31 +744,40 @@ function Nodebar() {
                     </div>
                     {/* Grouped view when no search and multiple tags exist */}
                     {!debouncedSearchQuery && selectedTags.size === 0 && Object.keys(groupedNodes).length > 1 ? (
-                      Object.keys(groupedNodes).sort().map(groupName => {
+                      <>
+                      <div className="flex items-center gap-2 pb-1">
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={expandAllGroups}>
+                          <ChevronDown className="h-3 w-3 mr-1" />Expand All
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={collapseAllGroups}>
+                          <ChevronUp className="h-3 w-3 mr-1" />Collapse All
+                        </Button>
+                      </div>
+                      {Object.keys(groupedNodes).sort().map(groupName => {
                         const groupNodes = groupedNodes[groupName]
-                        const isCollapsed = collapsedGroups.has(groupName)
+                        const isExpanded = expandedGroups.has(groupName)
                         return (
-                          <Collapsible key={groupName} open={!isCollapsed} onOpenChange={() => toggleGroupCollapse(groupName)}>
+                          <Collapsible key={groupName} open={isExpanded} onOpenChange={() => toggleGroupExpand(groupName)}>
                             <CollapsibleTrigger asChild>
                               <Button
                                 variant="ghost"
                                 className="w-full justify-between px-2 py-1.5 h-auto hover:bg-accent/50"
                               >
                                 <div className="flex items-center gap-1.5">
-                                  {isCollapsed ? (
-                                    <Folder className="h-3.5 w-3.5 text-muted-foreground" />
-                                  ) : (
+                                  {isExpanded ? (
                                     <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                                  ) : (
+                                    <Folder className="h-3.5 w-3.5 text-muted-foreground" />
                                   )}
                                   <span className="text-xs font-semibold">{groupName}</span>
                                   <Badge variant="secondary" className="h-4 px-1 text-[10px]">
                                     {groupNodes.length}
                                   </Badge>
                                 </div>
-                                {isCollapsed ? (
-                                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                ) : (
+                                {isExpanded ? (
                                   <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                                ) : (
+                                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
                                 )}
                               </Button>
                             </CollapsibleTrigger>
@@ -726,7 +799,8 @@ function Nodebar() {
                             </CollapsibleContent>
                           </Collapsible>
                         )
-                      })
+                      })}
+                      </>
                     ) : (
                       <>
                         {visibleNodes.map((node) => (

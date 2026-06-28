@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Folder, LucideIcon, Workflow,KanbanSquare, PackageSearch, Warehouse } from 'lucide-react'
+import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, Warehouse, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { host, port } from '@/config/server'
@@ -23,6 +23,7 @@ import { UploadProgressIndicator } from './FileExplorer_New/components/UploadPro
 import Nodebar from './Nodebar/Nodebar'
 import Settings from '../settings/Settings'
 import PackageManager from './PackageManager/PackageManager'
+import CronJobs from './CronJobs/CronJobs'
 
 /**
  * ToolbarItem represents an item in the sidebar toolbar
@@ -113,6 +114,12 @@ function Toolbar({ onComponentChange, sidebarOpen, onToggleSidebar }: ToolbarPro
       icon: Warehouse,
       type: "sidebar",
       component: () => <>Directly mount storage bucket to any folder Google Drive / S3 Bucket etc...</>
+    },
+    {
+      name: "Cron Jobs",
+      icon: Clock,
+      type: "sidebar",
+      component: () => <CronJobs />
     },
     // {
     //   name: "Git",
