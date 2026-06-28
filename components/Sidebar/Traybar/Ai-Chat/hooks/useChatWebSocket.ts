@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useChatStore, type ChatMentionItem, type UploadedFile } from '../components/chatStore';
 import { wsService } from './wsService';
+import { useTabStore } from '@/components/FileTabs/useTabStore';
 
 export interface SendMessageOptions {
   mentions?: ChatMentionItem[];
@@ -468,6 +469,20 @@ export const useChatWebSocket = () => {
           break;
         case 'tool_execution_start':
           break;
+        case 'canvas_update': {
+          // Dispatch a custom window event that Canvas.tsx listens for
+          // This allows gradual canvas updates without hard refreshes
+          window.dispatchEvent(new CustomEvent('canvasUpdateEvent', {
+            detail: {
+              action: message.action,
+              node: message.node,
+              edge: message.edge,
+              node_id: message.node_id,
+              filePath: message.filePath,
+            }
+          }));
+          break;
+        }
         case 'tool_start': {
           const toolStepId = message.tool_message_id || `tool-${Date.now()}`;
           // Remove thinking messages — the agent is now executing a tool, not pondering
@@ -486,20 +501,41 @@ export const useChatWebSocket = () => {
           });
           break;
         }
+        case 'tool_code': {
+          const codeToolStepId = message.tool_message_id || `tool-${Date.now()}`;
+          sessionAddMessage({
+            type: 'tool_code',
+            role: 'assistant',
+            content: '',
+            toolName: message.tool_name || 'tool',
+            code: message.code || '',
+            codeLanguage: message.language || 'bash',
+            outputLines: [],
+            isRunning: true,
+            metadata: {
+              toolName: message.tool_name || 'tool',
+              toolMessageId: codeToolStepId,
+            },
+          });
+          break;
+        }
         case 'tool_output_stream': {
           const streamMessages = sessionGetMessages();
           const toolMsg = streamMessages.find(
-            m => m.type === 'tool' && m.metadata?.toolMessageId === message.tool_message_id
+            m => (m.type === 'tool' || m.type === 'tool_code') && m.metadata?.toolMessageId === message.tool_message_id
           );
           if (toolMsg) {
-            const currentOutput = toolMsg.result || '';
-            const newOutput = currentOutput + (currentOutput ? '\n' : '') + (message.output || '');
+            const newOutputLine = message.output || '';
             sessionUpdateMessages(msgs =>
-              msgs.map(m =>
-                m.id === toolMsg.id
-                  ? { ...m, result: newOutput }
-                  : m
-              )
+              msgs.map(m => {
+                if (m.id !== toolMsg.id) return m;
+                if (m.type === 'tool_code') {
+                  return { ...m, outputLines: [...(m.outputLines || []), newOutputLine] };
+                }
+                const currentOutput = m.result || '';
+                const newOutput = currentOutput + (currentOutput ? '\n' : '') + newOutputLine;
+                return { ...m, result: newOutput };
+              })
             );
           }
           break;
@@ -508,7 +544,7 @@ export const useChatWebSocket = () => {
         case 'tool_execution_complete': {
           const resultMessages = sessionGetMessages();
           const toolMsg = resultMessages.find(
-            m => m.type === 'tool' && m.metadata?.toolMessageId === message.tool_message_id && m.isRunning
+            m => (m.type === 'tool' || m.type === 'tool_code') && m.metadata?.toolMessageId === message.tool_message_id && m.isRunning
           );
           if (toolMsg) {
             sessionUpdateMessages(msgs =>
@@ -782,6 +818,51 @@ export const useChatWebSocket = () => {
         case 'max_output_tokens_recovery':
         case 'stop_hook_blocking':
           break;
+        case 'command_stopped': {
+          const cmdToolMsg = sessionGetMessages().find(
+            m => (m.type === 'tool' || m.type === 'tool_code') && m.metadata?.toolMessageId === message.tool_message_id
+          );
+          if (cmdToolMsg) {
+            sessionUpdateMessages(msgs =>
+              msgs.map(m =>
+                m.id === cmdToolMsg.id
+                  ? {
+                      ...m,
+                      isRunning: false,
+                      result: m.result || (message.killed ? 'Command stopped by user' : 'Command finished'),
+                      toolResult: {
+                        status: 'stopped',
+                        error: message.killed ? 'Command was killed' : undefined,
+                      },
+                    }
+                  : m
+              )
+            );
+          }
+          break;
+        }
+        case 'ask_user_question_resolved': {
+          const askToolMsg = sessionGetMessages().find(
+            m => m.type === 'confirmation' && m.metadata?.toolMessageId === message.tool_message_id
+          );
+          if (askToolMsg) {
+            sessionUpdateMessages(msgs =>
+              msgs.map(m =>
+                m.id === askToolMsg.id
+                  ? {
+                      ...m,
+                      confirmation: {
+                        ...m.confirmation!,
+                        state: 'approval-responded',
+                        approved: true,
+                      },
+                    }
+                  : m
+              )
+            );
+          }
+          break;
+        }
         case 'error':
           sessionAddMessage({
             type: 'system',
@@ -872,6 +953,27 @@ export const useChatWebSocket = () => {
       // Get the active file explorer root path
       const activeRootPath = options?.rootPath || (typeof window !== 'undefined' ? localStorage.getItem('fileExplorer_rootPath') || undefined : undefined);
 
+      // Collect open tabs info (paths + active tab) so the backend agent knows
+      // which files are open, especially .flow files for the canvas agent
+      let openTabs: { path: string; name: string; isActive: boolean }[] | undefined;
+      try {
+        const tabState = useTabStore.getState();
+        const allTabs = tabState.getAllTabs();
+        const activeId = tabState.activeTabId;
+        if (allTabs.length > 0) {
+          openTabs = allTabs.map((t) => ({
+            path: t.path,
+            name: t.name,
+            isActive: t.id === activeId,
+          }));
+          console.log('[AI Chat] Sending open_tabs:', openTabs.length, 'tabs, active:', openTabs.find(t => t.isActive)?.path || 'none');
+        } else {
+          console.log('[AI Chat] No open tabs found in tab store');
+        }
+      } catch (e) {
+        console.error('[AI Chat] Failed to collect open tabs:', e);
+      }
+
       wsService.sendMessage({
         type: 'chat',
         content,
@@ -887,6 +989,7 @@ export const useChatWebSocket = () => {
         command_args: options?.commandArgs || undefined,
         root_path: activeRootPath,
         keep_intermediate_files: options?.keepIntermediateFiles,
+        open_tabs: openTabs,
       });
 
       if (isNew) {

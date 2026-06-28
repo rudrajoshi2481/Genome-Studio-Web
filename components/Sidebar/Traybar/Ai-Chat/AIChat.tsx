@@ -12,6 +12,7 @@ import PlanMessage from './components/PlanMessage';
 import TaskMessage from './components/TaskMessage';
 import ConfirmationMessage from './components/ConfirmationMessage';
 import ToolMessage from './components/ToolMessage';
+import ToolCodeMessage from './components/ToolCodeMessage';
 import ChatGreeting from './components/ChatGreeting';
 import {
   Conversation,
@@ -257,7 +258,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   };
 
   const renderMessage = (message: any, index: number) => {
-    const groupedTypes = ['tool', 'reasoning', 'plan', 'task', 'confirmation'];
+    const groupedTypes = ['tool', 'tool_code', 'reasoning', 'plan', 'task', 'confirmation'];
     const isGrouped = index > 0 && groupedTypes.includes(message.type);
     const wrapperClass = isGrouped ? '-mt-4' : '';
     const isLast = index === messages.length - 1;
@@ -276,6 +277,8 @@ function AIChat({ onClose }: { onClose?: () => void }) {
           const toolMessageId = message.metadata?.toolMessageId || id;
           sendToolApproval(toolMessageId, false);
         }} />;
+      case 'tool_code':
+        return <ToolCodeMessage key={message.id} message={message} isLast={isLast} onStopCommand={stopCommand} />;
       case 'confirmation':
         return <ConfirmationMessage key={message.id} message={message} onApprove={(toolName, approved, _reason, approvalMode) => {
           const toolMessageId = message.metadata?.toolMessageId || message.id;

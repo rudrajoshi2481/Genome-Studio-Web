@@ -217,6 +217,67 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
     setExecutionStatus(null);
   }, [setNodes]);
 
+  // --- Canvas Agent update listener ---
+  // Listens for canvasUpdateEvent dispatched by useChatWebSocket when
+  // the canvas agent sends canvas_update messages via WebSocket.
+  // Applies changes directly to ReactFlow state for smooth, gradual updates.
+  useEffect(() => {
+    const handleCanvasUpdate = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (!detail) return;
+
+      // Targeting: if the message includes a filePath, only apply it to the
+      // matching canvas. If no filePath is specified, apply to all canvases
+      // (backward compatibility).
+      const targetFilePath = detail.filePath;
+      if (targetFilePath && targetFilePath !== filePath) return;
+
+      const { action, node, edge, node_id } = detail;
+
+      if (action === 'add_node' && node) {
+        // Add the node with filePath for consistency
+        const newNode = {
+          ...node,
+          data: {
+            ...node.data,
+            filePath: filePath,
+          },
+        };
+        setNodes((nds) => {
+          // Avoid duplicate if node already exists
+          if (nds.some((n) => n.id === node.id)) return nds;
+          return nds.concat(newNode);
+        });
+        // Mark tab as dirty since canvas changed
+        setDirty(tabId, true);
+        updateTab(tabId, { isDirty: true });
+      } else if (action === 'add_edge' && edge) {
+        setEdges((eds) => {
+          // Avoid duplicate edges
+          if (eds.some((e) => e.id === edge.id)) return eds;
+          return eds.concat(edge);
+        });
+        setDirty(tabId, true);
+        updateTab(tabId, { isDirty: true });
+      } else if (action === 'remove_node' && node_id) {
+        setNodes((nds) => nds.filter((n) => n.id !== node_id));
+        setEdges((eds) => eds.filter((e) => e.source !== node_id && e.target !== node_id));
+        setDirty(tabId, true);
+        updateTab(tabId, { isDirty: true });
+      } else if (action === 'clear') {
+        setNodes([]);
+        setEdges([]);
+        setDirty(tabId, true);
+        updateTab(tabId, { isDirty: true });
+      }
+    };
+
+    window.addEventListener('canvasUpdateEvent', handleCanvasUpdate);
+    return () => {
+      window.removeEventListener('canvasUpdateEvent', handleCanvasUpdate);
+    };
+  }, [filePath, tabId, setNodes, setEdges, setDirty, updateTab]);
+
   // Load file content
   const loadFileContent = useCallback(async () => {
     if (!filePath) return;

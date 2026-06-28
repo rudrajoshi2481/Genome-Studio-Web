@@ -60,7 +60,7 @@ export type ReasoningStep =
 
 export interface Message {
   id: string
-  type: 'human' | 'ai' | 'tool' | 'system' | 'thinking' | 'stream' | 'reasoning' | 'plan' | 'task' | 'confirmation'
+  type: 'human' | 'ai' | 'tool' | 'tool_code' | 'system' | 'thinking' | 'stream' | 'reasoning' | 'plan' | 'task' | 'confirmation'
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp?: string
@@ -100,6 +100,9 @@ export interface Message {
     approved?: boolean
     reason?: string
   }
+  code?: string
+  codeLanguage?: string
+  outputLines?: string[]
   metadata?: {
     toolName?: string
     toolArgs?: Record<string, any>
@@ -337,6 +340,9 @@ export const useChatStore = create<ChatState>()(
           };
         }
         if (msg.type === 'tool' && msg.isRunning) {
+          return { ...msg, isRunning: false };
+        }
+        if (msg.type === 'tool_code' && msg.isRunning) {
           return { ...msg, isRunning: false };
         }
         return msg;

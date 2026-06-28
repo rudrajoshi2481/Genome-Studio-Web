@@ -7,7 +7,6 @@ import {
   PromptInput,
   PromptInputFooter,
   PromptInputTools,
-  type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input'
 import {
   ModelSelector,
@@ -293,18 +292,6 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
     }
 
     if (onSendMessage) {
-      const messageParts: PromptInputMessage = {
-        text,
-        parts: [
-          { text, type: 'text' as const },
-          ...uploadedFiles.map(f => ({
-            filename: f.name,
-            mediaType: f.mimeType,
-            type: 'file' as const,
-            url: f.previewUrl,
-          })),
-        ],
-      }
       onSendMessage(text, selectedModel)
     }
 
