@@ -240,10 +240,22 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
         clearInput()
         break
       case '/clear':
+      case 'clear':
+        if (onSendCommand) {
+          onSendCommand('clear', [], selectedModel)
+        }
         clearMessages()
         clearInput()
         break
+      case '/compact':
+      case 'compact':
+        if (onSendCommand) {
+          onSendCommand('compact', [], selectedModel)
+        }
+        clearInput()
+        break
       case '/help':
+      case 'help':
         if (onSendCommand) {
           onSendCommand('help', [], selectedModel)
         }
@@ -310,28 +322,13 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
     const editor = editorRef.current
     if (!editor) return
 
-    const { from } = editor.state.selection
-    const textBefore = editor.state.doc.textBetween(0, from, '', '')
-    const lastSlashIdx = textBefore.lastIndexOf('/')
+    editor.chain().focus().clearContent().run()
+    setInputValue('')
+    setMentions([])
+    clearMentions()
+    clearUploadedFiles()
 
-    const mentionNode = {
-      type: 'mention' as const,
-      attrs: {
-        label: cmd.name,
-        id: JSON.stringify({ type: 'command', name: cmd.name, id: cmd.name, description: cmd.description }),
-      },
-    }
-    const spaceNode = { type: 'text' as const, text: ' ' }
-
-    if (lastSlashIdx >= 0) {
-      const deleteFrom = from - (textBefore.length - lastSlashIdx)
-      editor.chain().focus()
-        .deleteRange({ from: Math.max(1, deleteFrom), to: from })
-        .insertContent([mentionNode, spaceNode])
-        .run()
-    } else {
-      editor.chain().focus().insertContent([mentionNode, spaceNode]).run()
-    }
+    executeSlashCommand(`/${cmd.name}`)
   }
 
   const checkForSlashTrigger = (text: string) => {
