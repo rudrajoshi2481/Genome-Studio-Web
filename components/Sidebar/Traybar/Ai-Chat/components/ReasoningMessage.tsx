@@ -55,7 +55,7 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
   }
 
   return (
-    <div className="px-3 py-1">
+    <div className="px-3 py-0.5">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"

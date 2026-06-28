@@ -126,10 +126,12 @@ function FileTab({
         <div 
           className={cn(
             'flex items-center h-9 px-3 py-1 text-sm cursor-pointer group relative overflow-hidden flex-shrink-0',
-            'transition-colors duration-200',
-            isActive ? 'bg-gray-100' : 'hover:bg-gray-50',
-            isDirty && !isExecuting && 'border-b-2 border-yellow-400',
-            isExecuting && 'border-b-2 border-green-500',
+            'transition-colors duration-150 border-t-2 border-t-transparent',
+            isActive
+              ? 'bg-background text-foreground border-t-blue-500'
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+            isDirty && !isExecuting && 'border-b-2 border-b-yellow-400',
+            isExecuting && 'border-b-2 border-b-green-500',
           )}
           onClick={handleActivate}
           data-tab-id={id}

@@ -146,6 +146,21 @@ interface ChatSession {
   messages: Message[]
   pendingFiles: PendingFile[]
   isTemporary: boolean
+  tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }
+  contextWindow: number
+  isLoading: boolean
+  queuedMessages: QueueMessageItem[]
+  queuedTodos: QueueTodoItem[]
+  mentions: ChatMentionItem[]
+  uploadedFiles: UploadedFile[]
+  promptSuggestions: string[]
+  permissionMode: 'default' | 'bypass' | 'always'
+  allowedTools: string[]
+  currentStreamingMessageId: string | null
+  currentReasoningId: string | null
+  showFilePanel: boolean
+  currentConversationId: string | null
+  isNewChat: boolean
 }
 
 interface ChatState {
@@ -160,7 +175,7 @@ interface ChatState {
   currentStreamingMessageId: string | null
   currentReasoningId: string | null
   showConversationHistory: boolean
-  tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number }
+  tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }
   contextWindow: number
   queuedMessages: QueueMessageItem[]
   queuedTodos: QueueTodoItem[]
@@ -186,7 +201,7 @@ interface ChatState {
   setShowConversationHistory: (show: boolean) => void
   loadConversationMessages: (conversationId: string) => void
   updateReasoningMessage: (id: string, content: string, isStreaming?: boolean) => void
-  setTokenUsage: (usage: { inputTokens: number; outputTokens: number; totalTokens: number }) => void
+  setTokenUsage: (usage: { inputTokens: number; outputTokens: number; totalTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }) => void
   setContextWindow: (size: number) => void
   addQueuedMessage: (message: QueueMessageItem) => void
   removeQueuedMessage: (id: string) => void
@@ -246,7 +261,7 @@ export const useChatStore = create<ChatState>()(
   currentStreamingMessageId: null,
   currentReasoningId: null,
   showConversationHistory: true,
-  tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+  tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
   contextWindow: 4096,
   queuedMessages: [],
   queuedTodos: [],
@@ -457,12 +472,57 @@ export const useChatStore = create<ChatState>()(
 
   openSession: (id, title, msgs) => {
     set((state) => {
-      if (state.openSessions.some(s => s.id === id)) {
-        return { activeSessionId: id };
+      const existing = state.openSessions.find(s => s.id === id);
+      if (existing) {
+        return {
+          activeSessionId: id,
+          messages: existing.messages,
+          pendingFiles: existing.pendingFiles || [],
+          tokenUsage: existing.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+          contextWindow: existing.contextWindow || 4096,
+          isLoading: existing.isLoading || false,
+          queuedMessages: existing.queuedMessages || [],
+          queuedTodos: existing.queuedTodos || [],
+          mentions: existing.mentions || [],
+          uploadedFiles: existing.uploadedFiles || [],
+          promptSuggestions: existing.promptSuggestions || [],
+          permissionMode: existing.permissionMode || 'default',
+          allowedTools: existing.allowedTools || [],
+          currentStreamingMessageId: existing.currentStreamingMessageId || null,
+          currentReasoningId: existing.currentReasoningId || null,
+          showFilePanel: existing.showFilePanel || false,
+          currentConversationId: existing.currentConversationId ?? (id.startsWith('temp-') ? null : id),
+          isNewChat: existing.isNewChat ?? id.startsWith('temp-'),
+        };
       }
+      const newSession: ChatSession = {
+        id, title, messages: msgs || [], pendingFiles: [], isTemporary: id.startsWith('temp-'),
+        tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }, contextWindow: 4096, isLoading: false,
+        queuedMessages: [], queuedTodos: [], mentions: [], uploadedFiles: [], promptSuggestions: [],
+        permissionMode: 'default' as 'default' | 'bypass' | 'always', allowedTools: [],
+        currentStreamingMessageId: null, currentReasoningId: null, showFilePanel: false,
+        currentConversationId: id.startsWith('temp-') ? null : id, isNewChat: id.startsWith('temp-'),
+      };
       return {
-        openSessions: [...state.openSessions, { id, title, messages: msgs || [], pendingFiles: [], isTemporary: id.startsWith('temp-') }],
+        openSessions: [...state.openSessions, newSession],
         activeSessionId: id,
+        messages: msgs || [],
+        pendingFiles: [],
+        tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+        contextWindow: 4096,
+        isLoading: false,
+        queuedMessages: [],
+        queuedTodos: [],
+        mentions: [],
+        uploadedFiles: [],
+        promptSuggestions: [],
+        permissionMode: 'default' as 'default' | 'bypass' | 'always',
+        allowedTools: [],
+        currentStreamingMessageId: null,
+        currentReasoningId: null,
+        showFilePanel: false,
+        currentConversationId: id.startsWith('temp-') ? null : id,
+        isNewChat: id.startsWith('temp-'),
       };
     });
   },
@@ -474,22 +534,52 @@ export const useChatStore = create<ChatState>()(
       if (state.activeSessionId === id) {
         newActiveId = remaining.length > 0 ? remaining[remaining.length - 1].id : null;
       }
-      let newMessages = state.messages;
       if (newActiveId) {
         const session = remaining.find(s => s.id === newActiveId);
         if (session) {
-          newMessages = session.messages;
+          return {
+            openSessions: remaining,
+            activeSessionId: newActiveId,
+            messages: session.messages,
+            pendingFiles: session.pendingFiles || [],
+            tokenUsage: session.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+            contextWindow: session.contextWindow || 4096,
+            isLoading: session.isLoading || false,
+            queuedMessages: session.queuedMessages || [],
+            queuedTodos: session.queuedTodos || [],
+            mentions: session.mentions || [],
+            uploadedFiles: session.uploadedFiles || [],
+            promptSuggestions: session.promptSuggestions || [],
+            permissionMode: session.permissionMode || 'default',
+            allowedTools: session.allowedTools || [],
+            currentStreamingMessageId: session.currentStreamingMessageId || null,
+            currentReasoningId: session.currentReasoningId || null,
+            showFilePanel: session.showFilePanel || false,
+            currentConversationId: session.currentConversationId ?? (newActiveId.startsWith('temp-') ? null : newActiveId),
+            isNewChat: session.isNewChat ?? newActiveId.startsWith('temp-'),
+          };
         }
-      } else {
-        newMessages = [];
       }
       return {
         openSessions: remaining,
-        activeSessionId: newActiveId,
-        messages: newMessages,
-        currentConversationId: newActiveId && !newActiveId.startsWith('temp-') ? newActiveId : null,
-        isNewChat: !newActiveId || newActiveId.startsWith('temp-'),
-        promptSuggestions: [],
+        activeSessionId: null as string | null,
+        messages: [] as Message[],
+        pendingFiles: [] as PendingFile[],
+        tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+        contextWindow: 4096,
+        isLoading: false,
+        queuedMessages: [] as QueueMessageItem[],
+        queuedTodos: [] as QueueTodoItem[],
+        mentions: [] as ChatMentionItem[],
+        uploadedFiles: [] as UploadedFile[],
+        promptSuggestions: [] as string[],
+        permissionMode: 'default' as 'default' | 'bypass' | 'always',
+        allowedTools: [] as string[],
+        currentStreamingMessageId: null,
+        currentReasoningId: null,
+        showFilePanel: false,
+        currentConversationId: null,
+        isNewChat: true,
       };
     });
   },
@@ -499,10 +589,29 @@ export const useChatStore = create<ChatState>()(
     const session = state.openSessions.find(s => s.id === id);
     if (!session) return;
 
-    // Cache current messages into the current session
+    // Cache ALL current state into the outgoing session
     const updatedSessions = state.openSessions.map(s =>
       s.id === state.activeSessionId
-        ? { ...s, messages: state.messages, pendingFiles: state.pendingFiles }
+        ? {
+            ...s,
+            messages: state.messages,
+            pendingFiles: state.pendingFiles,
+            tokenUsage: state.tokenUsage,
+            contextWindow: state.contextWindow,
+            isLoading: state.isLoading,
+            queuedMessages: state.queuedMessages,
+            queuedTodos: state.queuedTodos,
+            mentions: state.mentions,
+            uploadedFiles: state.uploadedFiles,
+            promptSuggestions: state.promptSuggestions,
+            permissionMode: state.permissionMode,
+            allowedTools: state.allowedTools,
+            currentStreamingMessageId: state.currentStreamingMessageId,
+            currentReasoningId: state.currentReasoningId,
+            showFilePanel: state.showFilePanel,
+            currentConversationId: state.currentConversationId,
+            isNewChat: state.isNewChat,
+          }
         : s
     );
 
@@ -512,9 +621,21 @@ export const useChatStore = create<ChatState>()(
       activeSessionId: id,
       messages: targetSession?.messages || [],
       pendingFiles: targetSession?.pendingFiles || [],
-      currentConversationId: id.startsWith('temp-') ? null : id,
-      isNewChat: id.startsWith('temp-'),
-      promptSuggestions: [],
+      tokenUsage: targetSession?.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      contextWindow: targetSession?.contextWindow || 4096,
+      isLoading: targetSession?.isLoading || false,
+      queuedMessages: targetSession?.queuedMessages || [],
+      queuedTodos: targetSession?.queuedTodos || [],
+      mentions: targetSession?.mentions || [],
+      uploadedFiles: targetSession?.uploadedFiles || [],
+      promptSuggestions: targetSession?.promptSuggestions || [],
+      permissionMode: targetSession?.permissionMode || 'default',
+      allowedTools: targetSession?.allowedTools || [],
+      currentStreamingMessageId: targetSession?.currentStreamingMessageId || null,
+      currentReasoningId: targetSession?.currentReasoningId || null,
+      showFilePanel: targetSession?.showFilePanel || false,
+      currentConversationId: targetSession?.currentConversationId ?? (id.startsWith('temp-') ? null : id),
+      isNewChat: targetSession?.isNewChat ?? id.startsWith('temp-'),
     });
   },
 
@@ -532,7 +653,26 @@ export const useChatStore = create<ChatState>()(
     set((s) => ({
       openSessions: s.openSessions.map(sess =>
         sess.id === state.activeSessionId
-          ? { ...sess, messages: state.messages, pendingFiles: state.pendingFiles }
+          ? {
+              ...sess,
+              messages: state.messages,
+              pendingFiles: state.pendingFiles,
+              tokenUsage: state.tokenUsage,
+              contextWindow: state.contextWindow,
+              isLoading: state.isLoading,
+              queuedMessages: state.queuedMessages,
+              queuedTodos: state.queuedTodos,
+              mentions: state.mentions,
+              uploadedFiles: state.uploadedFiles,
+              promptSuggestions: state.promptSuggestions,
+              permissionMode: state.permissionMode,
+              allowedTools: state.allowedTools,
+              currentStreamingMessageId: state.currentStreamingMessageId,
+              currentReasoningId: state.currentReasoningId,
+              showFilePanel: state.showFilePanel,
+              currentConversationId: state.currentConversationId,
+              isNewChat: state.isNewChat,
+            }
           : sess
       ),
     }));
@@ -644,8 +784,21 @@ export const useChatStore = create<ChatState>()(
           const activeSession = state.openSessions.find(s => s.id === state.activeSessionId);
           if (activeSession) {
             state.messages = activeSession.messages;
-            state.currentConversationId = state.activeSessionId.startsWith('temp-') ? null : state.activeSessionId;
-            state.isNewChat = state.activeSessionId.startsWith('temp-');
+            state.tokenUsage = activeSession.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+            state.contextWindow = activeSession.contextWindow || 4096;
+            state.isLoading = false;
+            state.currentConversationId = activeSession.currentConversationId ?? (state.activeSessionId.startsWith('temp-') ? null : state.activeSessionId);
+            state.isNewChat = activeSession.isNewChat ?? state.activeSessionId.startsWith('temp-');
+            state.queuedMessages = activeSession.queuedMessages || [];
+            state.queuedTodos = activeSession.queuedTodos || [];
+            state.mentions = activeSession.mentions || [];
+            state.uploadedFiles = activeSession.uploadedFiles || [];
+            state.promptSuggestions = activeSession.promptSuggestions || [];
+            state.permissionMode = activeSession.permissionMode || 'default';
+            state.allowedTools = activeSession.allowedTools || [];
+            state.currentStreamingMessageId = null;
+            state.currentReasoningId = null;
+            state.showFilePanel = activeSession.showFilePanel || false;
           }
         }
       },

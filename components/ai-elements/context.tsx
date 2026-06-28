@@ -6,14 +6,12 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import type { LanguageModelUsage } from "ai";
 import type { ComponentProps } from "react";
 import { createContext, useContext, useMemo } from "react";
 import { getUsage } from "tokenlens";
 
-const PERCENT_MAX = 100;
 const ICON_RADIUS = 10;
 const ICON_VIEWBOX = 24;
 const ICON_CENTER = 12;
@@ -64,23 +62,24 @@ export const Context = ({
 const ContextIcon = () => {
   const { usedTokens, maxTokens } = useContextValue();
   const circumference = 2 * Math.PI * ICON_RADIUS;
-  const usedPercent = usedTokens / maxTokens;
+  const usedPercent = Math.min(usedTokens / maxTokens, 1);
   const dashOffset = circumference * (1 - usedPercent);
+
+  const color = usedPercent > 0.9 ? "#ef4444" : usedPercent > 0.7 ? "#f59e0b" : "#22c55e";
 
   return (
     <svg
       aria-label="Model context usage"
-      height="20"
+      height="16"
       role="img"
-      style={{ color: "currentcolor" }}
       viewBox={`0 0 ${ICON_VIEWBOX} ${ICON_VIEWBOX}`}
-      width="20"
+      width="16"
     >
       <circle
         cx={ICON_CENTER}
         cy={ICON_CENTER}
         fill="none"
-        opacity="0.25"
+        opacity="0.2"
         r={ICON_RADIUS}
         stroke="currentColor"
         strokeWidth={ICON_STROKE_WIDTH}
@@ -89,9 +88,9 @@ const ContextIcon = () => {
         cx={ICON_CENTER}
         cy={ICON_CENTER}
         fill="none"
-        opacity="0.7"
+        opacity="0.9"
         r={ICON_RADIUS}
-        stroke="currentColor"
+        stroke={color}
         strokeDasharray={`${circumference} ${circumference}`}
         strokeDashoffset={dashOffset}
         strokeLinecap="round"
@@ -105,20 +104,10 @@ const ContextIcon = () => {
 export type ContextTriggerProps = ComponentProps<typeof Button>;
 
 export const ContextTrigger = ({ children, ...props }: ContextTriggerProps) => {
-  const { usedTokens, maxTokens } = useContextValue();
-  const usedPercent = usedTokens / maxTokens;
-  const renderedPercent = new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 1,
-    style: "percent",
-  }).format(usedPercent);
-
   return (
     <HoverCardTrigger asChild>
       {children ?? (
         <Button type="button" variant="ghost" {...props}>
-          <span className="font-medium text-muted-foreground">
-            {renderedPercent}
-          </span>
           <ContextIcon />
         </Button>
       )}
@@ -133,7 +122,7 @@ export const ContextContent = ({
   ...props
 }: ContextContentProps) => (
   <HoverCardContent
-    className={cn("min-w-60 divide-y overflow-hidden p-0", className)}
+    className={cn("min-w-34 max-w-32 mr-5 divide-y overflow-hidden p-0", className)}
     {...props}
   />
 );
@@ -159,19 +148,11 @@ export const ContextContentHeader = ({
   }).format(maxTokens);
 
   return (
-    <div className={cn("w-full space-y-2 p-3", className)} {...props}>
+    <div className={cn("w-full p-3", className)} {...props}>
       {children ?? (
-        <>
-          <div className="flex items-center justify-between gap-3 text-xs">
-            <p>{displayPct}</p>
-            <p className="font-mono text-muted-foreground">
-              {used} / {total}
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Progress className="bg-muted" value={usedPercent * PERCENT_MAX} />
-          </div>
-        </>
+        <p className="font-mono text-xs text-muted-foreground text-center">
+          {used} / {total}
+        </p>
       )}
     </div>
   );
@@ -231,7 +212,6 @@ export const ContextContentFooter = ({
 
 const TokensWithCost = ({
   tokens,
-  costText,
 }: {
   tokens?: number;
   costText?: string;
@@ -242,9 +222,6 @@ const TokensWithCost = ({
       : new Intl.NumberFormat("en-US", {
           notation: "compact",
         }).format(tokens)}
-    {costText ? (
-      <span className="ml-2 text-muted-foreground">• {costText}</span>
-    ) : null}
   </span>
 );
 
@@ -266,24 +243,13 @@ export const ContextInputUsage = ({
     return null;
   }
 
-  const inputCost = modelId
-    ? getUsage({
-        modelId,
-        usage: { input: inputTokens, output: 0 },
-      }).costUSD?.totalUSD
-    : undefined;
-  const inputCostText = new Intl.NumberFormat("en-US", {
-    currency: "USD",
-    style: "currency",
-  }).format(inputCost ?? 0);
-
   return (
     <div
       className={cn("flex items-center justify-between text-xs", className)}
       {...props}
     >
       <span className="text-muted-foreground">Input</span>
-      <TokensWithCost costText={inputCostText} tokens={inputTokens} />
+      <TokensWithCost tokens={inputTokens} />
     </div>
   );
 };
@@ -306,24 +272,13 @@ export const ContextOutputUsage = ({
     return null;
   }
 
-  const outputCost = modelId
-    ? getUsage({
-        modelId,
-        usage: { input: 0, output: outputTokens },
-      }).costUSD?.totalUSD
-    : undefined;
-  const outputCostText = new Intl.NumberFormat("en-US", {
-    currency: "USD",
-    style: "currency",
-  }).format(outputCost ?? 0);
-
   return (
     <div
       className={cn("flex items-center justify-between text-xs", className)}
       {...props}
     >
       <span className="text-muted-foreground">Output</span>
-      <TokensWithCost costText={outputCostText} tokens={outputTokens} />
+      <TokensWithCost tokens={outputTokens} />
     </div>
   );
 };

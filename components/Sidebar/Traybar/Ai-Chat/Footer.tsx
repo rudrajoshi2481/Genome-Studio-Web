@@ -594,7 +594,11 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
                 inputTokens: tokenUsage.inputTokens,
                 outputTokens: tokenUsage.outputTokens,
                 totalTokens: tokenUsage.totalTokens,
-                inputTokenDetails: { cacheReadTokens: 0, cacheWriteTokens: 0, noCacheTokens: 0 },
+                inputTokenDetails: {
+                  cacheReadTokens: tokenUsage.cacheReadTokens || 0,
+                  cacheWriteTokens: tokenUsage.cacheWriteTokens || 0,
+                  noCacheTokens: Math.max(0, tokenUsage.inputTokens - (tokenUsage.cacheReadTokens || 0) - (tokenUsage.cacheWriteTokens || 0)),
+                },
                 outputTokenDetails: { reasoningTokens: 0, textTokens: 0 },
               }}
               modelId={selectedModel}
@@ -605,10 +609,7 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
                 <ContextContentBody>
                   <ContextInputUsage />
                   <ContextOutputUsage />
-                  <ContextReasoningUsage />
-                  <ContextCacheUsage />
                 </ContextContentBody>
-                <ContextContentFooter />
               </ContextContent>
             </Context>
 

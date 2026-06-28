@@ -75,6 +75,17 @@ export const useChatWebSocket = () => {
         const session = useChatStore.getState().openSessions.find(s => s.id === msgSessionId);
         return session?.messages || [];
       };
+      const sessionSetLoading = (loading: boolean) => {
+        if (isActiveSession || !msgSessionId) {
+          setLoading(loading);
+        } else {
+          useChatStore.setState(state => ({
+            openSessions: state.openSessions.map(s =>
+              s.id === msgSessionId ? { ...s, isLoading: loading } : s
+            ),
+          }));
+        }
+      };
 
       switch (message.type) {
         case 'system':
@@ -84,7 +95,7 @@ export const useChatWebSocket = () => {
           // Ignore connection messages to prevent unknown message type error
           break;
         case 'message':
-          addMessage({
+          sessionAddMessage({
             type: message.role === 'user' ? 'human' : 'ai',
             role: message.role,
             content: message.content,
@@ -109,12 +120,17 @@ export const useChatWebSocket = () => {
           }
           break;
         case 'stream':
-          // If backend sent a session_id and we have a temp session, upgrade it
+          // If backend sent a session_id that doesn't match any existing session,
+          // and the active session is temp, upgrade the active temp session.
+          // This is now rare since we send conversation_id = temp ID for new chats,
+          // but kept as a safety net for backward compatibility.
           if (message.session_id) {
             const state = useChatStore.getState();
             const activeId = state.activeSessionId;
-            if (activeId && activeId.startsWith('temp-')) {
-              // Replace temp session with real session ID
+            const sessionExists = state.openSessions.some(s => s.id === message.session_id);
+            if (activeId && activeId.startsWith('temp-') && !sessionExists && message.session_id !== activeId) {
+              // Only upgrade if no existing session has this ID — prevents
+              // upgrading the wrong tab when multiple temp sessions are open
               const tempSession = state.openSessions.find(s => s.id === activeId);
               if (tempSession) {
                 useChatStore.setState({
@@ -181,6 +197,10 @@ export const useChatWebSocket = () => {
                   isComplete: message.is_complete,
                 });
               }
+              // When background session stream completes, clear its loading state
+              if (message.is_complete) {
+                sessionSetLoading(false);
+              }
             }
           }
           break;
@@ -207,7 +227,7 @@ export const useChatWebSocket = () => {
               });
               setStreamingMessage(null);
               setCurrentReasoningId(null);
-              setLoading(false);
+              sessionSetLoading(false);
             }
           } else {
             // Background session — finalize streaming messages there
@@ -224,6 +244,7 @@ export const useChatWebSocket = () => {
                 return m;
               })
             );
+            sessionSetLoading(false);
           }
           break;
         }
@@ -235,7 +256,7 @@ export const useChatWebSocket = () => {
             role: 'system',
             content: message.content
           });
-          if (isActiveSession) setLoading(true);
+          sessionSetLoading(true);
           break;
         case 'ai_thinking':
           sessionAddMessage({
@@ -416,7 +437,7 @@ export const useChatWebSocket = () => {
           if (isActiveSession) {
             const { currentStreamingMessageId: streamingId3 } = useChatStore.getState();
             if (!streamingId3) {
-              const messageId = addMessage({
+              const messageId = sessionAddMessage({
                 type: 'ai',
                 role: 'assistant',
                 content: message.content,
@@ -426,6 +447,22 @@ export const useChatWebSocket = () => {
               setStreamingMessage(messageId);
             } else {
               updateStreamingMessage(message.full_content, false);
+            }
+          } else {
+            const sessionMessages = sessionGetMessages();
+            const lastMsg = sessionMessages[sessionMessages.length - 1];
+            if (lastMsg && lastMsg.type === 'ai' && lastMsg.isStreaming) {
+              sessionUpdateMessages(msgs =>
+                msgs.map(m => m.id === lastMsg.id ? { ...m, content: message.full_content } : m)
+              );
+            } else {
+              sessionAddMessage({
+                type: 'ai',
+                role: 'assistant',
+                content: message.content,
+                isStreaming: true,
+                isComplete: false
+              });
             }
           }
           break;
@@ -494,8 +531,7 @@ export const useChatWebSocket = () => {
               )
             );
           }
-          if (message.saved_files && message.saved_files.length > 0 && isActiveSession) {
-            const { addPendingFiles } = useChatStore.getState();
+          if (message.saved_files && message.saved_files.length > 0) {
             const pendingFiles = message.saved_files.map((f: any) => ({
               id: `${f.file_id}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
               file_id: f.file_id,
@@ -508,7 +544,17 @@ export const useChatWebSocket = () => {
               additions: f.additions,
               deletions: f.deletions,
             }));
-            addPendingFiles(pendingFiles);
+            if (isActiveSession || !msgSessionId) {
+              useChatStore.getState().addPendingFiles(pendingFiles);
+            } else {
+              useChatStore.setState(state => ({
+                openSessions: state.openSessions.map(s =>
+                  s.id === msgSessionId
+                    ? { ...s, pendingFiles: [...(s.pendingFiles || []), ...pendingFiles], showFilePanel: true }
+                    : s
+                ),
+              }));
+            }
           }
           // Safety net: if all tools done, finalize streaming/loading state
           {
@@ -529,7 +575,7 @@ export const useChatWebSocket = () => {
               if (isActiveSession) {
                 setStreamingMessage(null);
                 setCurrentReasoningId(null);
-                setLoading(false);
+                sessionSetLoading(false);
               }
             }
           }
@@ -537,12 +583,12 @@ export const useChatWebSocket = () => {
         }
         case 'tool_approval_resolved': {
           const storeState = useChatStore.getState();
-          const toolMsg = storeState.messages.find(
+          const toolMsg = sessionGetMessages().find(
             m => m.type === 'tool' && m.metadata?.toolMessageId === message.tool_message_id
           );
           if (toolMsg) {
-            useChatStore.setState({
-              messages: storeState.messages.map(m =>
+            sessionUpdateMessages(msgs =>
+              msgs.map(m =>
                 m.id === toolMsg.id
                   ? {
                       ...m,
@@ -555,48 +601,62 @@ export const useChatWebSocket = () => {
                     }
                   : m
               )
-            });
+            );
           }
           break;
         }
         case 'permission_mode_changed': {
-          const { setPermissionMode, addAllowedTool } = useChatStore.getState();
           if (message.mode === 'bypass') {
-            setPermissionMode('bypass');
-            // Auto-resolve all pending confirmation messages
-            const state = useChatStore.getState();
-            useChatStore.setState({
-              messages: state.messages.map(m => {
-                if (m.type === 'tool' && m.confirmation?.state === 'approval-requested') {
-                  return {
-                    ...m,
-                    confirmation: {
-                      ...m.confirmation,
-                      state: 'approval-responded',
-                      approved: true,
-                    },
-                  };
-                }
-                if (m.type === 'confirmation' && m.confirmation?.state === 'approval-requested') {
-                  return {
-                    ...m,
-                    confirmation: {
-                      ...m.confirmation,
-                      state: 'approval-responded',
-                      approved: true,
-                    },
-                  };
-                }
-                return m;
-              }),
-            });
+            if (isActiveSession || !msgSessionId) {
+              useChatStore.getState().setPermissionMode('bypass');
+            } else {
+              useChatStore.setState(state => ({
+                openSessions: state.openSessions.map(s =>
+                  s.id === msgSessionId ? { ...s, permissionMode: 'bypass' as const } : s
+                ),
+              }));
+            }
+            // Auto-resolve all pending confirmation messages in this session
+            sessionUpdateMessages(msgs => msgs.map(m => {
+              if (m.type === 'tool' && m.confirmation?.state === 'approval-requested') {
+                return {
+                  ...m,
+                  confirmation: {
+                    ...m.confirmation,
+                    state: 'approval-responded',
+                    approved: true,
+                  },
+                };
+              }
+              if (m.type === 'confirmation' && m.confirmation?.state === 'approval-requested') {
+                return {
+                  ...m,
+                  confirmation: {
+                    ...m.confirmation,
+                    state: 'approval-responded',
+                    approved: true,
+                  },
+                };
+              }
+              return m;
+            }));
           } else if (message.mode === 'always' && message.tool_name) {
-            addAllowedTool(message.tool_name);
+            if (isActiveSession || !msgSessionId) {
+              useChatStore.getState().addAllowedTool(message.tool_name);
+            } else {
+              useChatStore.setState(state => ({
+                openSessions: state.openSessions.map(s =>
+                  s.id === msgSessionId
+                    ? { ...s, allowedTools: s.allowedTools.includes(message.tool_name) ? s.allowedTools : [...s.allowedTools, message.tool_name] }
+                    : s
+                ),
+              }));
+            }
           }
           break;
         }
         case 'ai_followup':
-          addMessage({
+          sessionAddMessage({
             type: 'ai',
             role: 'assistant',
             content: message.content,
@@ -604,16 +664,28 @@ export const useChatWebSocket = () => {
             isComplete: true
           });
           break;
-        case 'token_usage':
-          setTokenUsage({
+        case 'token_usage': {
+          const usage = {
             inputTokens: message.input_tokens || 0,
             outputTokens: message.output_tokens || 0,
             totalTokens: message.total_tokens || 0,
-          });
+            cacheReadTokens: message.cache_read_tokens || 0,
+            cacheWriteTokens: message.cache_write_tokens || 0,
+          };
+          if (isActiveSession || !msgSessionId) {
+            setTokenUsage(usage);
+          } else {
+            useChatStore.setState(state => ({
+              openSessions: state.openSessions.map(s =>
+                s.id === msgSessionId ? { ...s, tokenUsage: usage } : s
+              ),
+            }));
+          }
           break;
+        }
         case 'ask_user_question': {
           const askToolId = message.tool_message_id || `ask-${Date.now()}`;
-          addMessage({
+          sessionAddMessage({
             type: 'confirmation',
             role: 'assistant',
             content: message.question || '',
@@ -632,19 +704,27 @@ export const useChatWebSocket = () => {
         }
         case 'prompt_suggestion': {
           if (message.suggestions && Array.isArray(message.suggestions)) {
-            useChatStore.setState({ promptSuggestions: message.suggestions });
+            if (isActiveSession || !msgSessionId) {
+              useChatStore.setState({ promptSuggestions: message.suggestions });
+            } else {
+              useChatStore.setState(state => ({
+                openSessions: state.openSessions.map(s =>
+                  s.id === msgSessionId ? { ...s, promptSuggestions: message.suggestions } : s
+                ),
+              }));
+            }
           }
           break;
         }
         case 'retry':
-          addMessage({
+          sessionAddMessage({
             type: 'system',
             role: 'system',
             content: `Retrying (attempt ${message.attempt})... ${message.message || ''}`
           });
           break;
         case 'model_fallback':
-          addMessage({
+          sessionAddMessage({
             type: 'system',
             role: 'system',
             content: `Model fallback: ${message.original_model} → ${message.fallback_model}`
@@ -652,22 +732,22 @@ export const useChatWebSocket = () => {
           break;
         case 'compaction':
         case 'reactive_compact':
-          addMessage({
+          sessionAddMessage({
             type: 'system',
             role: 'system',
             content: message.content || 'Context window was compacted'
           });
           break;
         case 'doom_loop':
-          addMessage({
+          sessionAddMessage({
             type: 'system',
             role: 'system',
             content: `Doom loop detected on ${message.tool_name}. ${message.content || ''}`
           });
-          setLoading(false);
+          if (isActiveSession) sessionSetLoading(false);
           break;
         case 'budget_stop':
-          addMessage({
+          sessionAddMessage({
             type: 'system',
             role: 'system',
             content: `Budget limit reached (${message.pct}% used, ${message.continuation_count} continuations)`
@@ -676,21 +756,21 @@ export const useChatWebSocket = () => {
         case 'budget_continue':
           break;
         case 'subagent_spawned':
-          addMessage({
+          sessionAddMessage({
             type: 'system',
             role: 'system',
             content: `Subagent spawned. ${message.result || ''}`
           });
           break;
         case 'team_update':
-          addMessage({
+          sessionAddMessage({
             type: 'system',
             role: 'system',
             content: `Team ${message.action}: ${message.result || ''}`
           });
           break;
         case 'tool_use_summary':
-          addMessage({
+          sessionAddMessage({
             type: 'system',
             role: 'system',
             content: message.content || ''
@@ -703,12 +783,12 @@ export const useChatWebSocket = () => {
         case 'stop_hook_blocking':
           break;
         case 'error':
-          addMessage({
+          sessionAddMessage({
             type: 'system',
             role: 'system',
             content: `Error: ${message.content}`
           });
-          setLoading(false);
+          if (isActiveSession) sessionSetLoading(false);
           break;
         default:
           console.log('Unknown message type:', message.type);
@@ -742,11 +822,21 @@ export const useChatWebSocket = () => {
     }
 
     try {
-      // Finalize any ongoing reasoning/streaming from previous turn
+      // Read fresh state at call time to avoid stale closure values when switching tabs
       const state = useChatStore.getState();
-      if (state.currentReasoningId || state.currentStreamingMessageId) {
+      const activeId = state.activeSessionId;
+      const convId = state.currentConversationId;
+      const isNew = state.isNewChat;
+
+      // Finalize any ongoing reasoning/streaming from the active session only
+      if (activeId && (state.currentReasoningId || state.currentStreamingMessageId)) {
         stopGeneration();
       }
+
+      // Always send conversation_id so the backend uses the correct session.
+      // For new chats, use the activeSessionId (temp ID) so the backend creates
+      // a session with that ID and echoes it back — no temp upgrade needed.
+      const sessionIdToSend = convId || activeId || undefined;
 
       // Add user message immediately for better UX
       addMessage({
@@ -785,8 +875,8 @@ export const useChatWebSocket = () => {
       wsService.sendMessage({
         type: 'chat',
         content,
-        conversation_id: currentConversationId || undefined,
-        new_chat: isNewChat || undefined,
+        conversation_id: sessionIdToSend,
+        new_chat: isNew || undefined,
         agent_type: 'default',
         model: model || undefined,
         stream: true,
@@ -799,10 +889,26 @@ export const useChatWebSocket = () => {
         keep_intermediate_files: options?.keepIntermediateFiles,
       });
 
-      if (isNewChat) {
-        useChatStore.setState({ isNewChat: false });
+      if (isNew) {
+        // Set currentConversationId to the session ID so subsequent messages
+        // from this tab use the same session — also sync to openSessions
+        useChatStore.setState((state) => ({
+          isNewChat: false,
+          currentConversationId: sessionIdToSend,
+          openSessions: state.openSessions.map(s =>
+            s.id === activeId
+              ? { ...s, isNewChat: false, currentConversationId: sessionIdToSend }
+              : s
+          ),
+        }));
       }
-      
+
+      // Sync loading state to the session
+      useChatStore.setState((state) => ({
+        openSessions: state.openSessions.map(s =>
+          s.id === activeId ? { ...s, isLoading: true } : s
+        ),
+      }));
       setLoading(true);
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -816,7 +922,9 @@ export const useChatWebSocket = () => {
   };
 
   const stopSending = () => {
-    wsService.sendMessage({ type: 'stop' });
+    const state = useChatStore.getState();
+    const sessionIdToSend = state.currentConversationId || state.activeSessionId || undefined;
+    wsService.sendMessage({ type: 'stop', conversation_id: sessionIdToSend });
     stopGeneration();
   };
 
@@ -854,6 +962,9 @@ export const useChatWebSocket = () => {
       console.error('WebSocket is not connected');
       return;
     }
+    // Read fresh state to get correct session ID for this tab
+    const state = useChatStore.getState();
+    const sessionIdToSend = state.currentConversationId || state.activeSessionId || undefined;
     // Add a thinking message immediately so the PonderingIndicator shows
     addMessage({
       type: 'thinking',
@@ -867,7 +978,7 @@ export const useChatWebSocket = () => {
       command,
       command_args: commandArgs || [],
       model: model || undefined,
-      conversation_id: currentConversationId || undefined,
+      conversation_id: sessionIdToSend,
     });
   };
 

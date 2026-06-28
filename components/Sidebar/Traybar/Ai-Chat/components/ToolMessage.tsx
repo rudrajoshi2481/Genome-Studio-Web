@@ -2,15 +2,6 @@
 
 import React, { useState, useCallback } from "react";
 import {
-  Terminal,
-  TerminalHeader,
-  TerminalTitle,
-  TerminalStatus,
-  TerminalActions,
-  TerminalCopyButton,
-  TerminalContent,
-} from "@/components/ai-elements/terminal";
-import {
   Tool,
   ToolHeader,
   ToolContent,
@@ -56,6 +47,8 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
   const explanation = toolArgs?.explanation || "";
   const needsApproval = message.confirmation?.state === "approval-requested";
 
+  const headerTitle = toolName;
+
   const [copied, setCopied] = useState(false);
 
   const toolState = isRunning
@@ -75,14 +68,6 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
     return results;
   };
 
-  const handleTerminalCopy = useCallback(() => {
-    console.log("Terminal output copied");
-  }, []);
-
-  const handleTerminalClear = useCallback(() => {
-    console.log("Terminal cleared");
-  }, []);
-
   const handleCopyOutput = useCallback(() => {
     const textToCopy = rawOutput || message.content || "";
     if (textToCopy) {
@@ -94,73 +79,36 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
 
   const isToolComplete = !isRunning && !needsApproval && (rawOutput || hasError);
 
-  // --- Terminal rendering for run_command ---
-  if (isCommandTool) {
-    return (
-      <div className="px-3 py-0.5 group/tool">
-        {explanation && (
-          <p className="text-xs text-foreground mb-1 leading-relaxed">{explanation}</p>
-        )}
-        <Terminal
-          autoScroll={true}
-          isStreaming={isRunning}
-          onClear={handleTerminalClear}
-          output={rawOutput || (isRunning ? "" : "(no output)")}
-          className="max-h-64"
-        >
-          <TerminalHeader>
-            <TerminalTitle>{command || "Terminal"}</TerminalTitle>
-            <div className="flex items-center gap-1">
-              <TerminalStatus />
-              <TerminalActions>
-                {isRunning && onStopCommand && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => onStopCommand(message.metadata?.toolMessageId || message.id)}
-                    title="Stop command"
-                  >
-                    <Square className="size-2.5" />
-                  </Button>
-                )}
-                <TerminalCopyButton onCopy={handleTerminalCopy} />
-              </TerminalActions>
-            </div>
-          </TerminalHeader>
-          <TerminalContent />
-        </Terminal>
-        {isLast && isToolComplete && (
-          <div className="flex items-center gap-0.5 mt-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-              onClick={handleCopyOutput}
-            >
-              {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
-            </Button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   // --- Sources rendering for web_search ---
   const searchResults = isWebSearch && rawOutput ? parseSearchResults(rawOutput) : [];
 
   // --- Generic tool rendering using ai-elements Tool ---
   return (
-    <div className="px-3 py-0.5 group/tool">
+    <div className="px-3 mt-4 py-0.5 group/tool">
       {explanation && (
         <p className="text-xs text-foreground mb-1 leading-relaxed">{explanation}</p>
       )}
       <Tool defaultOpen={needsApproval}>
         <ToolHeader
-          title={toolName}
+          title={headerTitle}
+          command={isCommandTool ? command : undefined}
           type="dynamic-tool"
           state={toolState as any}
           toolName={toolName}
+          actions={isRunning && onStopCommand ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStopCommand(message.metadata?.toolMessageId || message.id);
+              }}
+              title="Stop command"
+            >
+              <Square className="size-2.5" />
+            </Button>
+          ) : undefined}
         />
         <ToolContent className="space-y-2">
           {Object.keys(toolArgs).length > 0 && (

@@ -57,6 +57,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
     permissionMode,
     allowedTools,
     tokenUsage,
+    resetPermissionMode,
   } = useChatStore();
   const { sendMessage, stopSending, stopCommand, sendAskUserResponse, sendToolApproval, sendCommand } = useChatWebSocket();
 
@@ -115,14 +116,9 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   const handleNewConversation = () => {
     // Cache current session before switching
     cacheCurrentSession();
-    // Create a new temporary session tab
+    // Create a new temporary session tab — openSession resets all session-specific state
     const tempId = `temp-${Date.now()}`;
     openSession(tempId, 'New Chat');
-    setCurrentConversation(null);
-    clearMessages();
-    clearMentions();
-    clearUploadedFiles();
-    useChatStore.setState({ promptSuggestions: [] });
     setShowConvList(false);
   };
 
@@ -136,10 +132,8 @@ function AIChat({ onClose }: { onClose?: () => void }) {
       setShowConvList(false);
       return;
     }
-    // Open a new tab for this conversation
+    // Open a new tab for this conversation — openSession resets all session-specific state
     openSession(conv.id, conv.title || 'Chat');
-    setCurrentConversation(conv.id);
-    clearMessages();
     setShowConvList(false);
     try {
       const url = `${getApiBaseUrl()}/ai-chat/conversations/${conv.id}/messages`;
@@ -201,7 +195,8 @@ function AIChat({ onClose }: { onClose?: () => void }) {
           }
         }
         useChatStore.setState({ messages: transformed });
-        cacheCurrentSession();
+        // Also update the session's messages in openSessions
+        useChatStore.getState().cacheCurrentSession();
       }
     } catch (error) {
       console.error('Failed to load conversation messages:', error);
@@ -264,7 +259,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   const renderMessage = (message: any, index: number) => {
     const groupedTypes = ['tool', 'reasoning', 'plan', 'task', 'confirmation'];
     const isGrouped = index > 0 && groupedTypes.includes(message.type);
-    const wrapperClass = isGrouped ? '-mt-2' : '';
+    const wrapperClass = isGrouped ? '-mt-4' : '';
     const isLast = index === messages.length - 1;
 
     const content = (() => {
@@ -381,20 +376,6 @@ function AIChat({ onClose }: { onClose?: () => void }) {
         </div>
       )}
 
-      {promptSuggestions.length > 0 && (
-        <div className="px-3 pb-1 flex flex-wrap gap-1.5">
-          {promptSuggestions.map((s) => (
-            <button
-              key={s}
-              onClick={() => handlePromptSuggestion(s)}
-              className="text-xs px-2 py-1 rounded-md border bg-background hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className='p-3 pt-1'>
         {allowedTools.length > 0 && permissionMode !== 'bypass' && (
           <div className="flex items-center gap-1.5 mb-1.5">
@@ -404,8 +385,22 @@ function AIChat({ onClose }: { onClose?: () => void }) {
             </span>
           </div>
         )}
-        <Footer onSendMessage={handleSendMessage} onStop={stopSending} onSendCommand={sendCommand} />
+        <Footer key={activeSessionId} onSendMessage={handleSendMessage} onStop={stopSending} onSendCommand={sendCommand} />
       </div>
+
+      {promptSuggestions.length > 0 && (
+        <div className="px-3 pb-2 flex gap-1.5 overflow-x-auto scrollbar-thin">
+          {promptSuggestions.map((s) => (
+            <button
+              key={s}
+              onClick={() => handlePromptSuggestion(s)}
+              className="text-xs px-2 py-1 rounded-md border bg-background hover:bg-accent transition-colors text-muted-foreground hover:text-foreground whitespace-nowrap shrink-0"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

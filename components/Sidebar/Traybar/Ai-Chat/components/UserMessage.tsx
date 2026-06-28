@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Message as ChatMessage } from "./chatStore";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { host, port } from "@/config/server";
 
 const MAX_TEXT_LENGTH = 400;
 
@@ -24,6 +25,14 @@ function UserMessage({ message, isLast, onEdit, onDelete }: UserMessageProps) {
   const [expanded, setExpanded] = useState(false);
   const [editValue, setEditValue] = useState(message.content);
   const ref = useRef<HTMLDivElement>(null);
+
+  const getAvatarUrl = (avatarPath: string | undefined) => {
+    if (!avatarPath) return '';
+    if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
+      return avatarPath;
+    }
+    return `http://${host}:${port}${avatarPath}`;
+  };
 
   const displayName = (() => {
     const fullName = user?.full_name?.trim();
@@ -96,7 +105,7 @@ function UserMessage({ message, isLast, onEdit, onDelete }: UserMessageProps) {
         </span>
         <span className="text-[10px] font-medium text-foreground">{displayName}</span>
         <Avatar className="h-4 w-4">
-          {user?.avatar && <AvatarImage src={user.avatar} alt={displayName} />}
+          {user?.avatar && <AvatarImage src={getAvatarUrl(user.avatar)} alt={displayName} />}
           <AvatarFallback className="bg-muted text-muted-foreground">
             <User className="h-2.5 w-2.5" />
           </AvatarFallback>

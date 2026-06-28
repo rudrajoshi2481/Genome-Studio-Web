@@ -1,6 +1,7 @@
 import React, { memo, useCallback } from 'react'
 import { Dna, FolderOpen, Terminal, GitBranch } from 'lucide-react'
 import { useTabStore } from '@/components/FileTabs/useTabStore'
+import type { TabFile } from '@/components/FileTabs/useTabStore'
 import { useDialogStore } from '@/components/FileTabs/useDialogStore'
 import DialogProvider from '../FileTabs/DialogProvider'
 import FileTab from '../FileTabs/FileTab'
@@ -93,6 +94,7 @@ const EditorWindow = () => {
   // Get tab store methods
   const { removeTab, activateTab, getTab } = useTabStore()
   const { openUnsavedChangesDialog } = useDialogStore()
+  const activeTabId = useTabStore(state => state.activeTabId)
   
   // Get active tab using selector to prevent infinite loops
   const activeTab = useTabStore(state => {
@@ -104,6 +106,16 @@ const EditorWindow = () => {
   React.useEffect(() => {
     setIsMounted(true)
   }, [])
+  
+  // Scroll active tab into view
+  const tabBarRef = React.useRef<HTMLDivElement>(null)
+  React.useEffect(() => {
+    if (!activeTabId || !tabBarRef.current) return
+    const activeEl = tabBarRef.current.querySelector(`[data-tab-id="${activeTabId}"]`)
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+    }
+  }, [activeTabId])
   
   // Tab handlers
   const handleActivate = useCallback((tabId: string) => {
@@ -123,15 +135,17 @@ const EditorWindow = () => {
     }
   }, [removeTab, getTab, openUnsavedChangesDialog])
   
-  // Get all tabs
-  const allTabs = useTabStore(state => state.getAllTabs())
+  // Get all tabs - use primitive selectors to avoid infinite re-renders
+  const tabOrder = useTabStore(state => state.tabOrder)
+  const tabs = useTabStore(state => state.tabs)
+  const allTabs = tabOrder.map(id => tabs.get(id)).filter(Boolean) as TabFile[]
   
   return (
     <EditorProvider>
       <DialogProvider>
         <div className="h-full w-full flex flex-col overflow-hidden">  
           {/* Tab bar */}
-          <div className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0 tab-scroll-container">
+          <div ref={tabBarRef} className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0 tab-scroll-container">
             {isMounted && allTabs.map(tab => (
               <FileTab 
                 key={tab.id}

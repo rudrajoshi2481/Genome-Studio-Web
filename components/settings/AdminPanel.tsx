@@ -167,6 +167,14 @@ export default function AdminPanel() {
     setSelectedUser(null);
   };
 
+  const getAvatarUrl = (avatarPath: string | undefined) => {
+    if (!avatarPath) return '';
+    if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
+      return avatarPath;
+    }
+    return `http://${host}:${port}${avatarPath}`;
+  };
+
   // Get user initials
   const getInitials = (user: User) => {
     if (user.full_name) {
@@ -256,7 +264,7 @@ export default function AdminPanel() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={user.avatar} />
+                            <AvatarImage src={getAvatarUrl(user.avatar)} />
                             <AvatarFallback className="text-xs">
                               {getInitials(user)}
                             </AvatarFallback>
