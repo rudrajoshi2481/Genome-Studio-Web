@@ -95,7 +95,8 @@ export class WorkflowWebSocketService {
     this.shouldReconnect = true;
 
     const token = useAuthStore.getState().token;
-    const wsUrl = `ws://${host}:${port}/api/v1/workflow-manager-new/ws/${this.clientId}${token ? `?token=${token}` : ''}`;
+    const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${host}:${port}/api/v1/workflow-manager-new/ws/${this.clientId}${token ? `?token=${token}` : ''}`;
     
     if (process.env.NODE_ENV === 'development') {
       console.debug('WorkflowWebSocket: Connecting to', wsUrl);

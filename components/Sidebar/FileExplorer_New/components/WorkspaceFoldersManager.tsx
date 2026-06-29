@@ -33,15 +33,13 @@ export const WorkspaceFoldersManager: React.FC<WorkspaceFoldersManagerProps> = (
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const loadFolders = async () => {
+  const loadFolders = async (silent = false) => {
     setIsLoading(true);
     try {
       const baseUrl = getApiBaseUrl();
       const token = authService.getToken();
       const url = `${baseUrl}/file-explorer-new/workspace/folders`;
       
-      console.log('📂 Loading workspace folders from:', url);
-
       const response = await fetch(url, {
         headers: {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -49,27 +47,23 @@ export const WorkspaceFoldersManager: React.FC<WorkspaceFoldersManagerProps> = (
         credentials: 'include'
       });
 
-      console.log('📡 Load folders response:', response.status, response.statusText);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('📦 Loaded folders:', data);
         setFolders(data.folders || []);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Failed to load workspace folders:', response.status, errorData);
-        toast.error('Failed to load workspace folders');
+        if (!silent) toast.error('Failed to load workspace folders');
       }
     } catch (error) {
-      console.error('❌ Error loading workspace folders:', error);
-      toast.error(`Error loading folders: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (!silent) {
+        toast.error(`Error loading folders: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadFolders();
+    loadFolders(true);
   }, []);
 
   const handleRemoveFolder = async (folderPath: string) => {

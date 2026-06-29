@@ -230,9 +230,15 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
 
       // Targeting: if the message includes a filePath, only apply it to the
       // matching canvas. If no filePath is specified, apply to all canvases
-      // (backward compatibility).
+      // (backward compatibility). Match by exact path OR by basename to handle
+      // cases where the backend sends a relative path.
       const targetFilePath = detail.filePath;
-      if (targetFilePath && targetFilePath !== filePath) return;
+      if (targetFilePath && targetFilePath !== filePath) {
+        // Try basename match as fallback (e.g., "trial_04.flow" matches "/home/user/trial_04.flow")
+        const targetBasename = targetFilePath.split('/').pop();
+        const currentBasename = filePath?.split('/').pop();
+        if (targetBasename !== currentBasename) return;
+      }
 
       const { action, node, edge, node_id } = detail;
 

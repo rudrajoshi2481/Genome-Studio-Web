@@ -16,10 +16,11 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Zap, Server, Bot, Terminal, BookOpen, Cpu, CheckCircle2, XCircle, Loader2, Database, CheckCheck, Save, Search } from "lucide-react"
+import { Zap, Server, Bot, Terminal, BookOpen, Cpu, CheckCircle2, XCircle, Loader2, Database, CheckCheck, Save, Search, Link2, RotateCcw, Wifi, WifiOff } from "lucide-react"
 import { getApiBaseUrl } from "@/config/server"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useChatStore } from "./components/chatStore"
 
 interface ChatFeaturesDialogProps {
@@ -82,13 +83,22 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
   const [dbSearch, setDbSearch] = useState("")
   const [error, setError] = useState<string | null>(null)
 
+  // Provider URL config state
+  const [ollamaUrl, setOllamaUrl] = useState("")
+  const [ollamaUrlEnv, setOllamaUrlEnv] = useState("")
+  const [isCustomUrl, setIsCustomUrl] = useState(false)
+  const [urlSaving, setUrlSaving] = useState(false)
+  const [urlTesting, setUrlTesting] = useState(false)
+  const [urlTestResult, setUrlTestResult] = useState<{ reachable: boolean; message: string } | null>(null)
+  const [urlError, setUrlError] = useState<string | null>(null)
+
   const { enabledDatabases, toggleDatabase, setEnabledDatabases, keepIntermediateFiles, setKeepIntermediateFiles } = useChatStore()
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [provRes, agRes, skRes, cmdRes, knRes, instRes, dbRes] = await Promise.allSettled([
+      const [provRes, agRes, skRes, cmdRes, knRes, instRes, dbRes, cfgRes] = await Promise.allSettled([
         fetch(`${getApiBaseUrl()}/ai-chat/providers`).then(r => r.ok ? r.json() : null),
         fetch(`${getApiBaseUrl()}/ai-chat/agents`).then(r => r.ok ? r.json() : []),
         fetch(`${getApiBaseUrl()}/ai-chat/skills`).then(r => r.ok ? r.json() : []),
@@ -96,6 +106,7 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
         fetch(`${getApiBaseUrl()}/ai-chat/knowledge/stats`).then(r => r.ok ? r.json() : null),
         fetch(`${getApiBaseUrl()}/ai-chat/knowledge/instructions`).then(r => r.ok ? r.json() : []),
         fetch(`${getApiBaseUrl()}/ai-chat/databases`).then(r => r.ok ? r.json() : []),
+        fetch(`${getApiBaseUrl()}/ai-chat/providers/config`).then(r => r.ok ? r.json() : null),
       ])
 
       if (provRes.status === 'fulfilled' && provRes.value) setProviders(provRes.value.providers || [])
@@ -105,12 +116,91 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
       if (knRes.status === 'fulfilled') setKnowledgeStats(knRes.value)
       if (instRes.status === 'fulfilled') setInstructions(instRes.value || [])
       if (dbRes.status === 'fulfilled') setDatabases(dbRes.value || [])
+      if (cfgRes.status === 'fulfilled' && cfgRes.value) {
+        setOllamaUrl(cfgRes.value.base_url || "")
+        setOllamaUrlEnv(cfgRes.value.env_default || "")
+        setIsCustomUrl(cfgRes.value.is_custom || false)
+      }
     } catch (err) {
       setError("Failed to fetch backend status")
     } finally {
       setLoading(false)
     }
   }, [])
+
+  const handleSaveUrl = useCallback(async () => {
+    setUrlSaving(true)
+    setUrlError(null)
+    setUrlTestResult(null)
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/ai-chat/providers/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base_url: ollamaUrl }),
+      })
+      const data = await resp.json()
+      if (data.error) {
+        setUrlError(data.error)
+      } else {
+        setOllamaUrl(data.base_url)
+        setIsCustomUrl(data.base_url !== ollamaUrlEnv)
+        setUrlTestResult({
+          reachable: data.reachable,
+          message: data.reachable ? "Connected successfully!" : "URL saved but server is not reachable.",
+        })
+        // Refresh providers list
+        fetchAll()
+      }
+    } catch (err) {
+      setUrlError("Failed to save URL")
+    } finally {
+      setUrlSaving(false)
+    }
+  }, [ollamaUrl, ollamaUrlEnv, fetchAll])
+
+  const handleTestUrl = useCallback(async () => {
+    setUrlTesting(true)
+    setUrlError(null)
+    setUrlTestResult(null)
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/ai-chat/providers/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base_url: ollamaUrl }),
+      })
+      const data = await resp.json()
+      if (data.error) {
+        setUrlError(data.error)
+      } else {
+        setUrlTestResult({
+          reachable: data.reachable,
+          message: data.reachable ? "Connected successfully!" : "Cannot reach Ollama at this URL.",
+        })
+      }
+    } catch (err) {
+      setUrlError("Failed to test URL")
+    } finally {
+      setUrlTesting(false)
+    }
+  }, [ollamaUrl])
+
+  const handleResetUrl = useCallback(async () => {
+    setUrlSaving(true)
+    setUrlError(null)
+    setUrlTestResult(null)
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/ai-chat/providers/config`, { method: "DELETE" })
+      const data = await resp.json()
+      setOllamaUrl(data.base_url)
+      setIsCustomUrl(false)
+      setUrlTestResult({ reachable: data.reachable, message: "Reset to environment default." })
+      fetchAll()
+    } catch (err) {
+      setUrlError("Failed to reset URL")
+    } finally {
+      setUrlSaving(false)
+    }
+  }, [fetchAll])
 
   useEffect(() => {
     if (open) fetchAll()
@@ -153,13 +243,13 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
 
         {!loading && !error && (
           <div className="space-y-6">
-            {/* Provider Status */}
+            {/* Provider Status & Configuration */}
             <section>
               <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
                 <Server className="h-4 w-4" />
                 LLM Providers
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {providers.length === 0 && (
                   <p className="text-xs text-muted-foreground">No providers configured.</p>
                 )}
@@ -173,7 +263,7 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
                       <Cpu className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium text-xs">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{p.base_url}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{p.base_url}</p>
                       </div>
                     </div>
                     {p.available ? (
@@ -187,6 +277,84 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
                     )}
                   </div>
                 ))}
+
+                {/* Custom URL Configuration */}
+                <div className="rounded-lg border p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold flex items-center gap-1.5">
+                      <Link2 className="h-3.5 w-3.5" />
+                      Custom Ollama URL
+                    </Label>
+                    {isCustomUrl && (
+                      <Badge variant="secondary" className="text-[10px] gap-1">
+                        <Wifi className="h-2.5 w-2.5" /> Custom
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Point to a local Ollama instance, a remote server, or a tunnel (ngrok, cloudflared, etc.).
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={ollamaUrl}
+                      onChange={(e) => {
+                        setOllamaUrl(e.target.value)
+                        setUrlTestResult(null)
+                        setUrlError(null)
+                      }}
+                      placeholder="http://localhost:11434 or https://your-tunnel.ngrok-free.app"
+                      className="h-8 text-xs font-mono"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 shrink-0 text-xs gap-1.5"
+                      onClick={handleTestUrl}
+                      disabled={urlTesting || !ollamaUrl.trim()}
+                    >
+                      {urlTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
+                      Test
+                    </Button>
+                  </div>
+                  {urlError && (
+                    <p className="text-xs text-red-500">{urlError}</p>
+                  )}
+                  {urlTestResult && (
+                    <div className={`flex items-center gap-1.5 text-xs ${urlTestResult.reachable ? "text-green-600" : "text-amber-600"}`}>
+                      {urlTestResult.reachable ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                      {urlTestResult.message}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 text-xs gap-1.5"
+                      onClick={handleSaveUrl}
+                      disabled={urlSaving || !ollamaUrl.trim()}
+                    >
+                      {urlSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                      Save & Apply
+                    </Button>
+                    {isCustomUrl && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs gap-1.5"
+                        onClick={handleResetUrl}
+                        disabled={urlSaving}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Reset to Default
+                      </Button>
+                    )}
+                  </div>
+                  {ollamaUrlEnv && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Default: <span className="font-mono">{ollamaUrlEnv}</span>
+                    </p>
+                  )}
+                </div>
               </div>
             </section>
 

@@ -47,7 +47,8 @@ export class RealtimeFileSyncService {
     this.token = token
 
     try {
-      const wsUrl = `ws://${host}:${port}/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`
+      const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${host}:${port}/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`
       this.websocket = new WebSocket(wsUrl)
 
       return new Promise((resolve) => {

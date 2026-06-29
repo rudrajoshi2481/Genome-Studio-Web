@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal } from 'lucide-react'
+import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal, RefreshCw, Cpu, Check } from 'lucide-react'
 import ChatFeaturesDialog from './ChatFeaturesDialog'
 import { useChatStore } from './components/chatStore'
 import {
@@ -18,7 +18,6 @@ import {
   ModelSelectorGroup,
   ModelSelectorItem,
 } from '@/components/ai-elements/model-selector'
-import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import {
   Tooltip,
@@ -43,6 +42,9 @@ interface OllamaModel {
     supports_tools?: boolean
     supports_vision?: boolean
     supports_reasoning?: boolean
+    parameter_size?: string
+    quantization?: string
+    family?: string
   }
 }
 
@@ -62,18 +64,12 @@ const SELECTED_MODEL_KEY = 'selected-model'
 
 function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedModel, setSelectedModel] = useState(() => {
-    try {
-      const stored = localStorage.getItem(SELECTED_MODEL_KEY)
-      return stored || 'qwen3.5:latest'
-    } catch {
-      return 'qwen3.5:latest'
-    }
-  })
+  const [selectedModel, setSelectedModel] = useState('qwen3.5:latest')
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([])
   const [ollamaAvailable, setOllamaAvailable] = useState(false)
   const [modelsLoading, setModelsLoading] = useState(false)
   const [pinnedModels, setPinnedModels] = useState<string[]>([])
+  const [modelSelectorOpen, setModelSelectorOpen] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [mentions, setMentions] = useState<ChatMention[]>([])
   const [showSlashMenu, setShowSlashMenu] = useState(false)
@@ -104,6 +100,8 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
 
   useEffect(() => {
     try {
+      const storedModel = localStorage.getItem(SELECTED_MODEL_KEY)
+      if (storedModel) setSelectedModel(storedModel)
       const stored = localStorage.getItem(PINNED_MODELS_KEY)
       const pinned = stored ? JSON.parse(stored) : []
       if (Array.isArray(pinned)) {
@@ -185,6 +183,7 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
 
   const handleModelChange = (value: string) => {
     setSelectedModel(value)
+    setModelSelectorOpen(false)
     try {
       localStorage.setItem(SELECTED_MODEL_KEY, value)
     } catch {}
@@ -442,21 +441,41 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
               <TooltipContent side="top">Upload files</TooltipContent>
             </Tooltip>
 
-            <ModelSelector>
+            <ModelSelector open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
               <ModelSelectorTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
                   title="Select model"
                 >
-                  <span className="whitespace-nowrap">{formatModelName(selectedModel)}</span>
+                  <Cpu size={13} className="shrink-0" />
+                  <span className="whitespace-nowrap truncate max-w-[120px]">{formatModelName(selectedModel)}</span>
                 </Button>
               </ModelSelectorTrigger>
-              <ModelSelectorContent>
+              <ModelSelectorContent title="Select Model">
+                <div className="flex items-center justify-between px-3 py-2 border-b">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {ollamaModels.length > 0 ? `${ollamaModels.length} models available` : 'Models'}
+                  </span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-6 p-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => fetchOllamaModels()}
+                    disabled={modelsLoading}
+                    title="Refresh models"
+                  >
+                    {modelsLoading ? <Spinner className="size-3" /> : <RefreshCw size={12} />}
+                  </Button>
+                </div>
                 <ModelSelectorInput placeholder="Search models..." />
                 <ModelSelectorList>
-                  <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
+                  <ModelSelectorEmpty>
+                    <div className="flex flex-col items-center gap-2 py-6 text-center">
+                      <p className="text-xs text-muted-foreground">No models found.</p>
+                    </div>
+                  </ModelSelectorEmpty>
 
                   {ollamaAvailable && ollamaModels.length > 0 && (
                     <>
@@ -465,26 +484,81 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
                           {pinnedModels
                             .map(name => ollamaModels.find(m => m.name === name))
                             .filter((m): m is OllamaModel => !!m)
-                            .map((model) => (
+                            .map((model) => {
+                              const isSelected = model.name === selectedModel
+                              return (
+                                <ModelSelectorItem
+                                  key={`pinned-${model.name}`}
+                                  value={model.name}
+                                  onSelect={() => handleModelChange(model.name)}
+                                >
+                                  <div className="flex items-center gap-2 w-full min-w-0">
+                                    {isSelected ? (
+                                      <Check size={14} className="text-primary shrink-0" />
+                                    ) : (
+                                      <Pin size={14} className="text-primary shrink-0 fill-primary" />
+                                    )}
+                                    <span className="truncate text-sm font-medium flex-1 min-w-0">{formatModelName(model.name)}</span>
+                                    <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground font-mono">
+                                      {model.capabilities?.context_length && (
+                                        <span>{(model.capabilities.context_length / 1000).toFixed(0)}K ctx</span>
+                                      )}
+                                      {model.size && (
+                                        <span>{formatModelSize(model.size)}</span>
+                                      )}
+                                    </div>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="size-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                                      onPointerDown={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                      }}
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        togglePin(model.name)
+                                      }}
+                                    >
+                                      <PinOff size={13} />
+                                    </Button>
+                                  </div>
+                                </ModelSelectorItem>
+                              )
+                            })}
+                        </ModelSelectorGroup>
+                      )}
+                      <ModelSelectorGroup heading={`All Models (${ollamaModels.length})`}>
+                        {ollamaModels
+                          .filter(m => !pinnedModels.includes(m.name))
+                          .map((model) => {
+                            const isSelected = model.name === selectedModel
+                            return (
                               <ModelSelectorItem
-                                key={`pinned-${model.name}`}
+                                key={model.name}
                                 value={model.name}
                                 onSelect={() => handleModelChange(model.name)}
                               >
-                                <div className="flex items-center gap-1.5 truncate flex-1 min-w-0">
-                                  <Pin size={12} className="text-primary shrink-0 fill-primary" />
-                                  <span className="truncate">{formatModelName(model.name)}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  {model.size && (
-                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                                      {formatModelSize(model.size)}
-                                    </Badge>
+                                <div className="flex items-center gap-2 w-full min-w-0">
+                                  {isSelected ? (
+                                    <Check size={14} className="text-primary shrink-0" />
+                                  ) : (
+                                    <Cpu size={14} className="text-muted-foreground shrink-0" />
                                   )}
+                                  <span className="truncate text-sm font-medium flex-1 min-w-0">{formatModelName(model.name)}</span>
+                                  <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground font-mono">
+                                    {model.capabilities?.context_length && (
+                                      <span>{(model.capabilities.context_length / 1000).toFixed(0)}K ctx</span>
+                                    )}
+                                    {model.size && (
+                                      <span>{formatModelSize(model.size)}</span>
+                                    )}
+                                  </div>
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="size-5 p-0 text-muted-foreground hover:text-foreground"
+                                    className="size-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
                                     onPointerDown={(e) => {
                                       e.preventDefault()
                                       e.stopPropagation()
@@ -495,52 +569,12 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
                                       togglePin(model.name)
                                     }}
                                   >
-                                    <PinOff size={12} />
+                                    <Pin size={13} />
                                   </Button>
                                 </div>
                               </ModelSelectorItem>
-                            ))}
-                        </ModelSelectorGroup>
-                      )}
-                      <ModelSelectorGroup heading="Ollama (Local)">
-                        {ollamaModels.map((model) => (
-                          <ModelSelectorItem
-                            key={model.name}
-                            value={model.name}
-                            onSelect={() => handleModelChange(model.name)}
-                          >
-                            <div className="flex items-center justify-between w-full gap-2">
-                              <span className="truncate">{formatModelName(model.name)}</span>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {model.size && (
-                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                                    {formatModelSize(model.size)}
-                                  </Badge>
-                                )}
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="size-5 p-0 text-muted-foreground hover:text-foreground"
-                                  onPointerDown={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                  }}
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    togglePin(model.name)
-                                  }}
-                                >
-                                  {pinnedModels.includes(model.name) ? (
-                                    <Pin size={12} className="text-primary fill-primary" />
-                                  ) : (
-                                    <Pin size={12} />
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          </ModelSelectorItem>
-                        ))}
+                            )
+                          })}
                       </ModelSelectorGroup>
                     </>
                   )}
@@ -549,7 +583,7 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
                     <ModelSelectorGroup heading="Loading...">
                       <ModelSelectorItem value="__loading__" disabled>
                         <span className="flex items-center gap-2">
-                          <Spinner className="size-3" /> Fetching Ollama models...
+                          <Spinner className="size-3" /> Fetching models from Ollama...
                         </span>
                       </ModelSelectorItem>
                     </ModelSelectorGroup>
@@ -557,11 +591,24 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
 
                   {!ollamaAvailable && !modelsLoading && (
                     <ModelSelectorGroup heading="Ollama (Offline)">
-                      <ModelSelectorItem value="__ollama_offline__" disabled>
-                        <span className="text-xs text-muted-foreground">
-                          Ollama not running. Start with `ollama serve`
-                        </span>
-                      </ModelSelectorItem>
+                      <div className="flex flex-col items-center gap-3 py-6 px-4 text-center">
+                        <Cpu className="size-8 text-muted-foreground/50" />
+                        <div>
+                          <p className="text-xs font-medium">Ollama is not reachable</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Start it with <code className="font-mono bg-muted px-1 rounded">ollama serve</code> or
+                            configure a custom URL in Settings.
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1.5"
+                          onClick={() => fetchOllamaModels()}
+                        >
+                          <RefreshCw size={12} /> Retry
+                        </Button>
+                      </div>
                     </ModelSelectorGroup>
                   )}
                 </ModelSelectorList>

@@ -499,6 +499,7 @@ export const useChatWebSocket = () => {
               node: message.node,
               edge: message.edge,
               node_id: message.node_id,
+              updates: message.updates,
               filePath: message.filePath,
             }
           }));

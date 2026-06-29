@@ -82,7 +82,8 @@ class WorkflowManagerAPI {
 
   constructor() {
     this.baseUrl = `http://${host}:${port}/api/v1/workflow-manager-new`;
-    this.wsUrl = `ws://${host}:${port}/api/v1/workflow-manager-new`;
+    const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    this.wsUrl = `${wsProtocol}//${host}:${port}/api/v1/workflow-manager-new`;
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, Warehouse, Clock } from 'lucide-react'
+import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { host, port } from '@/config/server'
@@ -108,12 +108,6 @@ function Toolbar({ onComponentChange, sidebarOpen, onToggleSidebar }: ToolbarPro
       icon: PackageSearch,
       type: "sidebar",
       component: () =>  <PackageManager />
-    },
-    {
-      name: "Storage Bucket",
-      icon: Warehouse,
-      type: "sidebar",
-      component: () => <>Directly mount storage bucket to any folder Google Drive / S3 Bucket etc...</>
     },
     {
       name: "Cron Jobs",
