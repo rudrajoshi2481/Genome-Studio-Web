@@ -449,7 +449,6 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
                   className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
                   title="Select model"
                 >
-                  <Cpu size={13} className="shrink-0" />
                   <span className="whitespace-nowrap truncate max-w-[120px]">{formatModelName(selectedModel)}</span>
                 </Button>
               </ModelSelectorTrigger>

@@ -97,33 +97,37 @@ export const ToolHeader = ({
 
   return (
     <CollapsibleTrigger
-      className={cn(
-        "flex w-full items-center justify-between gap-4 p-3",
-        className
-      )}
-      {...props}
+      asChild
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <WrenchIcon className="size-4 text-muted-foreground shrink-0" />
-        <span className="font-bold text-xs shrink-0">{title ?? derivedName}</span>
-        {command && (
-          <span className="font-mono text-xs text-muted-foreground truncate">{command}</span>
+      <div
+        className={cn(
+          "flex w-full items-center justify-between gap-4 p-3 cursor-pointer",
+          className
         )}
-        {fileParts && (
-          <span className="flex items-center gap-0.5 min-w-0">
-            {fileParts.dir && (
-              <span dir="rtl" className="font-mono text-xs text-muted-foreground truncate min-w-0">
-                <span dir="ltr" className="inline-block">{fileParts.dir}/</span>
-              </span>
-            )}
-            <span className="font-mono text-xs text-foreground/70 truncate shrink-0">{fileParts.name}</span>
-          </span>
-        )}
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {getStatusBadge(state)}
-        {actions}
-        <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        {...props}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <WrenchIcon className="size-4 text-muted-foreground shrink-0" />
+          <span className="font-bold text-xs shrink-0">{title ?? derivedName}</span>
+          {command && (
+            <span className="font-mono text-xs text-muted-foreground truncate">{command}</span>
+          )}
+          {fileParts && (
+            <span className="flex items-center gap-0.5 min-w-0">
+              {fileParts.dir && (
+                <span dir="rtl" className="font-mono text-xs text-muted-foreground truncate min-w-0">
+                  <span dir="ltr" className="inline-block">{fileParts.dir}/</span>
+                </span>
+              )}
+              <span className="font-mono text-xs text-foreground/70 truncate shrink-0">{fileParts.name}</span>
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {getStatusBadge(state)}
+          {actions}
+          <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </div>
       </div>
     </CollapsibleTrigger>
   );

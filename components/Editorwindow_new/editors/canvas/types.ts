@@ -45,6 +45,7 @@ export interface NodeData extends Record<string, any> {
   // Add logs
   logs?: LogEntry[];
   originalId?: string;
+  isCollapsed?: boolean;
 }
 
 export interface CustomNodeProps {

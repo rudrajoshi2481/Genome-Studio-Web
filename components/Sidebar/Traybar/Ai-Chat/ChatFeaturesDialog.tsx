@@ -16,12 +16,13 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Zap, Server, Bot, Terminal, BookOpen, Cpu, CheckCircle2, XCircle, Loader2, Database, CheckCheck, Save, Search, Link2, RotateCcw, Wifi, WifiOff } from "lucide-react"
+import { Zap, Server, Bot, Terminal, BookOpen, Cpu, CheckCircle2, XCircle, Loader2, Database, CheckCheck, Save, Search, Link2, RotateCcw, Wifi, WifiOff, Shield, ShieldCheck, ShieldAlert } from "lucide-react"
 import { getApiBaseUrl } from "@/config/server"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useChatStore } from "./components/chatStore"
+import { wsService } from "./hooks/wsService"
 
 interface ChatFeaturesDialogProps {
   children: React.ReactNode
@@ -92,13 +93,19 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
   const [urlTestResult, setUrlTestResult] = useState<{ reachable: boolean; message: string } | null>(null)
   const [urlError, setUrlError] = useState<string | null>(null)
 
-  const { enabledDatabases, toggleDatabase, setEnabledDatabases, keepIntermediateFiles, setKeepIntermediateFiles } = useChatStore()
+  const { enabledDatabases, toggleDatabase, setEnabledDatabases, keepIntermediateFiles, setKeepIntermediateFiles, permissionMode, setPermissionMode, resetPermissionMode } = useChatStore()
+
+  // Permission state
+  const [permAllowedTools, setPermAllowedTools] = useState<string[]>([])
+  const [permDeniedTools, setPermDeniedTools] = useState<string[]>([])
+  const [permSaving, setPermSaving] = useState(false)
+  const [permError, setPermError] = useState<string | null>(null)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [provRes, agRes, skRes, cmdRes, knRes, instRes, dbRes, cfgRes] = await Promise.allSettled([
+      const [provRes, agRes, skRes, cmdRes, knRes, instRes, dbRes, cfgRes, permRes] = await Promise.allSettled([
         fetch(`${getApiBaseUrl()}/ai-chat/providers`).then(r => r.ok ? r.json() : null),
         fetch(`${getApiBaseUrl()}/ai-chat/agents`).then(r => r.ok ? r.json() : []),
         fetch(`${getApiBaseUrl()}/ai-chat/skills`).then(r => r.ok ? r.json() : []),
@@ -107,6 +114,7 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
         fetch(`${getApiBaseUrl()}/ai-chat/knowledge/instructions`).then(r => r.ok ? r.json() : []),
         fetch(`${getApiBaseUrl()}/ai-chat/databases`).then(r => r.ok ? r.json() : []),
         fetch(`${getApiBaseUrl()}/ai-chat/providers/config`).then(r => r.ok ? r.json() : null),
+        fetch(`${getApiBaseUrl()}/ai-chat/permissions`).then(r => r.ok ? r.json() : null),
       ])
 
       if (provRes.status === 'fulfilled' && provRes.value) setProviders(provRes.value.providers || [])
@@ -120,6 +128,16 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
         setOllamaUrl(cfgRes.value.base_url || "")
         setOllamaUrlEnv(cfgRes.value.env_default || "")
         setIsCustomUrl(cfgRes.value.is_custom || false)
+      }
+      if (permRes.status === 'fulfilled' && permRes.value) {
+        setPermAllowedTools(permRes.value.allowed || [])
+        setPermDeniedTools(permRes.value.denied || [])
+        const serverMode = permRes.value.mode || 'default'
+        if (serverMode === 'bypass' && permissionMode !== 'bypass') {
+          setPermissionMode('bypass')
+        } else if (serverMode === 'default' && permissionMode !== 'default' && permissionMode !== 'bypass') {
+          setPermissionMode('default')
+        }
       }
     } catch (err) {
       setError("Failed to fetch backend status")
@@ -201,6 +219,62 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
       setUrlSaving(false)
     }
   }, [fetchAll])
+
+  const handleSetPermissionMode = useCallback(async (mode: 'default' | 'bypass') => {
+    setPermSaving(true)
+    setPermError(null)
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/ai-chat/permissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      })
+      const data = await resp.json()
+      if (data.error) {
+        setPermError(data.error)
+      } else {
+        setPermissionMode(mode)
+        setPermAllowedTools(data.allowed || [])
+        setPermDeniedTools(data.denied || [])
+        // Also sync via WebSocket so the running agent picks up the change immediately
+        if (mode === 'bypass') {
+          wsService.sendMessage({ type: 'set_permission_mode', mode: 'bypass' })
+        } else {
+          wsService.sendMessage({ type: 'set_permission_mode', mode: 'default' })
+        }
+      }
+    } catch (err) {
+      setPermError("Failed to update permission mode")
+    } finally {
+      setPermSaving(false)
+    }
+  }, [setPermissionMode])
+
+  const handleResetPermissions = useCallback(async () => {
+    setPermSaving(true)
+    setPermError(null)
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/ai-chat/permissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: 'reset' }),
+      })
+      const data = await resp.json()
+      if (data.error) {
+        setPermError(data.error)
+      } else {
+        resetPermissionMode()
+        setPermAllowedTools(data.allowed || [])
+        setPermDeniedTools(data.denied || [])
+        // Re-apply bypass mode via WebSocket after reset
+        wsService.sendMessage({ type: 'set_permission_mode', mode: 'bypass' })
+      }
+    } catch (err) {
+      setPermError("Failed to reset permissions")
+    } finally {
+      setPermSaving(false)
+    }
+  }, [resetPermissionMode])
 
   useEffect(() => {
     if (open) fetchAll()
@@ -557,6 +631,96 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
               ) : (
                 <p className="text-xs text-muted-foreground">Knowledge base not available.</p>
               )}
+            </section>
+
+            <Separator />
+
+            {/* Permission Mode */}
+            <section>
+              <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Permission Mode
+              </h3>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border text-left transition-all ${
+                      permissionMode === 'bypass'
+                        ? 'border-green-500 bg-green-50 dark:border-green-800 dark:bg-green-950/30'
+                        : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                    onClick={() => handleSetPermissionMode('bypass')}
+                    disabled={permSaving}
+                  >
+                    <ShieldCheck className={`h-4 w-4 shrink-0 mt-0.5 ${permissionMode === 'bypass' ? 'text-green-500' : 'text-muted-foreground'}`} />
+                    <div className="min-w-0">
+                      <p className="font-medium text-xs">Bypass (YOLO)</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Auto-approve all tool calls. No confirmation prompts.</p>
+                    </div>
+                  </button>
+                  <button
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border text-left transition-all ${
+                      permissionMode === 'default'
+                        ? 'border-amber-500 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'
+                        : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                    onClick={() => handleSetPermissionMode('default')}
+                    disabled={permSaving}
+                  >
+                    <ShieldAlert className={`h-4 w-4 shrink-0 mt-0.5 ${permissionMode === 'default' ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                    <div className="min-w-0">
+                      <p className="font-medium text-xs">Default</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Ask before destructive tools (write, edit, run_command).</p>
+                    </div>
+                  </button>
+                </div>
+
+                {permError && (
+                  <p className="text-xs text-red-500">{permError}</p>
+                )}
+
+                {permSaving && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Updating...
+                  </div>
+                )}
+
+                {(permAllowedTools.length > 0 || permDeniedTools.length > 0) && (
+                  <div className="space-y-1.5">
+                    {permAllowedTools.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground shrink-0">Allowed:</span>
+                        {permAllowedTools.map((t) => (
+                          <Badge key={t} variant="outline" className="text-[10px] text-green-600 gap-1">
+                            <CheckCircle2 className="h-2.5 w-2.5" /> {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {permDeniedTools.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground shrink-0">Denied:</span>
+                        {permDeniedTools.map((t) => (
+                          <Badge key={t} variant="outline" className="text-[10px] text-red-500 gap-1">
+                            <XCircle className="h-2.5 w-2.5" /> {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs gap-1.5"
+                      onClick={handleResetPermissions}
+                      disabled={permSaving}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Reset to Default (Bypass)
+                    </Button>
+                  </div>
+                )}
+              </div>
             </section>
 
             <Separator />

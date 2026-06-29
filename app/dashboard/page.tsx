@@ -55,8 +55,8 @@ function Page() {
             </ResizablePanel> 
           </ResizablePanelGroup>
         </ResizablePanel>
-        <ResizableHandle className={!traybarOpen ? 'hidden' : ''} />
-        <ResizablePanel defaultSize={traybarOpen ? 20 : 0} minSize={traybarOpen ? 5 : 0} maxSize={50} className={!traybarOpen ? 'hidden' : ''}>
+        <ResizableHandle withHandle={true} className={!traybarOpen ? 'hidden' : ''} />
+        <ResizablePanel defaultSize={traybarOpen ? 20 : 0} minSize={traybarOpen ? 25 : 0} maxSize={50} className={!traybarOpen ? 'hidden' : ''}>
           <Traybar onClose={() => setTraybarOpen(false)} />
         </ResizablePanel>
       </ResizablePanelGroup>

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Pencil, Focus, Trash2, Copy, Save, Code, Type, Hash, Braces, ToggleLeft, List as ListIcon } from 'lucide-react';
+import { Pencil, Focus, Trash2, Copy, Save, Code, Type, Hash, Braces, ToggleLeft, List as ListIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -28,6 +28,7 @@ export interface DataTypeNodeData extends Record<string, any> {
   dataType: DataType;
   value: any;
   label?: string;
+  isCollapsed?: boolean;
 }
 
 interface DataTypeNodeProps extends NodeProps {
@@ -48,6 +49,14 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [labelError, setLabelError] = useState<string>('');
   const labelInputRef = useRef<HTMLInputElement>(null);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    // Check localStorage first (instant persistence like viewport), then node data
+    if (typeof window !== 'undefined' && nodeData.filePath) {
+      const stored = localStorage.getItem(`canvas_node_collapsed_${nodeData.filePath}_${id}`);
+      if (stored !== null) return stored === 'true';
+    }
+    return nodeData.isCollapsed ?? false;
+  });
 
   // Validate variable name
   const isValidVariableName = (name: string): { valid: boolean; error: string } => {
@@ -502,13 +511,38 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         >
         {/* Header */}
         <div 
-          className={cn("border-b border-border px-3 py-2 flex items-center justify-between relative overflow-hidden", getDataTypeBgClass(nodeData.dataType))}
+          className={cn("border-b border-border px-3 py-2 flex items-center justify-between relative overflow-hidden", getDataTypeBgClass(nodeData.dataType), isCollapsed && "border-b-0")}
           style={{
             backgroundImage: `repeating-linear-gradient(135deg, transparent, transparent 6px, ${getDataTypeStripeColor(nodeData.dataType)} 6px, ${getDataTypeStripeColor(nodeData.dataType)} 12px)`,
             backgroundSize: '200% 100%',
           }}
         >
           <div className="flex items-center gap-2 flex-1 min-w-0 relative z-10">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const newCollapsed = !isCollapsed;
+                setIsCollapsed(newCollapsed);
+                setNodes((nds) =>
+                  nds.map((node) =>
+                    node.id === id
+                      ? { ...node, data: { ...node.data, isCollapsed: newCollapsed } }
+                      : node
+                  )
+                );
+                // Persist to localStorage so it survives refreshes without saving
+                if (typeof window !== 'undefined' && nodeData.filePath) {
+                  localStorage.setItem(`canvas_node_collapsed_${nodeData.filePath}_${id}`, String(newCollapsed));
+                }
+              }}
+              className="shrink-0 p-0.5 hover:bg-muted/50 rounded transition-colors"
+              title={isCollapsed ? "Expand" : "Collapse"}
+            >
+              {isCollapsed
+                ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              }
+            </button>
             <DataTypeIcon className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className="flex-1 min-w-0">
               {isEditingLabel ? (
@@ -565,18 +599,20 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         )}
 
         {/* Content */}
-        <div className="p-3">
-          <Label className="text-xs text-muted-foreground mb-1.5 block">
-            Value
-          </Label>
-          {renderInput()}
-        </div>
+        {!isCollapsed && (
+          <div className="p-3">
+            <Label className="text-xs text-muted-foreground mb-1.5 block">
+              Value
+            </Label>
+            {renderInput()}
+          </div>
+        )}
 
         {/* Output Handle - styled like CustomNode */}
         <div 
           className="noDrag" 
           onMouseDown={(e) => e.stopPropagation()}
-          style={{ position: 'absolute', right: -5, top: '50%', transform: 'translateY(-50%)', zIndex: 100 }}
+          style={{ position: 'absolute', right: -5, top: isCollapsed ? '50%' : '50%', transform: 'translateY(-50%)', zIndex: 100, transition: 'top 0.2s ease' }}
         >
           <Handle
             type="source"

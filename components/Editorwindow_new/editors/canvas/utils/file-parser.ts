@@ -284,7 +284,8 @@ export const convertToFlowNodes = (nodes: Node[]): FlowNode[] => {
         data: {
           dataType: node.data.dataType,
           value: node.data.value,
-          label: node.data.label
+          label: node.data.label,
+          isCollapsed: node.data.isCollapsed ?? false
         },
         draggable: node.draggable !== false,
         selectable: node.selectable !== false,
@@ -326,7 +327,8 @@ export const convertFlowNodesToReactFlow = (nodes: FlowNode[]): Node[] => {
         data: {
           dataType: node.data.dataType,
           value: node.data.value,
-          label: node.data.label
+          label: node.data.label,
+          isCollapsed: node.data.isCollapsed ?? false
         },
         draggable: node.draggable !== false,
         selectable: node.selectable !== false,

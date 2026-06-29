@@ -15,7 +15,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Focus, Trash2, Copy, Save, Eye, Code, Lock, Unlock, ChevronRight, Terminal, Square } from 'lucide-react';
+import { Focus, Trash2, Copy, Save, Eye, Code, Lock, Unlock, ChevronRight, ChevronDown, Terminal, Square } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { createCustomNode } from '@/lib/services/custom-node-service';
@@ -132,6 +132,14 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   const [unifiedOutputs, setUnifiedOutputs] = useState<UnifiedOutput[]>([]);
   const [isLocked, setIsLocked] = useState(false); // Lock state: false = draggable, true = locked (no drag)
   const executionIdRef = useRef<string | null>(null); // Track execution_id for stop functionality
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    // Check localStorage first (instant persistence like viewport), then node data
+    if (typeof window !== 'undefined' && nodeData.filePath) {
+      const stored = localStorage.getItem(`canvas_node_collapsed_${nodeData.filePath}_${id}`);
+      if (stored !== null) return stored === 'true';
+    }
+    return Boolean(nodeData.isCollapsed ?? false);
+  });
   
   // Extract unified outputs from node data (combines logs + rich outputs + errors in execution order)
   useEffect(() => {
@@ -544,8 +552,17 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     // Minimum reasonable height for the node
     const minimumHeight = 180;
     
+    if (isCollapsed) {
+      // Header + space for stacked handles + collapsed footer with run button
+      const collapsedHandleHeight = Math.max(
+        (nodeData.inputs?.length || 0),
+        (nodeData.outputs?.length || 0)
+      ) * 20 + 40; // header + handle spacing
+      return Math.max(headerHeight + 36, collapsedHandleHeight + 36);
+    }
+    
     return Math.max(minimumHeight, baseHeight + inputsHeight + outputsHeight + dividerHeight);
-  }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, unifiedOutputs.length, outputsOpen]);
+  }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, unifiedOutputs.length, outputsOpen, isCollapsed]);
 
   return (
     <ContextMenu>
@@ -638,17 +655,45 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           className={cn(
             "border-b border-border px-4 py-2 flex items-center justify-between relative overflow-hidden",
             isRunning ? "bg-yellow-500/80 stripe-flow" : langBgClass,
-            isRunning && "text-white"
+            isRunning && "text-white",
+            isCollapsed && "border-b-0"
           )}
           style={stripeColor ? {
             backgroundImage: `repeating-linear-gradient(135deg, transparent, transparent 6px, ${stripeColor} 6px, ${stripeColor} 12px)`,
             backgroundSize: '200% 100%',
           } : undefined}
         >
-        <div className="font-medium text-sm text-foreground relative z-10">{nodeData.title || 'Untitled Node'}</div>
+        <div className="flex items-center gap-2 flex-1 min-w-0 relative z-10">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const newCollapsed = !isCollapsed;
+              setIsCollapsed(newCollapsed);
+              setNodes((nds: Node[]) =>
+                nds.map((n: Node) =>
+                  n.id === id
+                    ? { ...n, data: { ...n.data, isCollapsed: newCollapsed } }
+                    : n
+                )
+              );
+              if (typeof window !== 'undefined' && nodeData.filePath) {
+                localStorage.setItem(`canvas_node_collapsed_${nodeData.filePath}_${id}`, String(newCollapsed));
+              }
+              setTimeout(() => updateNodeInternals(id), 50);
+            }}
+            className="shrink-0 p-0.5 hover:bg-muted/50 rounded transition-colors"
+            title={isCollapsed ? "Expand" : "Collapse"}
+          >
+            {isCollapsed
+              ? <ChevronRight className={cn("h-3.5 w-3.5", isRunning ? "text-white/80" : "text-muted-foreground")} />
+              : <ChevronDown className={cn("h-3.5 w-3.5", isRunning ? "text-white/80" : "text-muted-foreground")} />
+            }
+          </button>
+          <div className={cn("font-medium text-sm truncate", isRunning ? "text-white" : "text-foreground")}>{nodeData.title || 'Untitled Node'}</div>
+        </div>
         {/* <div className="font-medium text-sm text-foreground">{nodeData.function_name || 'Untitled Node'}</div> */}
-        <div className="flex items-center gap-2 relative z-10">
-          <div className={cn("text-xs px-2 py-0.5 rounded-full border", isRunning ? "bg-background text-white" : langBadgeClass)}>
+        <div className="flex items-center gap-2 relative z-10 shrink-0">
+          <div className={cn("text-xs px-2 py-0.5 rounded-full border", isRunning ? "bg-white/20 text-white border-white/30" : langBadgeClass)}>
             {nodeData.language || 'python'}
           </div>
           <button 
@@ -660,7 +705,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
               }
             }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isRunning ? "text-white/80" : "text-muted-foreground"}>
               <path d="M18 6L6 18"></path>
               <path d="M6 6l12 12"></path>
             </svg>
@@ -670,7 +715,87 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         );
       })()}
       
-      {/* Node content */}
+      {/* Collapsed handles — compact dots on left/right edges */}
+      {isCollapsed && (
+        <>
+          {/* Input handles (stacked on left edge) */}
+          {nodeData.inputs && nodeData.inputs.length > 0 && (
+            <>
+              {nodeData.inputs.map((input, idx) => {
+                const total = nodeData.inputs!.length;
+                const spacing = Math.min(20, 120 / (total + 1));
+                const top = 40 + spacing * (idx + 1);
+                return (
+                  <div
+                    key={`collapsed-input-${input.id || idx}`}
+                    className="noDrag"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{ position: 'absolute', left: -5, top, transform: 'translateY(-50%)', zIndex: 100 }}
+                  >
+                    <Handle
+                      id={`input-${input.id || idx}`}
+                      type="target"
+                      position={Position.Left}
+                      style={{
+                        position: 'relative',
+                        left: 0,
+                        top: 0,
+                        transform: 'none',
+                        background: '#5D688A',
+                        width: 10,
+                        height: 10,
+                        border: '2px solid hsl(var(--background))',
+                        boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.1)',
+                        cursor: 'crosshair'
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </>
+          )}
+          {/* Output handles (stacked on right edge) */}
+          {nodeData.outputs && nodeData.outputs.length > 0 && (
+            <>
+              {nodeData.outputs.map((output, idx) => {
+                const total = nodeData.outputs!.length;
+                const spacing = Math.min(20, 120 / (total + 1));
+                const top = 40 + spacing * (idx + 1);
+                return (
+                  <div
+                    key={`collapsed-output-${output.id || idx}`}
+                    className="noDrag"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{ position: 'absolute', right: -5, top, transform: 'translateY(-50%)', zIndex: 100 }}
+                  >
+                    <Handle
+                      id={`output-${output.id || idx}`}
+                      type="source"
+                      position={Position.Right}
+                      style={{
+                        position: 'relative',
+                        left: 0,
+                        top: 0,
+                        transform: 'none',
+                        background: '#5D688A',
+                        width: 10,
+                        height: 10,
+                        border: '2px solid hsl(var(--background))',
+                        boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.1)',
+                        cursor: 'crosshair'
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </>
+      )}
+
+      {/* Node content — only when expanded */}
+      {!isCollapsed && (
+      <>
       <div className="p-3 select-text" onMouseDown={(e) => {
         // Allow text selection by stopping propagation when selecting text
         const selection = window.getSelection();
@@ -867,7 +992,31 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       </div>
       
       {/* Run/Stop buttons at bottom */}
-      <div className="px-3 py-2 border-t border-border">
+      </>
+      )}
+      {/* When collapsed, keep run button accessible in a minimal footer */}
+      {isCollapsed && (
+        <div className="px-3 py-1.5 border-t border-border flex items-center gap-2">
+          <button
+            className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-1 px-2 rounded flex items-center justify-center disabled:opacity-50"
+            onClick={handleRunNode}
+            disabled={isExecuting}
+          >
+            {isExecuting ? (
+              <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-foreground mr-1"></div>Running...</>
+            ) : (
+              <><svg className="h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>Run</>
+            )}
+          </button>
+          {isExecuting && (
+            <button className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs py-1 px-2 rounded" onClick={handleStopNode}>
+              <Square className="h-3 w-3 fill-current" />
+            </button>
+          )}
+        </div>
+      )}
+      {!isCollapsed && (
+      <div className="px-3 py-2 border-t border-border" style={{ borderTop: 'none' }}>
         <div className="flex gap-2">
         <button 
           className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-sm py-1 px-3 rounded flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
@@ -951,7 +1100,8 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         );
         })()}
       </div>
-    </div>
+      )}
+      </div>
       </ContextMenuTrigger>
       
       <ContextMenuContent className="w-56">

@@ -280,7 +280,7 @@ export const useChatStore = create<ChatState>()(
   promptSuggestions: [],
   enabledDatabases: ['pubmed'],
   keepIntermediateFiles: false,
-  permissionMode: 'default' as 'default' | 'bypass' | 'always',
+  permissionMode: 'bypass' as 'default' | 'bypass' | 'always',
   allowedTools: [] as string[],
   
   addMessage: (message) => {
@@ -513,7 +513,7 @@ export const useChatStore = create<ChatState>()(
         id, title, messages: msgs || [], pendingFiles: [], isTemporary: id.startsWith('temp-'),
         tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }, contextWindow: 4096, contextTokens: 0, isLoading: false,
         queuedMessages: [], queuedTodos: [], mentions: [], uploadedFiles: [], promptSuggestions: [],
-        permissionMode: 'default' as 'default' | 'bypass' | 'always', allowedTools: [],
+        permissionMode: 'bypass' as 'default' | 'bypass' | 'always', allowedTools: [],
         currentStreamingMessageId: null, currentReasoningId: null, showFilePanel: false,
         currentConversationId: id.startsWith('temp-') ? null : id, isNewChat: id.startsWith('temp-'),
       };
@@ -531,7 +531,7 @@ export const useChatStore = create<ChatState>()(
         mentions: [],
         uploadedFiles: [],
         promptSuggestions: [],
-        permissionMode: 'default' as 'default' | 'bypass' | 'always',
+        permissionMode: 'bypass' as 'default' | 'bypass' | 'always',
         allowedTools: [],
         currentStreamingMessageId: null,
         currentReasoningId: null,
@@ -590,7 +590,7 @@ export const useChatStore = create<ChatState>()(
         mentions: [] as ChatMentionItem[],
         uploadedFiles: [] as UploadedFile[],
         promptSuggestions: [] as string[],
-        permissionMode: 'default' as 'default' | 'bypass' | 'always',
+        permissionMode: 'bypass' as 'default' | 'bypass' | 'always',
         allowedTools: [] as string[],
         currentStreamingMessageId: null,
         currentReasoningId: null,
@@ -789,7 +789,7 @@ export const useChatStore = create<ChatState>()(
   addAllowedTool: (toolName) => set((state) => ({
     allowedTools: state.allowedTools.includes(toolName) ? state.allowedTools : [...state.allowedTools, toolName],
   })),
-  resetPermissionMode: () => set({ permissionMode: 'default', allowedTools: [] }),
+  resetPermissionMode: () => set({ permissionMode: 'bypass', allowedTools: [] }),
 }),
     {
       name: 'genome-studio-chat-settings',
