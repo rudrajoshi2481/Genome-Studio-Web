@@ -23,7 +23,7 @@ class WebSocketService {
   private reconnectDelay = 1000;
 
   async connect(): Promise<void> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
@@ -60,7 +60,9 @@ class WebSocketService {
             } else if (message.type === 'tool_execution_complete') {
               console.log('🔍 [WS SERVICE] tool_execution_complete:', message.tool_name);
             }
-            console.log('Received WebSocket message:', event.data);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Received WebSocket message:', event.data);
+            }
             this.messageHandlers.forEach(handler => handler(message));
           } catch (error) {
             console.error('Failed to parse WebSocket message:', error, event.data);
@@ -135,6 +137,8 @@ class WebSocketService {
 
   disconnect(): void {
     if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.onerror = null;
       this.ws.close();
       this.ws = null;
     }

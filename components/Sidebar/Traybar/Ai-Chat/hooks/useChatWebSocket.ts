@@ -97,6 +97,14 @@ export const useChatWebSocket = () => {
       switch (message.type) {
         case 'system':
           setConnectionStatus(true);
+          // Skip adding connection confirmation messages to the chat
+          if (message.content && message.content !== 'Connected to Genome Studio AI') {
+            sessionAddMessage({
+              type: 'system',
+              role: 'system',
+              content: message.content
+            });
+          }
           break;
         case 'connection':
           // Ignore connection messages to prevent unknown message type error
@@ -274,7 +282,7 @@ export const useChatWebSocket = () => {
           break;
         case 'reasoning':
         case 'reasoning_chunk': {
-          const chunkContent = (message.content || '').trim();
+          const chunkContent = message.content || '';
           if (!chunkContent) break;
           const currentMsgs = sessionGetMessages();
           const lastMsg = currentMsgs[currentMsgs.length - 1];
@@ -400,13 +408,6 @@ export const useChatWebSocket = () => {
           }
           break;
         }
-        case 'system':
-          sessionAddMessage({
-            type: 'system',
-            role: 'system',
-            content: message.content
-          });
-          break;
         case 'stream_chunk': {
           const currentMessages = sessionGetMessages();
           const lastMsg = currentMessages[currentMessages.length - 1];
@@ -987,6 +988,13 @@ export const useChatWebSocket = () => {
         role: 'system',
         content: 'WebSocket is not connected. Attempting to reconnect...'
       });
+      // Queue the message so it can be sent once reconnected
+      useChatStore.getState().addQueuedMessage({
+        id: `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        parts: [{ text: content, type: 'text' }],
+      });
+      // Trigger reconnection
+      wsService.connect().catch(() => {});
       return;
     }
 
@@ -1058,7 +1066,7 @@ export const useChatWebSocket = () => {
           workspaceFolders = data.folders || undefined;
         }
       } catch (e) {
-        console.error('[AI Chat] Failed to fetch workspace folders:', e);
+        // Silently handle — workspace folders are optional context for the AI
       }
 
       // Collect open tabs info (paths + active tab) so the backend agent knows
@@ -1210,11 +1218,18 @@ export const useChatWebSocket = () => {
   const sendCommand = (command: string, commandArgs?: string[], model?: string) => {
     if (!wsService.isConnected()) {
       console.error('WebSocket is not connected');
+      addMessage({
+        type: 'system',
+        role: 'system',
+        content: 'WebSocket is not connected. Attempting to reconnect...'
+      });
+      wsService.connect().catch(() => {});
       return;
     }
     // Read fresh state to get correct session ID for this tab
     const state = useChatStore.getState();
-    const sessionIdToSend = state.currentConversationId || state.activeSessionId || undefined;
+    const activeId = state.activeSessionId;
+    const sessionIdToSend = state.currentConversationId || activeId || undefined;
     // Show the command as a user message in the chat
     const argsStr = commandArgs && commandArgs.length > 0 ? ' ' + commandArgs.join(' ') : '';
     addMessage({
@@ -1229,6 +1244,12 @@ export const useChatWebSocket = () => {
       content: ''
     });
     setLoading(true);
+    // Sync loading state to the session
+    useChatStore.setState((state) => ({
+      openSessions: state.openSessions.map(s =>
+        s.id === activeId ? { ...s, isLoading: true } : s
+      ),
+    }));
     wsService.sendMessage({
       type: 'chat',
       content: '',

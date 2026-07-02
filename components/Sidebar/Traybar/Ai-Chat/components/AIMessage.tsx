@@ -40,19 +40,17 @@ function AIMessage({ message, isLast, isLoading, onRegenerate, onDelete }: AIMes
           <PonderingIndicator compact mode="responding" />
         ) : null}
       </div>
-      {!message.isStreaming && message.content && (
-        <div className="flex items-center gap-0.5">
-          {isLast && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-              onClick={handleCopy}
-            >
-              {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
-            </Button>
-          )}
-          {onRegenerate && isLast && (
+      {!message.isStreaming && message.content && isLast && (
+        <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+            onClick={handleCopy}
+          >
+            {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
+          </Button>
+          {onRegenerate && (
             <Button
               variant="ghost"
               size="sm"

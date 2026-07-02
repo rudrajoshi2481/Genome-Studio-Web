@@ -19,7 +19,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation';
-import { Sparkles, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { PonderingIndicator, SpinnerMode } from './components/PonderingIndicator';
 import QueuePanel from './components/QueuePanel';
 import HistoryPanel from './components/HistoryPanel';
@@ -67,6 +67,19 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   const [showConvList, setShowConvList] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const wasLoadingRef = useRef(false);
+  const prevMessageCountRef = useRef(0);
+
+  // Auto-scroll to bottom when new messages arrive or streaming content updates
+  useEffect(() => {
+    if (scrollRef.current) {
+      const el = scrollRef.current;
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+      if (isNearBottom) {
+        el.scrollTop = el.scrollHeight;
+      }
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages]);
 
   // Auto-process queued messages when loading finishes
   useEffect(() => {
@@ -251,13 +264,11 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   const handleRegenerate = () => {
     const lastUserMsg = [...messages].reverse().find((m) => m.type === 'human');
     if (lastUserMsg) {
-      const aiMessages = messages.filter((m) => m.type === 'ai' || m.type === 'stream');
-      const lastAiMsg = aiMessages[aiMessages.length - 1];
-      if (lastAiMsg) {
-        useChatStore.setState((state) => ({
-          messages: state.messages.filter((m) => m.id !== lastAiMsg.id),
-        }));
-      }
+      const lastUserIndex = messages.lastIndexOf(lastUserMsg);
+      // Remove all messages after the last user message (AI responses, tools, reasoning, thinking, etc.)
+      useChatStore.setState((state) => ({
+        messages: state.messages.slice(0, lastUserIndex + 1),
+      }));
       sendMessage(lastUserMsg.content);
     }
   };
@@ -271,9 +282,9 @@ function AIChat({ onClose }: { onClose?: () => void }) {
     const content = (() => {
     switch (message.type) {
       case 'human':
-        return <UserMessage key={message.id} message={message} isLast={isLast} onEdit={handleEditMessage} />;
+        return <UserMessage key={message.id} message={message} isLast={isLast} onEdit={handleEditMessage} onDelete={handleDeleteMessage} />;
       case 'ai':
-        return <AIMessage key={message.id} message={message} isLast={isLast} isLoading={isLoadingConvs} onRegenerate={handleRegenerate} />;
+        return <AIMessage key={message.id} message={message} isLast={isLast} isLoading={isLoadingConvs} onRegenerate={handleRegenerate} onDelete={handleDeleteMessage} />;
       case 'tool':
         return <ToolMessage key={message.id} message={message} isLast={isLast} onStopCommand={stopCommand} onApprove={(id, approvalMode) => {
           const toolMessageId = message.metadata?.toolMessageId || id;
@@ -302,7 +313,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
           </div>
         );
       case 'stream':
-        return <AIMessage key={message.id} message={message} isLast={isLast} isLoading={isLoadingConvs} onRegenerate={handleRegenerate} />;
+        return <AIMessage key={message.id} message={message} isLast={isLast} isLoading={isLoadingConvs} onRegenerate={handleRegenerate} onDelete={handleDeleteMessage} />;
       case 'system':
         return (
           <div key={message.id} className="text-xs text-muted-foreground text-center py-2 whitespace-pre-wrap">

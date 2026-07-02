@@ -17,7 +17,8 @@ import {
   Loader2,
   Settings,
   X,
-  Folder
+  Folder,
+  FoldVertical
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FileIconComponent } from './utils/fileIcons';
@@ -101,8 +102,20 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
     cutItems,
     copyItems,
     pasteItems,
-    canPaste
+    canPaste,
+    collapseAll,
+    selectRange
   } = useFileExplorerStore();
+
+  console.log('%c🔄 FileExplorer_New render', 'background: #9933ff; color: white; padding: 2px 6px; border-radius: 3px;', {
+    hasFileTree: !!fileTree,
+    isLoading,
+    selectedPathsCount: selectedPaths.length,
+    expandedPathsCount: useFileExplorerStore.getState().expandedPaths.length,
+    nodesCount: useFileExplorerStore.getState().nodes.size,
+    wsStatus,
+    error
+  });
 
   // Local state for dialogs
   
@@ -134,32 +147,73 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
   // If a directory is selected, returns that directory
   // If nothing is selected, returns root path
   const getTargetDirectoryPath = useCallback((path?: string): string => {
-    if (!path) return rootPath;
+    if (!path) return useFileExplorerStore.getState().rootPath;
     
-    // Check if the path is a file by looking at the fileTree
-    const findNode = (node: FileNode | null, targetPath: string): FileNode | null => {
-      if (!node) return null;
-      if (node.path === targetPath) return node;
-      if (node.children) {
-        for (const child of node.children) {
-          const found = findNode(child, targetPath);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    
-    const node = findNode(fileTree, path);
+    // Check if the path is a file by looking at the nodes Map (avoids fileTree dependency)
+    const node = useFileExplorerStore.getState().nodes.get(path);
     
     // If it's a file, return its parent directory
     if (node && !node.is_dir) {
       const lastSlashIndex = path.lastIndexOf('/');
-      return lastSlashIndex > 0 ? path.substring(0, lastSlashIndex) : rootPath;
+      return lastSlashIndex > 0 ? path.substring(0, lastSlashIndex) : useFileExplorerStore.getState().rootPath;
     }
     
     // If it's a directory or node not found, return the path itself
     return path;
-  }, [fileTree, rootPath]);
+  }, []);
+
+  // Cleanup function to fix Radix UI side effects (aria-hidden, pointer-events) that get
+  // stuck when transitioning between overlays (e.g. ContextMenu -> Dialog).
+  // Radix's DismissableLayer uses a module-level `originalBodyPointerEvents` variable that
+  // gets overwritten with "none" when a Dialog opens while a ContextMenu is still closing.
+  // When the Dialog later closes, it restores pointerEvents to the saved "none" value,
+  // permanently freezing the UI.
+  const cleanupRadixSideEffects = useCallback(() => {
+    const hasOpenOverlay =
+      document.querySelector('[data-radix-popper-content-wrapper]:not([data-state="closed"])') ||
+      document.querySelector('[role="dialog"][data-state="open"]');
+    if (!hasOpenOverlay) {
+      if (document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+      }
+      const mainContainer = document.querySelector('.relative.flex.h-screen.w-full.overflow-hidden');
+      if (mainContainer?.hasAttribute('aria-hidden')) {
+        mainContainer.removeAttribute('aria-hidden');
+        mainContainer.removeAttribute('data-aria-hidden');
+      }
+      document.querySelectorAll('[data-aria-hidden="true"]:not([data-radix-popper-content-wrapper])').forEach(el => {
+        el.removeAttribute('aria-hidden');
+        el.removeAttribute('data-aria-hidden');
+      });
+    }
+  }, []);
+
+  // MutationObserver to clean up orphaned aria-hidden and pointer-events left by Radix UI
+  // when transitioning between overlays (ContextMenu -> Dialog)
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      cleanupRadixSideEffects();
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['aria-hidden', 'data-aria-hidden'], subtree: true });
+    return () => observer.disconnect();
+  }, [cleanupRadixSideEffects]);
+
+  // Fallback: periodically check for stuck pointer-events after overlay transitions.
+  // The MutationObserver only fires on aria-hidden changes, but pointerEvents can get
+  // stuck even when aria-hidden is properly cleaned up.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.body.style.pointerEvents === 'none') {
+        const hasOpenOverlay =
+          document.querySelector('[data-radix-popper-content-wrapper]:not([data-state="closed"])') ||
+          document.querySelector('[role="dialog"][data-state="open"]');
+        if (!hasOpenOverlay) {
+          document.body.style.pointerEvents = '';
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Initialize component
   useEffect(() => {
@@ -176,10 +230,14 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
   }, []); // Empty dependency array - only run once on mount
 
   // Handle file selection
-  const handleFileSelect = useCallback((path: string, multiSelect = false) => {
-    selectNode(path, multiSelect);
+  const handleFileSelect = useCallback((path: string, multiSelect = false, shiftSelect = false) => {
+    if (shiftSelect) {
+      selectRange(path);
+    } else {
+      selectNode(path, multiSelect);
+    }
     onFileSelect?.(path);
-  }, [selectNode, onFileSelect]);
+  }, [selectNode, selectRange, onFileSelect]);
 
   // Handle file double-click (open)
   const handleFileOpen = useCallback(async (path: string) => {
@@ -577,9 +635,6 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
     event.preventDefault();
   }, []);
 
-  // Memoize selectedPaths Set to avoid recreating it on every render
-  const selectedPathsSet = useMemo(() => new Set(selectedPaths), [selectedPaths]);
-
   // Render search results or file tree
   const renderContent = () => {
     if (searchQuery && searchResults.length > 0) {
@@ -642,7 +697,6 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         onSelect={handleFileSelect}
         onOpen={handleFileOpen}
         onContextAction={handleContextAction}
-        selectedPaths={selectedPathsSet}
       />
     );
   };
@@ -757,6 +811,22 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
               </TooltipContent>
             </Tooltip>
             
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => collapseAll()}
+                  className="h-7 w-7 p-0 hover:bg-accent"
+                >
+                  <FoldVertical className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="text-xs">Collapse All</p>
+              </TooltipContent>
+            </Tooltip>
+            
             <Separator orientation="vertical" className="h-5 mx-0.5" />
             
             {/* More actions dropdown */}
@@ -861,9 +931,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
               await createDirectory(name, showCreateDialog.parentPath);
             }
             setShowCreateDialog(null);
+            setTimeout(cleanupRadixSideEffects, 300);
           }
         }}
-        onCancel={() => setShowCreateDialog(null)}
+        onCancel={() => { setShowCreateDialog(null); setTimeout(cleanupRadixSideEffects, 300); }}
       />
 
       <UploadDialog
@@ -873,9 +944,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
           if (showUploadDialog) {
             handleFileUpload(files, showUploadDialog.targetPath);
             setShowUploadDialog(null);
+            setTimeout(cleanupRadixSideEffects, 300);
           }
         }}
-        onCancel={() => setShowUploadDialog(null)}
+        onCancel={() => { setShowUploadDialog(null); setTimeout(cleanupRadixSideEffects, 300); }}
       />
 
       <DeleteConfirmDialog
@@ -886,9 +958,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
           if (showDeleteDialog) {
             await deleteItems(showDeleteDialog.paths);
             setShowDeleteDialog(null);
+            setTimeout(cleanupRadixSideEffects, 300);
           }
         }}
-        onCancel={() => setShowDeleteDialog(null)}
+        onCancel={() => { setShowDeleteDialog(null); setTimeout(cleanupRadixSideEffects, 300); }}
       />
 
       <RenameDialog
@@ -898,9 +971,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
           if (showRenameDialog) {
             await renameItem(showRenameDialog.path, newName);
             setShowRenameDialog(null);
+            setTimeout(cleanupRadixSideEffects, 300);
           }
         }}
-        onCancel={() => setShowRenameDialog(null)}
+        onCancel={() => { setShowRenameDialog(null); setTimeout(cleanupRadixSideEffects, 300); }}
       />
 
       {/* Hidden file input for upload */}

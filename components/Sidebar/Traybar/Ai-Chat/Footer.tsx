@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils'
 
 interface OllamaModel {
   name: string
+  provider?: string
   size?: number
   digest?: string
   modified_at?: string
@@ -53,6 +54,11 @@ interface OllamaModelsResponse {
   models: OllamaModel[]
 }
 
+interface AllModelsResponse {
+  providers: { id: string; name: string; available: boolean; base_url: string }[]
+  models: OllamaModel[]
+}
+
 interface FooterProps {
   onSendMessage?: (message: string, model?: string) => void;
   onStop?: () => void;
@@ -66,7 +72,9 @@ const SELECTED_MODEL_KEY = 'selected-model'
 function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterProps = {}) {
   const [isLoading, setIsLoading] = useState(false)
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([])
+  const [zaiModels, setZaiModels] = useState<OllamaModel[]>([])
   const [ollamaAvailable, setOllamaAvailable] = useState(false)
+  const [zaiAvailable, setZaiAvailable] = useState(false)
   const [modelsLoading, setModelsLoading] = useState(false)
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -169,14 +177,15 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
     if (ollamaModels.length === 0) return
 
     // Only auto-select if no valid model is currently selected
-    const currentValid = ollamaModels.some(m => m.name === selectedModel)
+    const allModels = [...ollamaModels, ...zaiModels]
+    const currentValid = allModels.some(m => m.name === selectedModel)
     if (currentValid) return
 
     let nextModel: string | null = null
 
     if (pinnedModels.length > 0) {
       const validPinned = pinnedModels.filter(name =>
-        ollamaModels.some(m => m.name === name)
+        allModels.some(m => m.name === name)
       )
       if (validPinned.length > 0) {
         nextModel = validPinned[0]
@@ -185,12 +194,12 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
 
     if (!nextModel) {
       const hasDefault = ollamaModels.some(m => m.name === 'qwen3.5:latest')
-      nextModel = hasDefault ? 'qwen3.5:latest' : ollamaModels[0].name
+      nextModel = hasDefault ? 'qwen3.5:latest' : (allModels[0]?.name || 'qwen3.5:latest')
     }
 
     const modelToSet = nextModel as string
     setSelectedModel(modelToSet)
-  }, [ollamaModels, pinnedModels])
+  }, [ollamaModels, zaiModels, pinnedModels])
 
   const togglePin = useCallback((modelName: string) => {
     setPinnedModels(prev =>
@@ -203,36 +212,48 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
   const fetchOllamaModels = useCallback(async () => {
     setModelsLoading(true)
     try {
-      const resp = await fetch(`${getApiBaseUrl()}/ai-chat/ollama/models`)
+      // Fetch all models (Ollama + Z.ai) from the unified endpoint
+      const resp = await fetch(`${getApiBaseUrl()}/ai-chat/models`)
       if (!resp.ok) throw new Error('Failed to fetch models')
-      const data: OllamaModelsResponse = await resp.json()
-      setOllamaAvailable(data.available)
-      setOllamaModels(data.models)
+      const data: AllModelsResponse = await resp.json()
+
+      // Split models by provider
+      const ollama = data.models.filter(m => !m.provider || m.provider === 'ollama')
+      const zai = data.models.filter(m => m.provider === 'zai')
+
+      setOllamaModels(ollama)
+      setOllamaAvailable(ollama.length > 0)
+      setZaiModels(zai)
+      setZaiAvailable(zai.length > 0)
     } catch (err) {
-      console.error('Error fetching Ollama models:', err)
+      console.error('Error fetching models:', err)
       setOllamaAvailable(false)
+      setZaiAvailable(false)
       setOllamaModels([])
+      setZaiModels([])
     } finally {
       setModelsLoading(false)
     }
-  }, [setContextWindow])
+  }, [])
 
   useEffect(() => {
     fetchOllamaModels()
   }, [fetchOllamaModels])
 
   useEffect(() => {
-    const model = ollamaModels.find(m => m.name === selectedModel)
+    // Look up model from both Ollama and Z.ai lists
+    const model = [...ollamaModels, ...zaiModels].find(m => m.name === selectedModel)
     const ctxLen = model?.context_length || model?.capabilities?.context_length
     if (ctxLen) {
       setContextWindow(ctxLen)
     }
-  }, [selectedModel, ollamaModels, setContextWindow])
+  }, [selectedModel, ollamaModels, zaiModels, setContextWindow])
 
   const handleModelChange = (value: string) => {
     setSelectedModel(value)
     setModelSelectorOpen(false)
-    const model = ollamaModels.find(m => m.name === value)
+    // Look up model from both Ollama and Z.ai lists
+    const model = [...ollamaModels, ...zaiModels].find(m => m.name === value)
     const ctxLen = model?.context_length || model?.capabilities?.context_length
     if (ctxLen) {
       setContextWindow(ctxLen)
@@ -331,6 +352,11 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
         id: `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         parts: [{ text, type: 'text' }],
       })
+      setInputValue('')
+      setMentions([])
+      clearMentions()
+      clearUploadedFiles()
+      editorRef.current?.commands.clearContent()
       return
     }
 
@@ -385,7 +411,9 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
   }
 
   const formatModelName = (name: string) => {
-    return name.replace(/[:]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    // Strip provider prefix for display
+    const display = name.replace(/^(zai|ollama):/, '')
+    return display.replace(/[:]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   }
 
   const formatModelSize = (size?: number) => {
@@ -500,7 +528,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
               <ModelSelectorContent title="Select Model">
                 <div className="flex items-center justify-between px-3 py-2 border-b">
                   <span className="text-xs font-medium text-muted-foreground">
-                    {ollamaModels.length > 0 ? `${ollamaModels.length} models available` : 'Models'}
+                    {[...ollamaModels, ...zaiModels].length > 0 ? `${[...ollamaModels, ...zaiModels].length} models available` : 'Models'}
                   </span>
                   <Button
                     size="icon"
@@ -515,7 +543,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                 </div>
                 <ModelSelectorInput placeholder="Search models..." />
                 <ModelSelectorList>
-                  {ollamaAvailable && (
+                  {(ollamaAvailable || zaiAvailable) && (
                     <ModelSelectorEmpty>
                       <div className="flex flex-col items-center gap-2 py-6 text-center">
                         <p className="text-xs text-muted-foreground">No models found.</p>
@@ -528,7 +556,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                       {pinnedModels.length > 0 && (
                         <ModelSelectorGroup heading="Pinned">
                           {pinnedModels
-                            .map(name => ollamaModels.find(m => m.name === name))
+                            .map(name => [...ollamaModels, ...zaiModels].find(m => m.name === name))
                             .filter((m): m is OllamaModel => !!m)
                             .map((model) => {
                               const isSelected = model.name === selectedModel
@@ -548,6 +576,15 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                                     <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground font-mono">
                                       {model.capabilities?.context_length && (
                                         <span>{(model.capabilities.context_length / 1000).toFixed(0)}K ctx</span>
+                                      )}
+                                      {model.capabilities?.supports_tools && (
+                                        <span>tools</span>
+                                      )}
+                                      {model.capabilities?.supports_reasoning && (
+                                        <span>reasoning</span>
+                                      )}
+                                      {model.capabilities?.supports_vision && (
+                                        <span>vision</span>
                                       )}
                                       {model.size && (
                                         <span>{formatModelSize(model.size)}</span>
@@ -575,7 +612,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                             })}
                         </ModelSelectorGroup>
                       )}
-                      <ModelSelectorGroup heading={`All Models (${ollamaModels.length})`}>
+                      <ModelSelectorGroup heading={`Ollama (${ollamaModels.length})`}>
                         {ollamaModels
                           .filter(m => !pinnedModels.includes(m.name))
                           .map((model) => {
@@ -596,6 +633,15 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                                   <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground font-mono">
                                     {model.capabilities?.context_length && (
                                       <span>{(model.capabilities.context_length / 1000).toFixed(0)}K ctx</span>
+                                    )}
+                                    {model.capabilities?.supports_tools && (
+                                      <span>tools</span>
+                                    )}
+                                    {model.capabilities?.supports_reasoning && (
+                                      <span>reasoning</span>
+                                    )}
+                                    {model.capabilities?.supports_vision && (
+                                      <span>vision</span>
                                     )}
                                     {model.size && (
                                       <span>{formatModelSize(model.size)}</span>
@@ -625,29 +671,85 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                     </>
                   )}
 
+                  {zaiAvailable && zaiModels.length > 0 && (
+                    <ModelSelectorGroup heading={`Z.ai Cloud (${zaiModels.length})`}>
+                      {zaiModels
+                        .filter(m => !pinnedModels.includes(m.name))
+                        .map((model) => {
+                          const isSelected = model.name === selectedModel
+                          return (
+                            <ModelSelectorItem
+                              key={model.name}
+                              value={model.name}
+                              onSelect={() => handleModelChange(model.name)}
+                            >
+                              <div className="flex items-center gap-2 w-full min-w-0">
+                                {isSelected ? (
+                                  <Check size={14} className="text-primary shrink-0" />
+                                ) : (
+                                  <Cpu size={14} className="text-muted-foreground shrink-0" />
+                                )}
+                                <span className="truncate text-sm font-medium flex-1 min-w-0">{formatModelName(model.name)}</span>
+                                <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground font-mono">
+                                  {model.capabilities?.context_length && (
+                                    <span>{(model.capabilities.context_length / 1000).toFixed(0)}K ctx</span>
+                                  )}
+                                  {model.capabilities?.supports_tools && (
+                                    <span>tools</span>
+                                  )}
+                                  {model.capabilities?.supports_reasoning && (
+                                    <span>reasoning</span>
+                                  )}
+                                  {model.capabilities?.supports_vision && (
+                                    <span>vision</span>
+                                  )}
+                                </div>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                                  onPointerDown={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                  }}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    togglePin(model.name)
+                                  }}
+                                >
+                                  <Pin size={13} />
+                                </Button>
+                              </div>
+                            </ModelSelectorItem>
+                          )
+                        })}
+                    </ModelSelectorGroup>
+                  )}
+
                   {modelsLoading && (
                     <ModelSelectorGroup heading="Loading...">
                       <ModelSelectorItem value="__loading__" disabled>
                         <span className="flex items-center gap-2">
-                          <Spinner className="size-3" /> Fetching models from Ollama...
+                          <Spinner className="size-3" /> Fetching models...
                         </span>
                       </ModelSelectorItem>
                     </ModelSelectorGroup>
                   )}
 
-                  {!ollamaAvailable && !modelsLoading && (
+                  {!ollamaAvailable && !zaiAvailable && !modelsLoading && (
                     <div className="flex flex-col items-center justify-center gap-4 py-10 px-6 text-center">
                       <div className="rounded-full bg-destructive/10 p-3">
                         <WifiOff className="size-6 text-destructive" />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-sm font-medium">Ollama is not reachable</p>
+                        <p className="text-sm font-medium">No models available</p>
                         <p className="text-xs text-muted-foreground leading-relaxed max-w-[280px]">
-                          Start it with{" "}
+                          Start Ollama with{" "}
                           <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">
                             ollama serve
                           </code>{" "}
-                          or configure a custom URL in Settings.
+                          or configure Z.ai API key in backend .env.
                         </p>
                       </div>
                       <Button

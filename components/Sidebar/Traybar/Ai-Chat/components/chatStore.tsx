@@ -352,6 +352,13 @@ export const useChatStore = create<ChatState>()(
         }
         return msg;
       }),
+      openSessions: state.activeSessionId
+        ? state.openSessions.map(s =>
+            s.id === state.activeSessionId
+              ? { ...s, isLoading: false, currentStreamingMessageId: null, currentReasoningId: null }
+              : s
+          )
+        : state.openSessions,
     });
   },
     
@@ -501,7 +508,7 @@ export const useChatStore = create<ChatState>()(
           mentions: existing.mentions || [],
           uploadedFiles: existing.uploadedFiles || [],
           promptSuggestions: existing.promptSuggestions || [],
-          permissionMode: existing.permissionMode || 'default',
+          permissionMode: existing.permissionMode || 'bypass',
           allowedTools: existing.allowedTools || [],
           currentStreamingMessageId: existing.currentStreamingMessageId || null,
           currentReasoningId: existing.currentReasoningId || null,
@@ -567,7 +574,7 @@ export const useChatStore = create<ChatState>()(
             mentions: session.mentions || [],
             uploadedFiles: session.uploadedFiles || [],
             promptSuggestions: session.promptSuggestions || [],
-            permissionMode: session.permissionMode || 'default',
+            permissionMode: session.permissionMode || 'bypass',
             allowedTools: session.allowedTools || [],
             currentStreamingMessageId: session.currentStreamingMessageId || null,
             currentReasoningId: session.currentReasoningId || null,
@@ -649,7 +656,7 @@ export const useChatStore = create<ChatState>()(
       mentions: targetSession?.mentions || [],
       uploadedFiles: targetSession?.uploadedFiles || [],
       promptSuggestions: targetSession?.promptSuggestions || [],
-      permissionMode: targetSession?.permissionMode || 'default',
+      permissionMode: targetSession?.permissionMode || 'bypass',
       allowedTools: targetSession?.allowedTools || [],
       currentStreamingMessageId: targetSession?.currentStreamingMessageId || null,
       currentReasoningId: targetSession?.currentReasoningId || null,

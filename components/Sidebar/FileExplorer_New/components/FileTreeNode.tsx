@@ -21,10 +21,9 @@ import { cn } from "@/lib/utils";
 interface FileTreeNodeProps {
   node: FileNode;
   level?: number;
-  onSelect: (path: string, multiSelect?: boolean) => void;
+  onSelect: (path: string, multiSelect?: boolean, shiftSelect?: boolean) => void;
   onOpen: (path: string) => void;
   onContextAction: (action: string, node: FileNode) => void;
-  selectedPaths: Set<string>;
 }
 
 
@@ -99,15 +98,15 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
   level = 0,
   onSelect,
   onOpen,
-  onContextAction,
-  selectedPaths
+  onContextAction
 }) => {
-  // Select only the specific state we need to avoid re-rendering on unrelated store changes
-  const expandedPaths = useFileExplorerStore((state) => state.expandedPaths);
+  // Each node subscribes only to its own expansion/selection state (boolean selector)
+  // This prevents re-rendering all nodes when expandedPaths/selectedPaths change
+  const isExpanded = useFileExplorerStore((state) => state.expandedPaths.includes(node.path));
+  const isSelected = useFileExplorerStore((state) => state.selectedPaths.includes(node.path));
   const toggleNode = useFileExplorerStore((state) => state.toggleNode);
-
-  const isExpanded = expandedPaths.includes(node.path);
-  const isSelected = selectedPaths.has(node.path);
+  
+  console.log(`%c🌿 FileTreeNode render: ${node.name} (expanded=${isExpanded}, selected=${isSelected}, children=${node.children?.length || 0})`, 'color: #00aa88; font-size: 10px;');
   
   const iconColor = getFileColor(node.name, node.is_dir);
 
@@ -116,7 +115,8 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
     event.stopPropagation();
     
     const multiSelect = event.ctrlKey || event.metaKey;
-    onSelect(node.path, multiSelect);
+    const shiftSelect = event.shiftKey;
+    onSelect(node.path, multiSelect, shiftSelect);
   }, [node.path, onSelect]);
 
   // Handle double click
@@ -247,7 +247,6 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
               onSelect={onSelect}
               onOpen={onOpen}
               onContextAction={onContextAction}
-              selectedPaths={selectedPaths}
             />
           ))}
         </div>
