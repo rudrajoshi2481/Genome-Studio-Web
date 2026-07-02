@@ -154,7 +154,7 @@ function Settings() {
         ?.split('=')[1]
 
       if (!token) {
-        toast.error('Not authenticated')
+        // toast.error('Not authenticated')
         return
       }
 
@@ -182,10 +182,10 @@ function Settings() {
       // Update auth store with new user data
       useAuthStore.setState({ user: updatedUser })
       
-      toast.success('Profile updated successfully')
+      // toast.success('Profile updated successfully')
       setIsEditing(false)
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update profile')
+      // toast.error(error instanceof Error ? error.message : 'Failed to update profile')
     }
   }
 
@@ -199,13 +199,13 @@ function Settings() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file')
+      // toast.error('Please select an image file')
       return
     }
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB')
+      // toast.error('Image must be less than 5MB')
       return
     }
 
@@ -216,7 +216,7 @@ function Settings() {
         ?.split('=')[1]
 
       if (!token) {
-        toast.error('Not authenticated')
+        // toast.error('Not authenticated')
         return
       }
 
@@ -241,15 +241,15 @@ function Settings() {
       // Update settings with new avatar URL
       updateSetting('avatar', `http://${host}:${port}${result.avatar_url}`)
       
-      toast.success('Avatar uploaded successfully')
+      // toast.success('Avatar uploaded successfully')
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to upload avatar')
+      // toast.error(error instanceof Error ? error.message : 'Failed to upload avatar')
     }
   }
 
   const handleRemoveAvatar = () => {
     updateSetting('avatar', '')
-    toast.success('Avatar removed')
+    // toast.success('Avatar removed')
   }
 
   return (

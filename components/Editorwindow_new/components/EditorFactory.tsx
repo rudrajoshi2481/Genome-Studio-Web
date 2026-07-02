@@ -34,8 +34,11 @@ const EditorFactory: React.FC<EditorFactoryProps> = ({ tabId, filePath, extensio
   const [error, setError] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
 
+  console.log('🔍 [EDITOR FACTORY] render:', { tabId, filePath, extension, isActive, isInitialized, isMounted, hasFileInfo: !!fileInfo })
+
   // Handle client-side mounting to prevent hydration mismatch
   useEffect(() => {
+    console.log('🔍 [EDITOR FACTORY] mounted:', { tabId, filePath })
     setIsMounted(true)
   }, [])
 

@@ -56,9 +56,13 @@ const DEFAULT_WORKFLOWS: ChatMention[] = [];
 const DEFAULT_DATABASES: ChatMention[] = [];
 
 async function fetchBackendMentions(): Promise<{ agents: ChatMention[]; files: ChatMention[]; skills: ChatMention[]; commands: ChatMention[]; databases: ChatMention[]; tools: ChatMention[] }> {
+  const rootPath = typeof window !== 'undefined' ? localStorage.getItem('fileExplorer_rootPath') : null;
+  const filesQuery = rootPath
+    ? `${getApiBaseUrl()}/ai-chat/files?limit=50&root_path=${encodeURIComponent(rootPath)}`
+    : `${getApiBaseUrl()}/ai-chat/files?limit=50`;
   const [agentsResp, filesResp, skillsResp, cmdResp, dbResp, toolsResp] = await Promise.allSettled([
     fetch(`${getApiBaseUrl()}/ai-chat/agents`).then(r => r.ok ? r.json() : []),
-    fetch(`${getApiBaseUrl()}/ai-chat/files?limit=50`).then(r => r.ok ? r.json() : []),
+    fetch(filesQuery).then(r => r.ok ? r.json() : []),
     fetch(`${getApiBaseUrl()}/ai-chat/skills`).then(r => r.ok ? r.json() : []),
     fetch(`${getApiBaseUrl()}/ai-chat/commands`).then(r => r.ok ? r.json() : []),
     fetch(`${getApiBaseUrl()}/ai-chat/databases`).then(r => r.ok ? r.json() : []),
@@ -95,13 +99,17 @@ async function fetchBackendMentions(): Promise<{ agents: ChatMention[]; files: C
 type BackendMentions = { agents: ChatMention[]; files: ChatMention[]; skills: ChatMention[]; commands: ChatMention[]; databases: ChatMention[]; tools: ChatMention[] };
 
 let _cachedMentions: BackendMentions | null = null;
+let _cachedMentionsRootPath: string | null = null;
 let _mentionsFetchPromise: Promise<BackendMentions> | null = null;
 
 function getBackendMentions(): Promise<BackendMentions> {
-  if (_cachedMentions) return Promise.resolve(_cachedMentions);
+  const currentRootPath = typeof window !== 'undefined' ? localStorage.getItem('fileExplorer_rootPath') : null;
+  if (_cachedMentions && _cachedMentionsRootPath === currentRootPath) return Promise.resolve(_cachedMentions);
+  _cachedMentions = null;
   if (_mentionsFetchPromise) return _mentionsFetchPromise;
   _mentionsFetchPromise = fetchBackendMentions().then(result => {
     _cachedMentions = result;
+    _cachedMentionsRootPath = typeof window !== 'undefined' ? localStorage.getItem('fileExplorer_rootPath') : null;
     _mentionsFetchPromise = null;
     return result;
   }).catch(() => {
@@ -247,6 +255,7 @@ export function ChatMentionInputMentionItem({
 export function ChatMentionInputSuggestion({
   onSelectMention,
   onClose,
+  onDeleteTrigger,
   top,
   left,
   className,
@@ -254,6 +263,7 @@ export function ChatMentionInputSuggestion({
   style,
 }: {
   onClose: () => void;
+  onDeleteTrigger?: () => void;
   onSelectMention: (item: { label: string; id: string }) => void;
   top: number;
   left: number;
@@ -460,8 +470,13 @@ export function ChatMentionInputSuggestion({
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Backspace" && !e.currentTarget.value) {
+                if (e.key === "Escape") {
+                  e.preventDefault();
                   onClose();
+                }
+                if (e.key === "Backspace" && !e.currentTarget.value) {
+                  e.preventDefault();
+                  onDeleteTrigger?.();
                 }
                 if (e.key === "Enter" && allMentions.length > 0) {
                   e.preventDefault();

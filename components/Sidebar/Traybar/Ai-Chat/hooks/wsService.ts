@@ -40,7 +40,7 @@ class WebSocketService {
         this.ws.onopen = () => {
           console.log('WebSocket connected to:', wsUrl);
           this.reconnectAttempts = 0;
-          // Re-send YOLO mode if it was active before reconnection
+          // Re-send Lytic mode if it was active before reconnection
           const { permissionMode } = useChatStore.getState();
           if (permissionMode === 'bypass') {
             this.sendMessage({ type: 'set_permission_mode', mode: 'bypass' });
@@ -50,8 +50,17 @@ class WebSocketService {
         
         this.ws.onmessage = (event) => {
           try {
-            console.log('Received WebSocket message:', event.data);
             const message: WebSocketMessage = JSON.parse(event.data);
+            if (message.type === 'canvas_update') {
+              console.log('🔍 [WS SERVICE] canvas_update message:', { action: message.action, filePath: message.filePath, hasNode: !!message.node, hasEdge: !!message.edge });
+            } else if (message.type === 'complete') {
+              console.log('🔍 [WS SERVICE] complete message received');
+            } else if (message.type === 'tool_start') {
+              console.log('🔍 [WS SERVICE] tool_start:', message.tool_name);
+            } else if (message.type === 'tool_execution_complete') {
+              console.log('🔍 [WS SERVICE] tool_execution_complete:', message.tool_name);
+            }
+            console.log('Received WebSocket message:', event.data);
             this.messageHandlers.forEach(handler => handler(message));
           } catch (error) {
             console.error('Failed to parse WebSocket message:', error, event.data);

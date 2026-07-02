@@ -34,7 +34,7 @@ import {
   createEmptyFlow,
   isValidFlowFormat
 } from './utils/file-parser';
-import { setCanvasState } from './canvasStateStore';
+import { setCanvasState, getCanvasState } from './canvasStateStore';
 
 interface CanvasProps {
   tabId: string;
@@ -60,6 +60,8 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
   const [savedViewport, setSavedViewport] = useState<{ x: number; y: number; zoom: number } | null>(null);
   const wasActiveRef = useRef(isActive); // Track previous active state
   const wsNodesAddedRef = useRef(false); // Track if nodes were added via WebSocket while loading
+  const hasLoadedRef = useRef(false); // Guard against double loadFileContent in Strict Mode
+  const reactFlowInstance = useReactFlow();
   
   // Reset isInitialLoad when tab becomes active (e.g. switching back to a hidden tab)
   // ReactFlow recalculates dimensions when a hidden element becomes visible,
@@ -71,11 +73,35 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
     }
     wasActiveRef.current = isActive;
   }, [isActive]);
+
+  // Ensure ReactFlow actually renders/fits nodes once they are present and the
+  // tab is visible. This handles the case where nodes were added (via WebSocket
+  // or store hydration) while ReactFlow had zero dimensions — e.g. a freshly
+  // mounted tab or a tab that was created already-active. Without this, nodes
+  // exist in state but don't appear until the tab is closed and reopened.
+  useEffect(() => {
+    if (!isActive || nodes.length === 0 || !reactFlowInstance) return;
+    const id = requestAnimationFrame(() => {
+      reactFlowInstance.fitView({ padding: 0.2, duration: 0 });
+    });
+    // When a hidden tab (display:none, so ReactFlow measures a 0x0 container)
+    // becomes active, the rAF above can run before the ResizeObserver reports
+    // real dimensions — leaving nodes laid out but scrolled off-screen. Re-fit
+    // once layout settles so nodes appear without needing to close/reopen.
+    const timers = [80, 200, 400].map((delay) =>
+      setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 0 });
+      }, delay)
+    );
+    return () => {
+      cancelAnimationFrame(id);
+      timers.forEach(clearTimeout);
+    };
+  }, [isActive, nodes.length, reactFlowInstance]);
   
   const { updateContent, setDirty, setSaved, registerSaveCallback, unregisterSaveCallback } = useEditorContext();
   const { updateTab } = useTabStore();
   const isTabDirty = useTabStore(state => state.tabs.get(tabId)?.isDirty ?? false);
-  const reactFlowInstance = useReactFlow();
 
   // --- Buffered WebSocket update mechanism ---
   // Buffers incoming updates and flushes them in a single setNodes call via rAF
@@ -241,8 +267,10 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       }
 
       const { action, node, edge, node_id } = detail;
+      console.log('🔍 [CANVAS] canvasUpdateEvent received:', { action, filePath, targetFilePath, hasNode: !!node, hasEdge: !!edge, node_id });
 
       if (action === 'add_node' && node) {
+        console.log('Canvas: WS add_node received for', filePath, 'node:', node.id, 'type:', node.type);
         // Track that nodes were added via WebSocket (prevents loadFileContent from overwriting)
         wsNodesAddedRef.current = true;
         // Add the node with filePath for consistency
@@ -256,7 +284,12 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
         setNodes((nds) => {
           // Avoid duplicate if node already exists
           if (nds.some((n) => n.id === node.id)) return nds;
-          return nds.concat(newNode);
+          const updated = nds.concat(newNode);
+          // Write to store synchronously so other Canvas instances can see it
+          const existing = getCanvasState(filePath!);
+          setCanvasState(filePath!, updated, existing?.edges ?? []);
+          console.log('Canvas: WS add_node applied — total nodes:', updated.length);
+          return updated;
         });
         // Mark tab as dirty since canvas changed
         setDirty(tabId, true);
@@ -266,7 +299,11 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
         setEdges((eds) => {
           // Avoid duplicate edges
           if (eds.some((e) => e.id === edge.id)) return eds;
-          return eds.concat(edge);
+          const updated = eds.concat(edge);
+          // Write to store synchronously so other Canvas instances can see it
+          const existing = getCanvasState(filePath!);
+          setCanvasState(filePath!, existing?.nodes ?? [], updated);
+          return updated;
         });
         setDirty(tabId, true);
         updateTab(tabId, { isDirty: true });
@@ -292,7 +329,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
             }
             // Update data fields
             updated.data = { ...n.data };
-            for (const key of ['title', 'description', 'language', 'source_code', 'function_name', 'inputs', 'outputs', 'tags']) {
+            for (const key of ['title', 'description', 'language', 'source_code', 'function_name', 'inputs', 'outputs', 'tags', 'dataType', 'value', 'label']) {
               if (key in updates) {
                 updated.data[key] = updates[key];
               }
@@ -319,13 +356,28 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
 
   // Sync live canvas state to the module-level store so the AI Chat
   // WebSocket hook can send the current (unsaved) nodes/edges to the backend.
+  // Guard: don't overwrite the store with empty state if it already has nodes
+  // (prevents unmount/remount cycles from wiping WS-added nodes).
   useEffect(() => {
+    console.log('🔍 [CANVAS] canvasStateStore sync effect:', { filePath, nodesCount: nodes.length, edgesCount: edges.length });
+    if (nodes.length === 0 && edges.length === 0) {
+      const existing = getCanvasState(filePath);
+      if (existing && (existing.nodes.length > 0 || existing.edges.length > 0)) {
+        console.log('🔍 [CANVAS] Skipping store overwrite — existing state has', existing.nodes.length, 'nodes');
+        return;
+      }
+    }
     setCanvasState(filePath, nodes, edges);
+    console.log('🔍 [CANVAS] Store updated for', filePath, '— nodes:', nodes.length, 'edges:', edges.length);
   }, [filePath, nodes, edges]);
 
   // Load file content
   const loadFileContent = useCallback(async () => {
-    if (!filePath) return;
+    if (!filePath) {
+      console.log('🔍 [CANVAS] loadFileContent: no filePath, returning');
+      return;
+    }
+    console.log('🔍 [CANVAS] loadFileContent START:', { filePath, tabId, isActive });
 
     try {
       setIsLoading(true);
@@ -335,7 +387,31 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       // Reset the WebSocket-added flag before loading
       wsNodesAddedRef.current = false;
       
+      // Check canvasStateStore first — if another Canvas instance (or WS update)
+      // already populated live state for this filePath, use that instead of disk.
+      const existingState = getCanvasState(filePath);
+      console.log('🔍 [CANVAS] loadFileContent — canvasStateStore check:', { filePath, hasExistingState: !!existingState, existingNodes: existingState?.nodes.length, existingEdges: existingState?.edges.length });
+      if (existingState && existingState.nodes.length > 0) {
+        console.log('Canvas: Found existing live state in store,', existingState.nodes.length, 'nodes — using that instead of disk');
+        const nodesWithFilePath = existingState.nodes.map(node => ({
+          ...node,
+          data: {
+            ...node.data,
+            filePath: filePath,
+          },
+        }));
+        setNodes(nodesWithFilePath);
+        setEdges(existingState.edges);
+        setIsLoading(false);
+        setIsInitialLoad(false);
+        setDirty(tabId, true);
+        updateTab(tabId, { isDirty: true });
+        return;
+      }
+      
+      console.log('🔍 [CANVAS] loadFileContent — fetching from disk:', filePath);
       const fileContent = await editorAPI.getFileContent(filePath);
+      console.log('🔍 [CANVAS] loadFileContent — got file content:', { hasContent: !!fileContent.content, contentLength: fileContent.content?.length, version: fileContent.version });
       
       // If nodes were added via WebSocket while we were loading the file,
       // skip overwriting the canvas state — the live WebSocket nodes take priority
@@ -349,6 +425,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       // Parse workflow content using the new file parser
       if (fileContent.content) {
         const validationResult = isValidFlowFormat(fileContent.content);
+        console.log('🔍 [CANVAS] loadFileContent — validation:', { isValid: validationResult.isValid, hasParsedData: !!validationResult.parsedData });
         
         if (validationResult.isValid && validationResult.parsedData) {
           // Convert flow format to ReactFlow format
@@ -365,6 +442,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
           }));
           
           console.log('Canvas: Loaded', nodesWithFilePath.length, 'nodes,', reactFlowEdges.length, 'edges');
+          console.log('🔍 [CANVAS] loadFileContent — parsed from disk:', { nodes: nodesWithFilePath.length, edges: reactFlowEdges.length, filePath });
           
           setNodes(nodesWithFilePath);
           setEdges(reactFlowEdges);
@@ -404,6 +482,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       // Update context
       updateContent(tabId, fileContent.content, fileContent.version);
       setSaved(tabId, fileContent.version || 1);
+      console.log('🔍 [CANVAS] loadFileContent — content updated in context, clearing dirty');
       
       // Clear dirty flag after loading (in case ReactFlow triggers changes)
       setDirty(tabId, false);
@@ -417,10 +496,11 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       
       console.log('Canvas: File content loaded');
     } catch (error) {
-      console.error('❌ Canvas: Error loading file content:', error);
+      console.error('🔍 [CANVAS] loadFileContent ERROR:', { filePath, error });
       setError(error instanceof Error ? error.message : 'Failed to load file');
     } finally {
       setIsLoading(false);
+      console.log('🔍 [CANVAS] loadFileContent FINALLY:', { filePath, isLoading: false });
     }
   }, [filePath, tabId, updateContent, setSaved, setDirty, updateTab]);
 
@@ -610,21 +690,38 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
     }));
   }, [nodes, filePath, setDirty, updateTab, tabId]);
 
-  // Load file content on mount
+  // Load file content on mount (guard against Strict Mode double-invoke)
   useEffect(() => {
+    console.log('🔍 [CANVAS] loadFileContent effect triggered:', { tabId, filePath, hasLoaded: hasLoadedRef.current, isActive });
+    if (hasLoadedRef.current) {
+      console.log('🔍 [CANVAS] Skipping loadFileContent — already loaded (Strict Mode guard):', tabId);
+      return;
+    }
+    hasLoadedRef.current = true;
+    console.log('🔍 [CANVAS] Calling loadFileContent for:', filePath);
     loadFileContent();
   }, [loadFileContent]);
 
-  // Register save callback
+  // Keep a ref to the latest saveFileContent so the registered callback
+  // always calls the current version without needing to re-register.
+  const saveFileContentRef = useRef(saveFileContent);
+  saveFileContentRef.current = saveFileContent;
+  console.log('🔍 [CANVAS] saveFileContentRef updated — current nodes count:', nodes.length, 'edges count:', edges.length);
+
+  // Register save callback once (stable identity — no churn)
   useEffect(() => {
-    console.log('📝 Canvas: Registering save callback for tabId:', tabId);
-    registerSaveCallback(tabId, saveFileContent);
+    console.log('🔍 [CANVAS] Register save callback effect — registering for tabId:', tabId);
+    const stableSave = async () => {
+      console.log('🔍 [CANVAS] stableSave called — delegating to saveFileContentRef for tabId:', tabId);
+      await saveFileContentRef.current();
+    };
+    registerSaveCallback(tabId, stableSave);
     
     return () => {
-      console.log('📝 Canvas: Unregistering save callback for tabId:', tabId);
+      console.log('🔍 [CANVAS] Register save callback effect — unregistering for tabId:', tabId);
       unregisterSaveCallback(tabId);
     };
-  }, [tabId, registerSaveCallback, unregisterSaveCallback, saveFileContent]);
+  }, [tabId, registerSaveCallback, unregisterSaveCallback]);
 
   // Workflow execution handlers - moved before early returns to maintain hook order
   const handleRun = useCallback(() => {
@@ -783,6 +880,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
           onDrop={onDrop}
           onDragOver={onDragOver}
           nodeTypes={nodeTypes}
+          deleteKeyCode={null}
           {...(savedViewport ? { defaultViewport: savedViewport, fitView: false } : { fitView: true })}
           onMoveEnd={(_, vp) => {
             if (typeof window !== 'undefined') {

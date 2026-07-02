@@ -111,8 +111,10 @@ export const useTabStore = create<TabState>()(
       
       addTab: (filePath, fileName, content) => {
         const state = get();
+        console.log('🔍 [TAB STORE] addTab called:', { filePath, fileName, currentTabCount: state.tabs instanceof Map ? state.tabs.size : 'NOT_MAP', allowDuplicates: state.options.allowDuplicates });
         
         if (!(state.tabs instanceof Map)) {
+          console.warn('🔍 [TAB STORE] tabs is not a Map, resetting');
           set({ tabs: new Map<string, TabFile>() });
           return null;
         }
@@ -121,10 +123,12 @@ export const useTabStore = create<TabState>()(
         if (!state.options.allowDuplicates) {
           for (const [id, tab] of state.tabs.entries()) {
             if (tab.path === filePath) {
+              console.log('🔍 [TAB STORE] Duplicate detected — activating existing tab:', { id, path: tab.path, name: tab.name });
               state.activateTab(id);
               return id;
             }
           }
+          console.log('🔍 [TAB STORE] No duplicate found for:', filePath);
         }
 
         // Check max tabs limit
@@ -157,6 +161,7 @@ export const useTabStore = create<TabState>()(
           activeTabId: newActiveTabId
         });
         
+        console.log('🔍 [TAB STORE] Created new tab:', { tabId, name, filePath, totalTabs: newTabs.size, activeTabId: newActiveTabId });
         return tabId;
       },
       
@@ -220,14 +225,20 @@ export const useTabStore = create<TabState>()(
       
       activateTab: (tabId) => {
         const state = get();
+        console.log('🔍 [TAB STORE] activateTab called:', { tabId, currentActive: state.activeTabId, tabExists: state.tabs instanceof Map ? state.tabs.has(tabId) : 'NOT_MAP' });
         
         if (!(state.tabs instanceof Map)) {
+          console.warn('🔍 [TAB STORE] activateTab: tabs is not a Map');
           return false;
         }
         
-        if (!state.tabs.has(tabId)) return false;
+        if (!state.tabs.has(tabId)) {
+          console.warn('🔍 [TAB STORE] activateTab: tab not found:', tabId);
+          return false;
+        }
         
         set({ activeTabId: tabId });
+        console.log('🔍 [TAB STORE] activateTab: set active to', tabId);
         return true;
       },
       
@@ -252,10 +263,13 @@ export const useTabStore = create<TabState>()(
         const state = get();
         
         if (!(state.tabs instanceof Map)) {
+          console.warn('🔍 [TAB STORE] getAllTabs: tabs is not a Map, returning []');
           return [];
         }
         
-        return state.tabOrder.map(id => state.tabs.get(id)).filter(Boolean) as TabFile[];
+        const result = state.tabOrder.map(id => state.tabs.get(id)).filter(Boolean) as TabFile[];
+        console.log('🔍 [TAB STORE] getAllTabs:', { count: result.length, paths: result.map(t => t.path), activeTabId: state.activeTabId });
+        return result;
       },
       
       updateTabContent: (tabId, content) => {
@@ -512,7 +526,10 @@ export const useTabStore = create<TabState>()(
         const { tabs, tabOrder } = get();
         const tab = tabs.get(tabId);
         
-        if (!tab) return false;
+        if (!tab) {
+          console.warn('🔍 [TAB STORE] updateTab: tab not found:', tabId);
+          return false;
+        }
         
         const newTab = { ...tab, ...updatedTab };
         
@@ -520,6 +537,7 @@ export const useTabStore = create<TabState>()(
         newTabs.set(tabId, newTab);
         
         set({ tabs: newTabs });
+        console.log('🔍 [TAB STORE] updateTab:', { tabId, updates: Object.keys(updatedTab), tabName: tab.name });
         return true;
       }
     }),

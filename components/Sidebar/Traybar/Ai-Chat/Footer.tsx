@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal, RefreshCw, Cpu, Check } from 'lucide-react'
+import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal, RefreshCw, Cpu, Check, WifiOff } from 'lucide-react'
 import ChatFeaturesDialog from './ChatFeaturesDialog'
 import { useChatStore } from './components/chatStore'
 import {
@@ -57,18 +57,17 @@ interface FooterProps {
   onSendMessage?: (message: string, model?: string) => void;
   onStop?: () => void;
   onSendCommand?: (command: string, commandArgs?: string[], model?: string) => void;
+  setInputRef?: (setter: (text: string) => void) => void;
 }
 
 const PINNED_MODELS_KEY = 'pinned-models'
 const SELECTED_MODEL_KEY = 'selected-model'
 
-function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
+function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterProps = {}) {
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedModel, setSelectedModel] = useState('qwen3.5:latest')
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([])
   const [ollamaAvailable, setOllamaAvailable] = useState(false)
   const [modelsLoading, setModelsLoading] = useState(false)
-  const [pinnedModels, setPinnedModels] = useState<string[]>([])
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [mentions, setMentions] = useState<ChatMention[]>([])
@@ -78,6 +77,19 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const justInsertedCommand = useRef(false)
+
+  // Register input setter with parent so prompt suggestions can fill the input
+  useEffect(() => {
+    if (setInputRef) {
+      setInputRef((text: string) => {
+        setInputValue(text)
+        if (editorRef.current) {
+          editorRef.current.commands.focus()
+          editorRef.current.commands.setContent(text)
+        }
+      })
+    }
+  }, [setInputRef])
 
   const {
     isLoading: storeLoading,
@@ -96,19 +108,62 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
     setCurrentConversation,
     openSession,
     cacheCurrentSession,
+    selectedModel: storeSelectedModel,
+    setSelectedModel: storeSetSelectedModel,
+    pinnedModels: storePinnedModels,
+    setPinnedModels: storeSetPinnedModels,
   } = useChatStore()
 
+  // Use store values as source of truth. Initialize with default for SSR consistency;
+  // actual value from localStorage/store is applied in useEffect after hydration.
+  const [selectedModel, setSelectedModelState] = useState<string>('qwen3.5:latest')
+  const [pinnedModels, setPinnedModelsState] = useState<string[]>([])
+
+  const setSelectedModel = useCallback((model: string) => {
+    setSelectedModelState(model)
+    storeSetSelectedModel(model)
+    try { localStorage.setItem(SELECTED_MODEL_KEY, model) } catch {}
+  }, [storeSetSelectedModel])
+
+  const setPinnedModels = useCallback((updater: string[] | ((prev: string[]) => string[])) => {
+    const next = typeof updater === 'function' ? (updater as (prev: string[]) => string[])(pinnedModels) : updater
+    setPinnedModelsState(next)
+    storeSetPinnedModels(next)
+    try {
+      localStorage.setItem(PINNED_MODELS_KEY, JSON.stringify(next))
+    } catch {}
+  }, [storeSetPinnedModels, pinnedModels])
+
+  // Sync selected model and pinned models from store/localStorage after hydration
   useEffect(() => {
+    // Prefer store value, fall back to localStorage for migration
+    const model = storeSelectedModel || (() => {
+      try { return localStorage.getItem(SELECTED_MODEL_KEY) || 'qwen3.5:latest' } catch { return 'qwen3.5:latest' }
+    })()
+    setSelectedModelState(model)
+
+    const pinned = storePinnedModels.length > 0 ? storePinnedModels : (() => {
+      try {
+        const stored = localStorage.getItem(PINNED_MODELS_KEY)
+        const parsed = stored ? JSON.parse(stored) : []
+        return Array.isArray(parsed) ? parsed as string[] : []
+      } catch { return [] }
+    })()
+    setPinnedModelsState(pinned)
+
+    // Migrate old localStorage keys to store
     try {
       const storedModel = localStorage.getItem(SELECTED_MODEL_KEY)
-      if (storedModel) setSelectedModel(storedModel)
+      if (storedModel && !storeSelectedModel) {
+        storeSetSelectedModel(storedModel)
+      }
       const stored = localStorage.getItem(PINNED_MODELS_KEY)
-      const pinned = stored ? JSON.parse(stored) : []
-      if (Array.isArray(pinned)) {
-        setPinnedModels(pinned)
+      const parsed = stored ? JSON.parse(stored) : []
+      if (Array.isArray(parsed) && parsed.length > 0 && storePinnedModels.length === 0) {
+        storeSetPinnedModels(parsed)
       }
     } catch {}
-  }, [])
+  }, [storeSelectedModel, storePinnedModels, storeSetSelectedModel, storeSetPinnedModels])
 
   useEffect(() => {
     if (ollamaModels.length === 0) return
@@ -135,22 +190,15 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
 
     const modelToSet = nextModel as string
     setSelectedModel(modelToSet)
-    try {
-      localStorage.setItem(SELECTED_MODEL_KEY, modelToSet)
-    } catch {}
   }, [ollamaModels, pinnedModels])
 
   const togglePin = useCallback((modelName: string) => {
-    setPinnedModels(prev => {
-      const next = prev.includes(modelName)
+    setPinnedModels(prev =>
+      prev.includes(modelName)
         ? prev.filter(m => m !== modelName)
         : [...prev, modelName]
-      try {
-        localStorage.setItem(PINNED_MODELS_KEY, JSON.stringify(next))
-      } catch {}
-      return next
-    })
-  }, [])
+    )
+  }, [setPinnedModels])
 
   const fetchOllamaModels = useCallback(async () => {
     setModelsLoading(true)
@@ -184,9 +232,6 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
   const handleModelChange = (value: string) => {
     setSelectedModel(value)
     setModelSelectorOpen(false)
-    try {
-      localStorage.setItem(SELECTED_MODEL_KEY, value)
-    } catch {}
     const model = ollamaModels.find(m => m.name === value)
     const ctxLen = model?.context_length || model?.capabilities?.context_length
     if (ctxLen) {
@@ -470,11 +515,13 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
                 </div>
                 <ModelSelectorInput placeholder="Search models..." />
                 <ModelSelectorList>
-                  <ModelSelectorEmpty>
-                    <div className="flex flex-col items-center gap-2 py-6 text-center">
-                      <p className="text-xs text-muted-foreground">No models found.</p>
-                    </div>
-                  </ModelSelectorEmpty>
+                  {ollamaAvailable && (
+                    <ModelSelectorEmpty>
+                      <div className="flex flex-col items-center gap-2 py-6 text-center">
+                        <p className="text-xs text-muted-foreground">No models found.</p>
+                      </div>
+                    </ModelSelectorEmpty>
+                  )}
 
                   {ollamaAvailable && ollamaModels.length > 0 && (
                     <>
@@ -589,26 +636,29 @@ function Footer({ onSendMessage, onStop, onSendCommand }: FooterProps = {}) {
                   )}
 
                   {!ollamaAvailable && !modelsLoading && (
-                    <ModelSelectorGroup heading="Ollama (Offline)">
-                      <div className="flex flex-col items-center gap-3 py-6 px-4 text-center">
-                        <Cpu className="size-8 text-muted-foreground/50" />
-                        <div>
-                          <p className="text-xs font-medium">Ollama is not reachable</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            Start it with <code className="font-mono bg-muted px-1 rounded">ollama serve</code> or
-                            configure a custom URL in Settings.
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs gap-1.5"
-                          onClick={() => fetchOllamaModels()}
-                        >
-                          <RefreshCw size={12} /> Retry
-                        </Button>
+                    <div className="flex flex-col items-center justify-center gap-4 py-10 px-6 text-center">
+                      <div className="rounded-full bg-destructive/10 p-3">
+                        <WifiOff className="size-6 text-destructive" />
                       </div>
-                    </ModelSelectorGroup>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Ollama is not reachable</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed max-w-[280px]">
+                          Start it with{" "}
+                          <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">
+                            ollama serve
+                          </code>{" "}
+                          or configure a custom URL in Settings.
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs gap-1.5"
+                        onClick={() => fetchOllamaModels()}
+                      >
+                        <RefreshCw size={13} /> Retry connection
+                      </Button>
+                    </div>
                   )}
                 </ModelSelectorList>
               </ModelSelectorContent>

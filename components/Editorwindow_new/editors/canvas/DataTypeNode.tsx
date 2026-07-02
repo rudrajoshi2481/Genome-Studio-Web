@@ -288,13 +288,13 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         minZoom: 1,
         maxZoom: 1.5,
       });
-      toast.success(`Focused on "${label}"`);
+      // toast.success(`Focused on "${label}"`);
     }
   };
 
   const handleDeleteNode = () => {
     setNodes((nds) => nds.filter((node) => node.id !== id));
-    toast.success(`Deleted node "${label}"`);
+    // toast.success(`Deleted node "${label}"`);
   };
 
   const handleDuplicateNode = () => {
@@ -304,7 +304,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
     // Get the current node to duplicate
     const currentNode = getNode(id);
     if (!currentNode) {
-      toast.error('Could not find node to duplicate');
+      // toast.error('Could not find node to duplicate');
       return;
     }
     
@@ -326,13 +326,13 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
     // Add the duplicate to the canvas
     setNodes((nds) => [...nds, duplicateNode]);
     
-    toast.success(`Duplicated "${label}"`);
+    // toast.success(`Duplicated "${label}"`);
   };
 
   const handleSaveToNodebar = async () => {
     try {
       if (!token) {
-        toast.error('Please log in to save nodes');
+        // toast.error('Please log in to save nodes');
         return;
       }
 
@@ -387,15 +387,15 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
       const savedNode = await createCustomNode(token, nodeToSave);
       
       console.log('Data type node saved successfully:', savedNode);
-      toast.success(`Saved "${label}" to Nodebar!`);
+      // toast.success(`Saved "${label}" to Nodebar!`);
     } catch (error) {
       console.error('Error saving data type node to nodebar:', error);
-      toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleViewCode = () => {
-    toast.info(`Data type: ${nodeData.dataType}, Value: ${JSON.stringify(value)}`);
+    // toast.info(`Data type: ${nodeData.dataType}, Value: ${JSON.stringify(value)}`);
   };
 
   // Render input based on data type

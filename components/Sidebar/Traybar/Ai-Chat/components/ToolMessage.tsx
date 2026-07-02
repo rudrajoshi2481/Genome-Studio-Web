@@ -30,7 +30,7 @@ interface ToolMessageProps {
   message: Message;
   isLast?: boolean;
   onStopCommand?: (toolMessageId: string) => void;
-  onApprove?: (id: string, approvalMode?: 'once' | 'always' | 'yolo') => void;
+  onApprove?: (id: string, approvalMode?: 'once' | 'always' | 'lytic') => void;
   onReject?: (id: string) => void;
 }
 
@@ -47,20 +47,46 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
   const explanation = toolArgs?.explanation || "";
   const needsApproval = message.confirmation?.state === "approval-requested";
 
-  const filePathTools = ["read_file", "edit_file", "write_file", "list_directory", "grep_search", "glob_find", "notebook_edit", "lsp_tool"];
+  const filePathTools = ["read_file", "edit_file", "write_file", "list_directory", "notebook_edit", "lsp_tool"];
   const filePath = filePathTools.includes(toolName)
     ? toolArgs?.filepath || toolArgs?.path || toolArgs?.notebook_path || toolArgs?.file_path || ""
     : "";
 
-  const canvasSubtitleTools: Record<string, (args: Record<string, any>) => string> = {
-    canvas_add_node: (a) => a.title || "",
+  // Subtitle/pattern shown next to tool name in the header for all tools
+  const toolSubtitles: Record<string, (args: Record<string, any>) => string> = {
+    run_command: (a) => a.command || "",
+    glob_find: (a) => a.pattern || "",
+    grep_search: (a) => a.query || a.search_term || "",
+    read_file: (a) => a.filepath || a.path || "",
+    edit_file: (a) => a.filepath || a.path || "",
+    write_file: (a) => a.filepath || a.path || "",
+    list_directory: (a) => a.path || a.directory || "",
+    notebook_edit: (a) => a.notebook_path || a.path || "",
+    lsp_tool: (a) => a.path || a.filepath || "",
+    web_search: (a) => a.query || "",
+    web_fetch: (a) => a.url || "",
+    canvas_add_node: (a) => a.title || a.node_name || "",
     canvas_add_edge: (a) => a.source_node_id && a.target_node_id ? `${a.source_node_id} → ${a.target_node_id}` : "",
     canvas_remove_node: (a) => a.node_id || "",
     canvas_remove_nodes: (a) => a.node_ids || "",
+    canvas_edit_node: (a) => a.node_id || "",
     canvas_get_node_details: (a) => a.node_id || "",
     canvas_search_nodes: (a) => a.query || "",
+    canvas_read: (a) => a.scope ? `scope=${a.scope}` : "",
+    canvas_create_flow: (a) => a.file_path || "",
+    canvas_verify_flow: (a) => a.file_path || "",
+    canvas_clear: (a) => a.file_path || "",
+    canvas_get_active_flow: () => "",
+    canvas_list_nodes: () => "",
+    canvas_get_flow_nodes: () => "",
+    log_experiment: (a) => a.experiment_name || a.name || "",
+    ask_user: (a) => a.question || "",
+    todo_write: () => "",
   };
-  const canvasSubtitle = canvasSubtitleTools[toolName] ? canvasSubtitleTools[toolName](toolArgs) : "";
+  const toolSubtitle = toolSubtitles[toolName] ? toolSubtitles[toolName](toolArgs) : "";
+
+  // For file path tools that also have a subtitle, prefer the subtitle
+  const headerCommand = toolSubtitle || (isCommandTool ? command : "") || undefined;
 
   const headerTitle = toolName;
 
@@ -106,7 +132,7 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
       <Tool defaultOpen={needsApproval}>
         <ToolHeader
           title={headerTitle}
-          command={isCommandTool ? command : canvasSubtitle || undefined}
+          command={headerCommand}
           filePath={filePath || undefined}
           type="dynamic-tool"
           state={toolState as any}
@@ -173,7 +199,7 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
 
 function ApprovalButtons({ messageId, onApprove, onReject }: {
   messageId: string;
-  onApprove?: (id: string, approvalMode?: 'once' | 'always' | 'yolo') => void;
+  onApprove?: (id: string, approvalMode?: 'once' | 'always' | 'lytic') => void;
   onReject?: (id: string) => void;
 }) {
   return (
@@ -225,10 +251,10 @@ function ApprovalButtons({ messageId, onApprove, onReject }: {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => onApprove?.(messageId, 'yolo')}>
+              <DropdownMenuItem onClick={() => onApprove?.(messageId, 'lytic')}>
                 <Zap className="size-3.5" />
                 <div className="flex flex-col">
-                  <span className="font-medium">YOLO mode</span>
+                  <span className="font-medium">Lytic mode</span>
                   <span className="text-[10px] text-muted-foreground">Auto-approve everything</span>
                 </div>
               </DropdownMenuItem>

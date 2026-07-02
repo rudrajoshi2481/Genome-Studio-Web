@@ -14,7 +14,7 @@ import { Message } from './chatStore';
 
 interface ConfirmationMessageProps {
   message: Message;
-  onApprove?: (toolName: string, approved: boolean, reason?: string, approvalMode?: 'once' | 'always' | 'yolo') => void;
+  onApprove?: (toolName: string, approved: boolean, reason?: string, approvalMode?: 'once' | 'always' | 'lytic') => void;
   onRespond?: (toolMessageId: string, response: string) => void;
 }
 
@@ -95,7 +95,7 @@ export default ConfirmationMessage;
 
 function ConfirmationApprovalButtons({ toolName, onApprove }: {
   toolName: string;
-  onApprove?: (toolName: string, approved: boolean, reason?: string, approvalMode?: 'once' | 'always' | 'yolo') => void;
+  onApprove?: (toolName: string, approved: boolean, reason?: string, approvalMode?: 'once' | 'always' | 'lytic') => void;
 }) {
   const [showDropdown, setShowDropdown] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -176,12 +176,12 @@ function ConfirmationApprovalButtons({ toolName, onApprove }: {
               className="flex items-center gap-2 w-full px-2.5 py-1.5 text-xs hover:bg-accent transition-colors text-left"
               onClick={() => {
                 setShowDropdown(false);
-                onApprove?.(toolName, true, undefined, 'yolo');
+                onApprove?.(toolName, true, undefined, 'lytic');
               }}
             >
               <Zap className="size-3.5 text-orange-500" />
               <div className="flex flex-col">
-                <span className="font-medium text-orange-600 dark:text-orange-400">YOLO mode</span>
+                <span className="font-medium text-orange-600 dark:text-orange-400">Lytic mode</span>
                 <span className="text-[10px] text-muted-foreground">Auto-approve everything</span>
               </div>
             </button>

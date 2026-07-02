@@ -109,7 +109,7 @@ export const useCanvasHandlers = (
     setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
     setDirty(tabId, true);
     updateTab(tabId, { isDirty: true });
-    toast.success('Node deleted');
+    // toast.success('Node deleted');
   }, [setNodes, setEdges, tabId, setDirty, updateTab]);
 
   // Handle drag over event (needed for drop functionality)
@@ -166,7 +166,7 @@ export const useCanvasHandlers = (
             label: nodeData.label || nodeData.function_name || dataType
           }
         };
-        toast.success(`Added ${nodeData.label || nodeData.function_name || dataType} node to canvas`);
+        // toast.success(`Added ${nodeData.label || nodeData.function_name || dataType} node to canvas`);
       } else {
         // Create a custom code node
         newNode = {
@@ -186,7 +186,7 @@ export const useCanvasHandlers = (
             originalId: nodeData.id || nodeData.node_id
           }
         };
-        toast.success(`Added ${nodeData.title || nodeData.name || 'node'} to canvas`);
+        // toast.success(`Added ${nodeData.title || nodeData.name || 'node'} to canvas`);
       }
 
       // Add the new node to the flow
@@ -207,8 +207,9 @@ export const useCanvasHandlers = (
       e.preventDefault();
       saveFileContent();
     }
-    // Delete selected nodes/edges with Delete key
-    if (e.key === 'Delete' || e.key === 'Backspace') {
+    // Delete selected nodes/edges with Delete key only
+    // Backspace is intentionally excluded to prevent accidental node deletion while typing
+    if (e.key === 'Delete') {
       const selectedNodes = nodes.filter(node => node.selected);
       const selectedEdges = edges.filter(edge => edge.selected);
       
@@ -221,7 +222,7 @@ export const useCanvasHandlers = (
           setEdges((eds) => eds.filter((edge) => !edge.selected));
           setDirty(tabId, true);
           updateTab(tabId, { isDirty: true });
-          toast.success(`Deleted ${selectedEdges.length} edge(s)`);
+          // toast.success(`Deleted ${selectedEdges.length} edge(s)`);
         }
       }
     }

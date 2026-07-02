@@ -119,7 +119,7 @@ function CronJobs() {
       setJobs(data.jobs || [])
     } catch (err) {
       console.error('Error fetching cron jobs:', err)
-      toast.error('Failed to load cron jobs')
+      // toast.error('Failed to load cron jobs')
     } finally {
       setIsLoading(false)
     }
@@ -134,7 +134,7 @@ function CronJobs() {
   const handleCreate = async () => {
     if (!token) return
     if (!newJob.name.trim() || !newJob.command.trim() || !newJob.schedule.trim()) {
-      toast.error('Name, command, and schedule are required')
+      // toast.error('Name, command, and schedule are required')
       return
     }
 
@@ -154,14 +154,14 @@ function CronJobs() {
         }),
       })
       if (!res.ok) throw new Error('Failed to create cron job')
-      toast.success('Cron job created')
+      // toast.success('Cron job created')
       setNewJob({ name: '', command: '', schedule: '*/5 * * * *', description: '' })
       setSchedulePreset('*/5 * * * *')
       setIsCreateOpen(false)
       loadJobs()
     } catch (err) {
       console.error('Error creating cron job:', err)
-      toast.error('Failed to create cron job')
+      // toast.error('Failed to create cron job')
     }
   }
 
@@ -173,13 +173,13 @@ function CronJobs() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to delete cron job')
-      toast.success(`"${job.name}" deleted`)
+      // toast.success(`"${job.name}" deleted`)
       setDeleteTarget(null)
       setDetailJob(null)
       loadJobs()
     } catch (err) {
       console.error('Error deleting cron job:', err)
-      toast.error('Failed to delete cron job')
+      // toast.error('Failed to delete cron job')
     }
   }
 
@@ -195,11 +195,11 @@ function CronJobs() {
         body: JSON.stringify({ enabled: !job.enabled }),
       })
       if (!res.ok) throw new Error('Failed to toggle cron job')
-      toast.success(job.enabled ? 'Cron job disabled' : 'Cron job enabled')
+      // toast.success(job.enabled ? 'Cron job disabled' : 'Cron job enabled')
       loadJobs()
     } catch (err) {
       console.error('Error toggling cron job:', err)
-      toast.error('Failed to toggle cron job')
+      // toast.error('Failed to toggle cron job')
     }
   }
 
@@ -211,11 +211,11 @@ function CronJobs() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to run cron job')
-      toast.success('Cron job triggered')
+      // toast.success('Cron job triggered')
       setTimeout(() => loadJobs(), 2000)
     } catch (err) {
       console.error('Error running cron job:', err)
-      toast.error('Failed to run cron job')
+      // toast.error('Failed to run cron job')
     }
   }
 
@@ -255,7 +255,7 @@ function CronJobs() {
   const handleSaveEdit = async () => {
     if (!token || !detailJob) return
     if (!editJob.name.trim() || !editJob.command.trim() || !editJob.schedule.trim()) {
-      toast.error('Name, command, and schedule are required')
+      // toast.error('Name, command, and schedule are required')
       return
     }
     setIsSaving(true)
@@ -274,14 +274,14 @@ function CronJobs() {
         }),
       })
       if (!res.ok) throw new Error('Failed to update cron job')
-      toast.success('Cron job updated')
+      // toast.success('Cron job updated')
       setIsEditing(false)
       const updated = await res.json()
       setDetailJob(updated)
       loadJobs()
     } catch (err) {
       console.error('Error updating cron job:', err)
-      toast.error('Failed to update cron job')
+      // toast.error('Failed to update cron job')
     } finally {
       setIsSaving(false)
     }

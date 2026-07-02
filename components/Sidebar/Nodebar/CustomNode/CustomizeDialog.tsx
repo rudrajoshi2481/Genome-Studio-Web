@@ -66,7 +66,7 @@ export default function CustomizeDialog() {
       setNodes(fetchedNodes)
     } catch (error) {
       console.error('Failed to fetch nodes:', error)
-      toast.error('Failed to load nodes')
+      // toast.error('Failed to load nodes')
     } finally {
       setIsLoading(false)
     }
@@ -98,7 +98,7 @@ export default function CustomizeDialog() {
 
   const handleDownloadSelected = () => {
     if (selectedNodes.size === 0) {
-      toast.error('No nodes selected')
+      // toast.error('No nodes selected')
       return
     }
 
@@ -125,7 +125,7 @@ export default function CustomizeDialog() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     
-    toast.success(`Downloaded ${selectedNodes.size} node${selectedNodes.size !== 1 ? 's' : ''}`)
+    // toast.success(`Downloaded ${selectedNodes.size} node${selectedNodes.size !== 1 ? 's' : ''}`)
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,7 +133,7 @@ export default function CustomizeDialog() {
     if (!file) return
 
     if (!token || !isAuthenticated) {
-      toast.error('You must be logged in to upload nodes')
+      // toast.error('You must be logged in to upload nodes')
       return
     }
 
@@ -148,7 +148,7 @@ export default function CustomizeDialog() {
       
       // Validate nodes data
       if (nodesArray.length === 0) {
-        toast.error('No valid nodes found in file')
+        // toast.error('No valid nodes found in file')
         return
       }
 
@@ -156,11 +156,11 @@ export default function CustomizeDialog() {
       setPreviewNodes(nodesArray)
       // Select all by default
       setSelectedPreviewNodes(new Set(nodesArray.map((_, idx) => idx)))
-      toast.success(`Loaded ${nodesArray.length} node(s) for preview`)
+      // toast.success(`Loaded ${nodesArray.length} node(s) for preview`)
       
     } catch (error: any) {
       console.error('File parsing error:', error)
-      toast.error('Failed to parse JSON file')
+      // toast.error('Failed to parse JSON file')
     } finally {
       // Reset file input
       event.target.value = ''
@@ -189,7 +189,7 @@ export default function CustomizeDialog() {
 
   const handleConfirmUpload = async () => {
     if (selectedPreviewNodes.size === 0) {
-      toast.error('No nodes selected')
+      // toast.error('No nodes selected')
       return
     }
 
@@ -198,7 +198,7 @@ export default function CustomizeDialog() {
     try {
       const nodesToUpload = previewNodes.filter((_, idx) => selectedPreviewNodes.has(idx))
       
-      const loadingToast = toast.loading(`Uploading ${nodesToUpload.length} node(s)...`)
+      // const loadingToast = toast.loading(`Uploading ${nodesToUpload.length} node(s)...`)
       
       const result = await bulkUploadNodes(token || '', nodesToUpload)
       
@@ -206,7 +206,7 @@ export default function CustomizeDialog() {
       setUploadResult(result)
       
       if (result.created > 0) {
-        toast.success(`Successfully uploaded ${result.created} node(s)`)
+        // toast.success(`Successfully uploaded ${result.created} node(s)`)
         // Refresh the nodes list
         loadNodes()
         // Clear preview
@@ -215,12 +215,12 @@ export default function CustomizeDialog() {
       }
       
       if (result.failed > 0) {
-        toast.error(`Failed to upload ${result.failed} node(s)`)
+        // toast.error(`Failed to upload ${result.failed} node(s)`)
       }
       
     } catch (error: any) {
       console.error('Upload error:', error)
-      toast.error(error.message || 'Failed to upload nodes')
+      // toast.error(error.message || 'Failed to upload nodes')
     } finally {
       setIsUploading(false)
     }

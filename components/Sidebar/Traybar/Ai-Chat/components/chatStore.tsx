@@ -14,7 +14,7 @@ export interface UploadedFile {
 }
 
 export interface ChatMentionItem {
-  type: 'tool' | 'agent' | 'workflow' | 'database' | 'command'
+  type: 'tool' | 'agent' | 'workflow' | 'database' | 'command' | 'file'
   name: string
   id?: string
   description?: string
@@ -80,6 +80,7 @@ export interface Message {
     content: string
     isStreaming?: boolean
     duration?: number
+    startedAt?: number
     toolSteps?: ToolStep[]
     orderedSteps?: ReasoningStep[]
   }
@@ -268,7 +269,7 @@ export const useChatStore = create<ChatState>()(
   currentReasoningId: null,
   showConversationHistory: true,
   tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
-  contextWindow: 4096,
+  contextWindow: 0,
   contextTokens: 0,
   queuedMessages: [],
   queuedTodos: [],
@@ -492,7 +493,7 @@ export const useChatStore = create<ChatState>()(
           messages: existing.messages,
           pendingFiles: existing.pendingFiles || [],
           tokenUsage: existing.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
-          contextWindow: existing.contextWindow || 4096,
+          contextWindow: existing.contextWindow || 0,
           contextTokens: existing.contextTokens || 0,
           isLoading: existing.isLoading || false,
           queuedMessages: existing.queuedMessages || [],
@@ -511,7 +512,7 @@ export const useChatStore = create<ChatState>()(
       }
       const newSession: ChatSession = {
         id, title, messages: msgs || [], pendingFiles: [], isTemporary: id.startsWith('temp-'),
-        tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }, contextWindow: 4096, contextTokens: 0, isLoading: false,
+        tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }, contextWindow: 0, contextTokens: 0, isLoading: false,
         queuedMessages: [], queuedTodos: [], mentions: [], uploadedFiles: [], promptSuggestions: [],
         permissionMode: 'bypass' as 'default' | 'bypass' | 'always', allowedTools: [],
         currentStreamingMessageId: null, currentReasoningId: null, showFilePanel: false,
@@ -558,7 +559,7 @@ export const useChatStore = create<ChatState>()(
             messages: session.messages,
             pendingFiles: session.pendingFiles || [],
             tokenUsage: session.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
-            contextWindow: session.contextWindow || 4096,
+            contextWindow: session.contextWindow || 0,
             contextTokens: session.contextTokens || 0,
             isLoading: session.isLoading || false,
             queuedMessages: session.queuedMessages || [],
@@ -582,7 +583,7 @@ export const useChatStore = create<ChatState>()(
         messages: [] as Message[],
         pendingFiles: [] as PendingFile[],
         tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
-        contextWindow: 4096,
+        contextWindow: 0,
         contextTokens: 0,
         isLoading: false,
         queuedMessages: [] as QueueMessageItem[],
@@ -640,7 +641,7 @@ export const useChatStore = create<ChatState>()(
       messages: targetSession?.messages || [],
       pendingFiles: targetSession?.pendingFiles || [],
       tokenUsage: targetSession?.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
-      contextWindow: targetSession?.contextWindow || 4096,
+      contextWindow: targetSession?.contextWindow || 0,
       contextTokens: targetSession?.contextTokens || 0,
       isLoading: targetSession?.isLoading || false,
       queuedMessages: targetSession?.queuedMessages || [],
@@ -785,11 +786,34 @@ export const useChatStore = create<ChatState>()(
     }),
   clearPendingFiles: () => set({ pendingFiles: [], showFilePanel: false }),
   setShowFilePanel: (show) => set({ showFilePanel: show }),
-  setPermissionMode: (mode) => set({ permissionMode: mode }),
-  addAllowedTool: (toolName) => set((state) => ({
-    allowedTools: state.allowedTools.includes(toolName) ? state.allowedTools : [...state.allowedTools, toolName],
-  })),
-  resetPermissionMode: () => set({ permissionMode: 'bypass', allowedTools: [] }),
+  setPermissionMode: (mode) => set((state) => {
+    const updates: Partial<ChatState> = { permissionMode: mode };
+    if (state.activeSessionId) {
+      updates.openSessions = state.openSessions.map(s =>
+        s.id === state.activeSessionId ? { ...s, permissionMode: mode } : s
+      );
+    }
+    return updates;
+  }),
+  addAllowedTool: (toolName) => set((state) => {
+    const newAllowed = state.allowedTools.includes(toolName) ? state.allowedTools : [...state.allowedTools, toolName];
+    const updates: Partial<ChatState> = { allowedTools: newAllowed };
+    if (state.activeSessionId) {
+      updates.openSessions = state.openSessions.map(s =>
+        s.id === state.activeSessionId ? { ...s, allowedTools: newAllowed } : s
+      );
+    }
+    return updates;
+  }),
+  resetPermissionMode: () => set((state) => {
+    const updates: Partial<ChatState> = { permissionMode: 'bypass', allowedTools: [] };
+    if (state.activeSessionId) {
+      updates.openSessions = state.openSessions.map(s =>
+        s.id === state.activeSessionId ? { ...s, permissionMode: 'bypass' as const, allowedTools: [] } : s
+      );
+    }
+    return updates;
+  }),
 }),
     {
       name: 'genome-studio-chat-settings',
@@ -798,6 +822,10 @@ export const useChatStore = create<ChatState>()(
         keepIntermediateFiles: state.keepIntermediateFiles,
         openSessions: state.openSessions,
         activeSessionId: state.activeSessionId,
+        selectedModel: state.selectedModel,
+        pinnedModels: state.pinnedModels,
+        permissionMode: state.permissionMode,
+        allowedTools: state.allowedTools,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.activeSessionId && state.openSessions.length > 0) {
@@ -805,7 +833,7 @@ export const useChatStore = create<ChatState>()(
           if (activeSession) {
             state.messages = activeSession.messages;
             state.tokenUsage = activeSession.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
-            state.contextWindow = activeSession.contextWindow || 4096;
+            state.contextWindow = activeSession.contextWindow || 0;
             state.contextTokens = activeSession.contextTokens || 0;
             state.isLoading = false;
             state.currentConversationId = activeSession.currentConversationId ?? (state.activeSessionId.startsWith('temp-') ? null : state.activeSessionId);
@@ -815,8 +843,9 @@ export const useChatStore = create<ChatState>()(
             state.mentions = activeSession.mentions || [];
             state.uploadedFiles = activeSession.uploadedFiles || [];
             state.promptSuggestions = activeSession.promptSuggestions || [];
-            state.permissionMode = activeSession.permissionMode || 'default';
-            state.allowedTools = activeSession.allowedTools || [];
+            // Prefer top-level persisted permissionMode (global setting) over session's
+            state.permissionMode = state.permissionMode || activeSession.permissionMode || 'default';
+            state.allowedTools = state.allowedTools || activeSession.allowedTools || [];
             state.currentStreamingMessageId = null;
             state.currentReasoningId = null;
             state.showFilePanel = activeSession.showFilePanel || false;

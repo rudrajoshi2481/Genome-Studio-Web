@@ -53,11 +53,25 @@ function ToolCodeMessage({ message, isLast, onStopCommand }: ToolCodeMessageProp
   const isCommandTool = toolName === "run_command";
   const headerIcon = isCommandTool ? <Terminal className="size-3.5" /> : <FileCode2 className="size-3.5" />;
 
+  // Subtitle shown next to tool name in the header
+  const toolArgs = message.metadata?.toolArgs || {};
+  const toolSubtitles: Record<string, (args: Record<string, any>) => string> = {
+    run_command: (a) => a.command || "",
+    canvas_add_node: (a) => a.title || "",
+    canvas_add_edge: (a) => a.source_node_id && a.target_node_id ? `${a.source_node_id} → ${a.target_node_id}` : "",
+    canvas_edit_node: (a) => a.node_id || "",
+    canvas_create_flow: (a) => a.file_path || "",
+    canvas_verify_flow: (a) => a.file_path || "",
+    canvas_read: (a) => a.scope ? `scope=${a.scope}` : "",
+  };
+  const headerCommand = toolSubtitles[toolName] ? toolSubtitles[toolName](toolArgs) || undefined : undefined;
+
   return (
     <div className="px-3 mt-4 py-0.5 group/tool">
       <Tool defaultOpen={false}>
         <ToolHeader
           title={toolName}
+          command={headerCommand}
           type="dynamic-tool"
           state={toolState as any}
           toolName={toolName}

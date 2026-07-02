@@ -36,7 +36,7 @@ export const AddWorkspaceFolderDialog: React.FC<AddWorkspaceFolderDialogProps> =
     e.preventDefault();
     
     if (!folderPath.trim()) {
-      toast.error('Please enter a folder path');
+      // toast.error('Please enter a folder path');
       return;
     }
 
@@ -74,18 +74,18 @@ export const AddWorkspaceFolderDialog: React.FC<AddWorkspaceFolderDialogProps> =
 
       if (response.ok && data.success) {
         console.log('✅ Folder added successfully');
-        toast.success(data.message || 'Folder added to workspace');
+        // toast.success(data.message || 'Folder added to workspace');
         setFolderPath('');
         setAlias('');
         onOpenChange(false);
         onFolderAdded();
       } else {
         console.error('❌ Failed to add folder:', data);
-        toast.error(data.message || data.detail || 'Failed to add folder');
+        // toast.error(data.message || data.detail || 'Failed to add folder');
       }
     } catch (error) {
       console.error('❌ Error adding workspace folder:', error);
-      toast.error(`Failed to add folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to add folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }

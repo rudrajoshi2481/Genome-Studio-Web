@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
@@ -114,11 +113,11 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader className="space-y-3">
-          <DialogTitle className="flex items-center gap-3">
+      <DialogContent className="sm:max-w-lg max-w-[calc(100vw-2rem)] overflow-hidden">
+        <DialogHeader className="space-y-3 overflow-hidden">
+          <DialogTitle className="flex items-center gap-3 overflow-hidden">
             <div className={cn(
-              "p-2 rounded-lg",
+              "p-2 rounded-lg shrink-0",
               type === 'file' 
                 ? "bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" 
                 : "bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
@@ -129,10 +128,13 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
                 <FolderPlus className="h-5 w-5" />
               )}
             </div>
-            <div>
-              <h3 className="text-lg font-semibold">Create New {type === 'file' ? 'File' : 'Folder'}</h3>
-              <p className="text-xs text-muted-foreground font-normal">
-                in <Badge variant="outline" className="font-mono text-xs">{parentPath || '/'}</Badge>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <h3 className="text-lg font-semibold truncate">Create New {type === 'file' ? 'File' : 'Folder'}</h3>
+              <p className="text-xs text-muted-foreground font-normal flex items-center gap-1.5 overflow-hidden">
+                <span className="shrink-0">in</span>
+                <span dir="rtl" className="font-mono text-xs overflow-hidden whitespace-nowrap text-ellipsis block min-w-0" title={parentPath || '/'}>
+                  {parentPath || '/'}
+                </span>
               </p>
             </div>
           </DialogTitle>

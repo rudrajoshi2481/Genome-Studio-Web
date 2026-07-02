@@ -45,10 +45,13 @@ const _store: Map<string, CanvasState> = new Map();
 
 export function setCanvasState(filePath: string, nodes: CanvasNodeData[], edges: CanvasEdgeData[]) {
   _store.set(filePath, { nodes, edges });
+  console.log('🔍 [CANVAS STATE STORE] setCanvasState:', { filePath, nodesCount: nodes.length, edgesCount: edges.length, totalKeys: _store.size, allKeys: Array.from(_store.keys()) });
 }
 
 export function getCanvasState(filePath: string): CanvasState | undefined {
-  return _store.get(filePath);
+  const result = _store.get(filePath);
+  console.log('🔍 [CANVAS STATE STORE] getCanvasState:', { filePath, found: !!result, nodesCount: result?.nodes.length, edgesCount: result?.edges.length });
+  return result;
 }
 
 export function getAllCanvasStates(): Map<string, CanvasState> {

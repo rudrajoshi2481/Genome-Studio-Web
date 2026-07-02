@@ -152,15 +152,15 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
       // Only show toast if it hasn't been shown yet for this tabId or if forcing refresh
       if (!validationToastShown.current || forceRefresh) {
         if (!validationResult.isValid) {
-          toast.error(
-            forceRefresh ? "Failed to refresh flow" : "Invalid flow format", 
-            { description: validationResult.error || "The file is not in a valid flow format" }
-          );
+          // toast.error(
+            // forceRefresh ? "Failed to refresh flow" : "Invalid flow format", 
+            // { description: validationResult.error || "The file is not in a valid flow format" }
+          // );
         } else {
-          toast.success(
-            forceRefresh ? "Flow refreshed successfully" : "Valid flow format", 
-            { description: "The file is in a valid flow format" }
-          );
+          // toast.success(
+            // forceRefresh ? "Flow refreshed successfully" : "Valid flow format", 
+            // { description: "The file is in a valid flow format" }
+          // );
         }
         validationToastShown.current = true;
       }
@@ -204,7 +204,7 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
       // console.log("File content length:", content?.length || 0);
     } catch (error) {
       // console.error("Error fetching tab data:", error);
-      toast.error("Failed to refresh flow data");
+      // toast.error("Failed to refresh flow data");
     } finally {
       setIsRefreshing(false);
     }
@@ -322,7 +322,7 @@ export const Canvas: React.FC<CanvasProps> = ({ tabId }) => {
     });
     
     // We no longer update fileContent here - it will be handled by the useEffect
-    toast.success("Node deleted");
+    // toast.success("Node deleted");
   }, [setNodes, setEdges]);
   
   // Use an effect to update fileContent whenever nodes or edges change

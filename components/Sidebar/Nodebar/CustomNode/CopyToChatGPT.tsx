@@ -99,15 +99,15 @@ Provide the corrected code in the Genome Studio format with title and descriptio
     
     // Copy prompt to clipboard as backup
     navigator.clipboard.writeText(prompt).then(() => {
-      toast.success('Prompt copied to clipboard!')
+      // toast.success('Prompt copied to clipboard!')
       
       // Open ChatGPT in new tab
       window.open(chatGPTUrl, '_blank', 'noopener,noreferrer')
       
-      toast.info('Opening ChatGPT in new tab...')
+      // toast.info('Opening ChatGPT in new tab...')
     }).catch((err) => {
       console.error('Failed to copy to clipboard:', err)
-      toast.error('Failed to copy prompt')
+      // toast.error('Failed to copy prompt')
     })
   }
 
@@ -205,12 +205,12 @@ Provide the corrected code in the Genome Studio format with title and descriptio
     const chatGPTUrl = `https://chat.openai.com/?q=${encodedPrompt}`
     
     navigator.clipboard.writeText(prompt).then(() => {
-      toast.success('Prompt copied to clipboard!')
+      // toast.success('Prompt copied to clipboard!')
       window.open(chatGPTUrl, '_blank', 'noopener,noreferrer')
-      toast.info('Opening ChatGPT in new tab...')
+      // toast.info('Opening ChatGPT in new tab...')
     }).catch((err) => {
       console.error('Failed to copy to clipboard:', err)
-      toast.error('Failed to copy prompt')
+      // toast.error('Failed to copy prompt')
     })
   }
 

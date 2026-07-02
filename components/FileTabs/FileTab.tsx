@@ -78,7 +78,7 @@ function FileTab({
 
   const handleCopyPath = () => {
     navigator.clipboard.writeText(path)
-    toast.success('Path copied to clipboard')
+    // toast.success('Path copied to clipboard')
   }
 
   const handleDelete = () => {
@@ -107,10 +107,10 @@ function FileTab({
   const handleRevealInExplorer = async () => {
     try {
       await revealInExplorer(path)
-      toast.success('File revealed in explorer')
+      // toast.success('File revealed in explorer')
     } catch (error) {
       console.error('Failed to reveal file:', error)
-      toast.error('Failed to reveal file in explorer')
+      // toast.error('Failed to reveal file in explorer')
     }
   }
 

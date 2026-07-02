@@ -28,6 +28,7 @@ import { getApiBaseUrl } from '@/config/server';
 import { Conversation as ConvType } from './components/chatStore';
 
 function AIChat({ onClose }: { onClose?: () => void }) {
+  const inputSetterRef = useRef<((text: string) => void) | null>(null);
   const {
     setCurrentConversation,
     clearMessages,
@@ -226,7 +227,11 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   };
 
   const handlePromptSuggestion = (suggestion: string) => {
-    sendMessage(suggestion);
+    if (inputSetterRef.current) {
+      inputSetterRef.current(suggestion);
+    } else {
+      sendMessage(suggestion);
+    }
   };
 
   const handleDeleteMessage = (id: string) => {
@@ -388,7 +393,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
             </span>
           </div>
         )}
-        <Footer key={activeSessionId} onSendMessage={handleSendMessage} onStop={stopSending} onSendCommand={sendCommand} />
+        <Footer key={activeSessionId} onSendMessage={handleSendMessage} onStop={stopSending} onSendCommand={sendCommand} setInputRef={(fn) => { inputSetterRef.current = fn; }} />
       </div>
 
       {promptSuggestions.length > 0 && (

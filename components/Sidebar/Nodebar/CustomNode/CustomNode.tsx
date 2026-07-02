@@ -177,7 +177,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
     setSaveSuccess(false)
     
     // Show loading toast
-    const loadingToast = toast.loading('Testing node code...')
+    // const loadingToast = toast.loading('Testing node code...')
     
     try {
       // Prepare the request payload
@@ -230,17 +230,17 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         }
         
         setTestResult(normalizedResult)
-        toast.success('Node code tested successfully!')
+        // toast.success('Node code tested successfully!')
       } else {
         setTestError(data.message || 'Error analyzing node code')
-        toast.error(data.message || 'Error analyzing node code')
+        // toast.error(data.message || 'Error analyzing node code')
       }
     } catch (error) {
       console.error('Error testing node:', error)
       const errorMessage = 'Failed to connect to the API. Make sure the server is running.'
       setTestError(errorMessage)
       toast.dismiss(loadingToast)
-      toast.error(errorMessage)
+      // toast.error(errorMessage)
     } finally {
       setTestLoading(false)
     }
@@ -253,7 +253,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
     // In edit mode, we might not need to test the node again if we're just updating metadata
     if (!isEditMode && !testResult) {
       console.log('No test result available, cannot save')
-      toast.error('Please test the node before saving')
+      // toast.error('Please test the node before saving')
       setTestError('Please test the node before saving')
       return
     }
@@ -269,14 +269,14 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       
       if (!token) {
         console.error('Authentication token not found')
-        toast.error('Authentication token not found. Please log in again.')
+        // toast.error('Authentication token not found. Please log in again.')
         setSaveError('Authentication token not found. Please log in again.')
         setIsSaving(false)
         return
       }
       
       // Show loading toast
-      const loadingToast = toast.loading(isEditMode ? 'Updating custom node...' : 'Saving custom node...')
+      // const loadingToast = toast.loading(isEditMode ? 'Updating custom node...' : 'Saving custom node...')
       
       if (isEditMode) {
         // UPDATE EXISTING NODE
@@ -337,7 +337,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           
           // Show success toast
           toast.dismiss(loadingToast);
-          toast.success('Custom node updated successfully!');
+          // toast.success('Custom node updated successfully!');
           
           setSaveSuccess(true);
           
@@ -357,7 +357,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           console.error('Error updating node:', error);
           toast.dismiss(loadingToast);
           const errorMessage = error instanceof Error ? error.message : 'Failed to update custom node';
-          toast.error(errorMessage);
+          // toast.error(errorMessage);
           setSaveError(errorMessage);
         }
       } else {
@@ -367,7 +367,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         // Validate test result structure
         if (!testResult || !testResult.node || !testResult.node.id || !testResult.node.data) {
           console.error('Test result is missing required fields')
-          toast.error('Invalid node data structure. Please test the node again.')
+          // toast.error('Invalid node data structure. Please test the node again.')
           setSaveError('Invalid node data structure. Please test the node again.')
           setIsSaving(false)
           toast.dismiss(loadingToast)
@@ -415,7 +415,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         // Validate required fields before sending
         if (!savePayload.data.function_name) {
           console.error('Missing function_name in node data')
-          toast.error('Invalid node data: missing function name')
+          // toast.error('Invalid node data: missing function name')
           setSaveError('Invalid node data: missing function name')
           setIsSaving(false)
           toast.dismiss(loadingToast)
@@ -450,7 +450,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             console.log('Node saved successfully:', data)
             
             // Show success toast
-            toast.success('Custom node saved successfully!')
+            // toast.success('Custom node saved successfully!')
             
             setSaveSuccess(true)
             
@@ -466,7 +466,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             }, 2000)
           } catch (parseError) {
             console.error('Error parsing success response:', parseError)
-            toast.error('Server returned success but response format was invalid')
+            // toast.error('Server returned success but response format was invalid')
             setSaveError('Server returned success but response format was invalid')
           }
         } else {
@@ -474,19 +474,19 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             const errorData = JSON.parse(responseText)
             console.error('Error saving node:', response.status, errorData)
             const errorMessage = `Failed to save node: ${errorData.detail || 'Unknown error'}`
-            toast.error(errorMessage)
+            // toast.error(errorMessage)
             setSaveError(errorMessage)
           } catch (parseError) {
             console.error('Error parsing error response:', parseError)
             const errorMessage = `Server error (${response.status}): ${responseText.substring(0, 100)}`
-            toast.error(errorMessage)
+            // toast.error(errorMessage)
             setSaveError(errorMessage)
           }
         }
       }
     } catch (error) {
       console.error('Error saving node:', error)
-      toast.error('Failed to connect to the API. Make sure the server is running.')
+      // toast.error('Failed to connect to the API. Make sure the server is running.')
       setSaveError('Failed to connect to the API. Make sure the server is running.')
     } finally {
       setIsSaving(false)

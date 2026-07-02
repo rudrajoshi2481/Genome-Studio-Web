@@ -23,7 +23,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Settings as SettingsIcon, X, Upload, Trash2, User, Mail, Shield, LogOut, Camera, Calendar, Loader2, Check, IdCard, Clock } from 'lucide-react';
+import { Settings as SettingsIcon, X, Upload, Trash2, User, Mail, Shield, LogOut, Camera, Calendar, Loader2, Check, IdCard, Clock, AlertTriangle } from 'lucide-react';
 import AdminPanel from './AdminPanel';
 
 interface AccountFormData {
@@ -87,7 +87,7 @@ export default function Settings() {
     try {
       const token = getToken();
       if (!token) {
-        toast.error('Not authenticated. Please log in again.');
+        // toast.error('Not authenticated. Please log in again.');
         return;
       }
 
@@ -112,10 +112,10 @@ export default function Settings() {
 
       const updatedUser = await response.json();
       useAuthStore.setState({ user: updatedUser });
-      toast.success('Profile updated successfully!');
+      // toast.success('Profile updated successfully!');
       setIsEditing(false);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update profile');
+      // toast.error(error instanceof Error ? error.message : 'Failed to update profile');
     } finally {
       setIsSaving(false);
     }
@@ -136,7 +136,7 @@ export default function Settings() {
   const handleLogout = () => {
     logout();
     setIsOpen(false);
-    toast.success('Logged out successfully');
+    // toast.success('Logged out successfully');
   };
 
   const getAvatarUrl = (avatarPath: string | undefined) => {
@@ -155,13 +155,13 @@ export default function Settings() {
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      toast.error('Please select a valid image file (JPG, PNG, GIF, or WebP)');
+      // toast.error('Please select a valid image file (JPG, PNG, GIF, or WebP)');
       setIsUploadingAvatar(false);
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
+      // toast.error('Image must be less than 5MB');
       setIsUploadingAvatar(false);
       return;
     }
@@ -169,7 +169,7 @@ export default function Settings() {
     try {
       const token = getToken();
       if (!token) {
-        toast.error('Not authenticated');
+        // toast.error('Not authenticated');
         setIsUploadingAvatar(false);
         return;
       }
@@ -191,9 +191,9 @@ export default function Settings() {
       const result = await response.json();
       handleChange('avatar', result.avatar_url);
       useAuthStore.setState({ user: { ...user!, avatar: result.avatar_url } });
-      toast.success('Avatar uploaded successfully!');
+      // toast.success('Avatar uploaded successfully!');
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to upload avatar');
+      // toast.error(error instanceof Error ? error.message : 'Failed to upload avatar');
     } finally {
       setIsUploadingAvatar(false);
       if (fileInputRef.current) {
@@ -204,7 +204,7 @@ export default function Settings() {
 
   const handleRemoveAvatar = () => {
     handleChange('avatar', '');
-    toast.info('Avatar removed. Save changes to apply.');
+    // toast.info('Avatar removed. Save changes to apply.');
   };
 
   const formatDate = (dateStr: string | undefined) => {
@@ -260,6 +260,10 @@ export default function Settings() {
                   Admin
                 </TabsTrigger>
               )}
+              <TabsTrigger value="storage" className="justify-start w-full h-auto flex-none px-3 py-2 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                <AlertTriangle className="h-4 w-4 mr-2.5" />
+                Storage
+              </TabsTrigger>
               <Separator className="my-2" />
               <Button
                 onClick={handleLogout}
@@ -516,6 +520,64 @@ export default function Settings() {
                 </ScrollArea>
               </TabsContent>
             )}
+
+            {/* Storage / Danger Zone Tab */}
+            <TabsContent value="storage" className="flex-1 m-0 p-0">
+              <ScrollArea className="h-[calc(88vh-73px)]">
+                <div className="p-6 space-y-6 max-w-3xl mx-auto">
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                      Storage & Cache
+                    </h3>
+                    <p className="text-xs text-muted-foreground">Manage cached data and local storage</p>
+                  </div>
+
+                  <Separator />
+
+                  {/* Danger Zone - Clear Cache */}
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                      <h4 className="text-sm font-semibold text-destructive">Danger Zone</h4>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-medium text-sm">Clear All Cache & Storage</p>
+                      <p className="text-xs text-muted-foreground">
+                        Removes all localStorage, sessionStorage, and zustand persisted state (chat sessions, model selection, workspace paths, UI preferences) except login token and authentication data. The page will reload.
+                      </p>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        if (!window.confirm('This will clear ALL cached data except login token. The page will reload. Continue?')) return;
+                        const PRESERVE_KEYS = new Set([
+                          'auth_token',
+                          'genome_studio_token',
+                          'genome_studio_refresh_token',
+                          'genome_studio_token_expiry',
+                        ]);
+                        const preserved: Record<string, string> = {};
+                        PRESERVE_KEYS.forEach(key => {
+                          const val = localStorage.getItem(key);
+                          if (val !== null) preserved[key] = val;
+                        });
+                        localStorage.clear();
+                        Object.entries(preserved).forEach(([key, val]) => {
+                          localStorage.setItem(key, val);
+                        });
+                        sessionStorage.clear();
+                        window.location.reload();
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Clear Cache
+                    </Button>
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
           </Tabs>
         )}
       </DialogContent>

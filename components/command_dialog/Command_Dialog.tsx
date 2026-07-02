@@ -212,7 +212,7 @@ export const CommandDialogComponent = () => {
         searchInput.focus();
         searchInput.select();
       } else {
-        toast.info('Open File Explorer to use search');
+        // toast.info('Open File Explorer to use search');
       }
     }, 100);
   }, []);
@@ -223,7 +223,7 @@ export const CommandDialogComponent = () => {
     // Open the file in a new tab
     const fileName = filePath.split('/').pop() || 'file';
     addFileTab(filePath, fileName, '');
-    toast.success(`Opened ${fileName}`);
+    // toast.success(`Opened ${fileName}`);
   }, [addFileTab]);
 
   // Handle create dialog confirm
@@ -233,13 +233,13 @@ export const CommandDialogComponent = () => {
     try {
       if (showCreateDialog.type === 'file') {
         await createFile(name, showCreateDialog.parentPath);
-        toast.success(`File "${name}" created successfully`);
+        // toast.success(`File "${name}" created successfully`);
       } else {
         await createDirectory(name, showCreateDialog.parentPath);
-        toast.success(`Folder "${name}" created successfully`);
+        // toast.success(`Folder "${name}" created successfully`);
       }
     } catch (error) {
-      toast.error(`Failed to create ${showCreateDialog.type}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to create ${showCreateDialog.type}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setShowCreateDialog(null);
     }
@@ -251,9 +251,9 @@ export const CommandDialogComponent = () => {
     
     try {
       await uploadFiles(files, showUploadDialog.targetPath);
-      toast.success(`Uploaded ${files.length} file(s) successfully`);
+      // toast.success(`Uploaded ${files.length} file(s) successfully`);
     } catch (error) {
-      toast.error(`Failed to upload files: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to upload files: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setShowUploadDialog(null);
     }
@@ -290,9 +290,9 @@ export const CommandDialogComponent = () => {
     const activeTab = getActiveTab();
     if (activeTab && activeTab.path) {
       navigator.clipboard.writeText(activeTab.path);
-      toast.success('File path copied to clipboard');
+      // toast.success('File path copied to clipboard');
     } else {
-      toast.error('No active file to copy path from');
+      // toast.error('No active file to copy path from');
     }
   }, [getActiveTab]);
 
@@ -300,7 +300,7 @@ export const CommandDialogComponent = () => {
     setOpen(false);
     // Create a new simple bash terminal tab
     const terminalId = createTerminalTab(`Terminal ${Date.now()}`, 'simple');
-    toast.success('New bash terminal created');
+    // toast.success('New bash terminal created');
     
     // Optional: Navigate to terminal view if needed
     // You might want to add logic here to switch to terminal view

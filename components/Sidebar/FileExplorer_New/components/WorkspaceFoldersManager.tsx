@@ -51,11 +51,11 @@ export const WorkspaceFoldersManager: React.FC<WorkspaceFoldersManagerProps> = (
         const data = await response.json();
         setFolders(data.folders || []);
       } else {
-        if (!silent) toast.error('Failed to load workspace folders');
+        // if (!silent) toast.error('Failed to load workspace folders');
       }
     } catch (error) {
       if (!silent) {
-        toast.error(`Error loading folders: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // toast.error(`Error loading folders: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     } finally {
       setIsLoading(false);
@@ -89,16 +89,16 @@ export const WorkspaceFoldersManager: React.FC<WorkspaceFoldersManagerProps> = (
 
       if (response.ok && data.success) {
         console.log('✅ Folder removed successfully');
-        toast.success(data.message || 'Folder removed from workspace');
+        // toast.success(data.message || 'Folder removed from workspace');
         setFolders(data.folders || []);
         onFoldersChange?.();
       } else {
         console.error('❌ Failed to remove folder:', data);
-        toast.error(data.message || data.detail || 'Failed to remove folder');
+        // toast.error(data.message || data.detail || 'Failed to remove folder');
       }
     } catch (error) {
       console.error('❌ Error removing workspace folder:', error);
-      toast.error(`Failed to remove folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to remove folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

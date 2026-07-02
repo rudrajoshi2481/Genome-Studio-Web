@@ -72,7 +72,7 @@ export default function AdminPanel() {
       );
 
       if (!tokenCookie) {
-        toast.error('Not authenticated');
+        // toast.error('Not authenticated');
         return;
       }
 
@@ -97,7 +97,7 @@ export default function AdminPanel() {
       setUsers(data);
     } catch (error: unknown) {
       console.error('❌ [ADMIN-PANEL] Error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to fetch users');
+      // toast.error(error instanceof Error ? error.message : 'Failed to fetch users');
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +114,7 @@ export default function AdminPanel() {
       );
 
       if (!tokenCookie) {
-        toast.error('Not authenticated');
+        // toast.error('Not authenticated');
         return;
       }
 
@@ -140,14 +140,14 @@ export default function AdminPanel() {
       // Update local state
       setUsers(users.map(u => u.id === userId ? updatedUser : u));
 
-      toast.success(
-        isAdmin
-          ? `${updatedUser.username} is now an admin`
-          : `${updatedUser.username} is no longer an admin`
-      );
+      // toast.success(
+        // isAdmin
+          // ? `${updatedUser.username} is now an admin`
+          // : `${updatedUser.username} is no longer an admin`
+      // );
     } catch (error: unknown) {
       console.error('❌ [ADMIN-PANEL] Error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update user role');
+      // toast.error(error instanceof Error ? error.message : 'Failed to update user role');
     }
   };
 

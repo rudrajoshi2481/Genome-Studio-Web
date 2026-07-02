@@ -21,7 +21,7 @@ function Toolbar({ onRefresh, isRefreshing = false, fileContent, fileName, nodes
   // Handle saving the current flow to the server
   const handleSave = async () => {
     if (!tabId) {
-      toast.error("Cannot save: No active tab");
+      // toast.error("Cannot save: No active tab");
       return;
     }
 
@@ -105,13 +105,13 @@ function Toolbar({ onRefresh, isRefreshing = false, fileContent, fileName, nodes
       const success = await updateTabFileContent(tabId, updatedContent);
       
       if (success) {
-        toast.success("Flow saved successfully");
+        // toast.success("Flow saved successfully");
       } else {
-        toast.error("Failed to save flow");
+        // toast.error("Failed to save flow");
       }
     } catch (error) {
       console.error('Error saving flow:', error);
-      toast.error("Error saving flow");
+      // toast.error("Error saving flow");
     } finally {
       setIsSaving(false);
     }

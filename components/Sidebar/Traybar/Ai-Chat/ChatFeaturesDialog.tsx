@@ -16,7 +16,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Zap, Server, Bot, Terminal, BookOpen, Cpu, CheckCircle2, XCircle, Loader2, Database, CheckCheck, Save, Search, Link2, RotateCcw, Wifi, WifiOff, Shield, ShieldCheck, ShieldAlert } from "lucide-react"
+import { Zap, Server, Bot, Terminal, BookOpen, Cpu, CheckCircle2, XCircle, Loader2, Database, CheckCheck, Save, Search, Link2, RotateCcw, Wifi, WifiOff, Shield, ShieldCheck, ShieldAlert, Trash2, AlertTriangle } from "lucide-react"
 import { getApiBaseUrl } from "@/config/server"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -366,7 +366,7 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Point to a local Ollama instance, a remote server, or a tunnel (ngrok, cloudflared, etc.).
+                    Point to a local Ollama instance or a remote server.
                   </p>
                   <div className="flex gap-2">
                     <Input
@@ -376,7 +376,7 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
                         setUrlTestResult(null)
                         setUrlError(null)
                       }}
-                      placeholder="http://localhost:11434 or https://your-tunnel.ngrok-free.app"
+                      placeholder="http://localhost:11434 or https://your-server.com"
                       className="h-8 text-xs font-mono"
                     />
                     <Button
@@ -654,7 +654,7 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
                   >
                     <ShieldCheck className={`h-4 w-4 shrink-0 mt-0.5 ${permissionMode === 'bypass' ? 'text-green-500' : 'text-muted-foreground'}`} />
                     <div className="min-w-0">
-                      <p className="font-medium text-xs">Bypass (YOLO)</p>
+                      <p className="font-medium text-xs">Bypass (Lytic)</p>
                       <p className="text-xs text-muted-foreground mt-0.5">Auto-approve all tool calls. No confirmation prompts.</p>
                     </div>
                   </button>
@@ -743,6 +743,60 @@ function ChatFeaturesDialog({ children, tooltipText = "AI Chat Settings" }: Chat
                   onCheckedChange={setKeepIntermediateFiles}
                   aria-label="Keep intermediate files"
                 />
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* Danger Zone - Clear Cache */}
+            <section>
+              <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                Danger Zone
+              </h3>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/30">
+                <div className="min-w-0 flex-1 mr-2">
+                  <p className="font-medium text-xs">Clear All Cache & Storage</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Removes all localStorage, sessionStorage, and zustand persisted state (chat sessions, model selection, workspace paths, UI preferences) except login token and authentication data. The page will reload.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-8 text-xs gap-1.5 shrink-0"
+                  onClick={() => {
+                    if (!window.confirm('This will clear ALL cached data except login token. The page will reload. Continue?')) return;
+                    // Keys to preserve (auth/token related)
+                    const PRESERVE_KEYS = new Set([
+                      'auth_token',
+                      'genome_studio_token',
+                      'genome_studio_refresh_token',
+                      'genome_studio_token_expiry',
+                    ]);
+                    // Save preserved values
+                    const preserved: Record<string, string> = {};
+                    PRESERVE_KEYS.forEach(key => {
+                      const val = localStorage.getItem(key);
+                      if (val !== null) preserved[key] = val;
+                    });
+                    // Clear all localStorage
+                    localStorage.clear();
+                    // Restore preserved values
+                    Object.entries(preserved).forEach(([key, val]) => {
+                      localStorage.setItem(key, val);
+                    });
+                    // Clear all sessionStorage
+                    sessionStorage.clear();
+                    // Clear zustand persisted state by removing the specific keys
+                    // (already cleared by localStorage.clear, but explicit for clarity)
+                    // Reload the page to reset all in-memory state
+                    window.location.reload();
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear Cache
+                </Button>
               </div>
             </section>
           </div>

@@ -336,11 +336,15 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 
   // Save callback management
   const registerSaveCallback = useCallback((tabId: string, callback: () => Promise<void>) => {
+    console.log('🔍 [EDITOR CONTEXT] registerSaveCallback:', { tabId, existingCallbacks: Array.from(saveCallbacks.keys()) })
     saveCallbacks.set(tabId, callback)
+    console.log('🔍 [EDITOR CONTEXT] registerSaveCallback — after set, callbacks:', Array.from(saveCallbacks.keys()))
   }, [saveCallbacks])
 
   const unregisterSaveCallback = useCallback((tabId: string) => {
+    console.log('🔍 [EDITOR CONTEXT] unregisterSaveCallback:', { tabId, existingCallbacks: Array.from(saveCallbacks.keys()) })
     saveCallbacks.delete(tabId)
+    console.log('🔍 [EDITOR CONTEXT] unregisterSaveCallback — after delete, callbacks:', Array.from(saveCallbacks.keys()))
   }, [saveCallbacks])
 
   const saveTab = useCallback(async (tabId: string): Promise<boolean> => {

@@ -192,7 +192,7 @@ function Toolbar({
 
       const validation = await workflowManagerAPI.validateWorkflow(filePath);
       if (!validation.is_valid) {
-        toast.error(`Workflow validation failed: ${validation.errors.join(', ')}`);
+        // toast.error(`Workflow validation failed: ${validation.errors.join(', ')}`);
         updateExecutingState(false);
         return;
       }
@@ -254,7 +254,7 @@ function Toolbar({
             updateExecutingState(false);
             setProgress(null);
             const errMsg = msg.error_message ? `: ${msg.error_message}` : '';
-            toast.error(`Workflow execution failed${errMsg}`);
+            // toast.error(`Workflow execution failed${errMsg}`);
             // Unsubscribe after failure
             workflowWebSocket.unsubscribeFromExecution(result.execution_id);
           }
@@ -291,7 +291,7 @@ function Toolbar({
       }
     } catch (error) {
       console.error('Error starting workflow:', error);
-      toast.error(`Failed to start workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to start workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
       updateExecutingState(false);
     }
   };
@@ -320,7 +320,7 @@ function Toolbar({
       }
     } catch (error) {
       console.error('Error stopping workflow:', error);
-      toast.error(`Failed to stop workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to stop workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -344,7 +344,7 @@ function Toolbar({
         updateExecutingState(false);
         setProgress(null);
         if (status.status === 'failed') {
-          toast.error(`Workflow execution failed: ${status.error_message || 'Unknown error'}`);
+          // toast.error(`Workflow execution failed: ${status.error_message || 'Unknown error'}`);
         }
       }
     } catch (error) {

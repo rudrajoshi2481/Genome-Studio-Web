@@ -87,7 +87,7 @@ export default function LoginForm() {
         throw new Error(data.detail || 'Registration failed');
       }
       
-      toast.success('Account created successfully! Please sign in.');
+      // toast.success('Account created successfully! Please sign in.');
       
       // Switch to login tab
       setPassword(registerPassword);
@@ -98,7 +98,7 @@ export default function LoginForm() {
       
     } catch (err: any) {
       setRegisterError(err.message || 'Failed to create account');
-      toast.error(err.message || 'Failed to create account');
+      // toast.error(err.message || 'Failed to create account');
     } finally {
       setRegisterLoading(false);
     }

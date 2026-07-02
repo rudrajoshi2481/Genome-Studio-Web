@@ -30,12 +30,12 @@ const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
       console.log('💾 DialogProvider: Save result:', saved)
       
       if (saved) {
-        toast.success('File saved successfully')
+        // toast.success('File saved successfully')
         // Then close the tab
         handleConfirmClose()
       } else {
         // If save failed, show error and keep dialog open
-        toast.error('Failed to save file')
+        // toast.error('Failed to save file')
         console.error('❌ DialogProvider: Failed to save file')
       }
     }

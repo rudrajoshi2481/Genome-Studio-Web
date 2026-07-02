@@ -83,10 +83,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ tabId, filePath }) => {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast.success('Image downloaded successfully')
+      // toast.success('Image downloaded successfully')
     } catch (error) {
       console.error('❌ ImageViewer: Error downloading image:', error)
-      toast.error('Failed to download image')
+      // toast.error('Failed to download image')
     }
   }, [filePath])
 

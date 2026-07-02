@@ -18,6 +18,8 @@ const EditorWindowContent = memo(() => {
   const allTabs = useTabStore(state => state.getAllTabs())
   const [isMounted, setIsMounted] = React.useState(false)
   
+  console.log('🔍 [EDITOR WINDOW] Content render:', { activeTabId, tabCount: allTabs.length, tabs: allTabs.map(t => ({ id: t.id, path: t.path, name: t.name })), isMounted })
+  
   // Handle client-side mounting to prevent hydration mismatch
   React.useEffect(() => {
     setIsMounted(true)

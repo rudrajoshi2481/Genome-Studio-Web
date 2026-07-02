@@ -86,7 +86,7 @@ function Nodebar() {
       setCustomNodes(nodes)
     } catch (error) {
       console.error('Failed to fetch custom nodes:', error)
-      toast.error('Failed to load custom nodes')
+      // toast.error('Failed to load custom nodes')
     } finally {
       setIsLoading(false)
     }
@@ -102,7 +102,7 @@ function Nodebar() {
   // Function to delete a custom node
   const handleDeleteNode = async (nodeId: string | number) => {
     if (!token) {
-      toast.error('You must be logged in to delete nodes')
+      // toast.error('You must be logged in to delete nodes')
       return
     }
     
@@ -125,7 +125,7 @@ function Nodebar() {
         })
       }
       
-      toast.success('Node deleted successfully')
+      // toast.success('Node deleted successfully')
       // Refresh the node list
       loadCustomNodes()
     } catch (error: any) {
@@ -135,7 +135,7 @@ function Nodebar() {
       if (error?.message) {
         errorMessage = `${errorMessage}: ${error.message}`
       }
-      toast.error(errorMessage)
+      // toast.error(errorMessage)
     } finally {
       setIsDeleting(null)
     }
@@ -144,19 +144,19 @@ function Nodebar() {
   // Function to duplicate a custom node
   const handleDuplicateNode = async (nodeId: string | number) => {
     if (!token) {
-      toast.error('You must be logged in to duplicate nodes')
+      // toast.error('You must be logged in to duplicate nodes')
       return
     }
     
     console.log(`Attempting to duplicate node with ID: ${nodeId}`)
-    const loadingToast = toast.loading('Duplicating node...')
+    // const loadingToast = toast.loading('Duplicating node...')
     
     try {
       const duplicatedNode = await duplicateCustomNode(token, nodeId)
       console.log('Duplicate node response:', duplicatedNode)
       
       toast.dismiss(loadingToast)
-      toast.success('Node duplicated successfully')
+      // toast.success('Node duplicated successfully')
       
       // Refresh the node list to show the new duplicate
       loadCustomNodes()
@@ -168,7 +168,7 @@ function Nodebar() {
       if (error?.message) {
         errorMessage = `${errorMessage}: ${error.message}`
       }
-      toast.error(errorMessage)
+      // toast.error(errorMessage)
     }
   }
 
@@ -232,7 +232,7 @@ function Nodebar() {
   // Toggle favorite status
   const toggleFavorite = async (nodeId: string) => {
     if (!token) {
-      toast.error('You must be logged in to favorite nodes')
+      // toast.error('You must be logged in to favorite nodes')
       return
     }
     
@@ -247,13 +247,13 @@ function Nodebar() {
       localStorage.setItem('nodebar-favorites', JSON.stringify(result.favorite_nodes))
       
       if (result.is_favorited) {
-        toast.success('Added to favorites')
+        // toast.success('Added to favorites')
       } else {
-        toast.success('Removed from favorites')
+        // toast.success('Removed from favorites')
       }
     } catch (error) {
       console.error('Failed to toggle favorite:', error)
-      toast.error('Failed to update favorite status')
+      // toast.error('Failed to update favorite status')
     }
   }
   

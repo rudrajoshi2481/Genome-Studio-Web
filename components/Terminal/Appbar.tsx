@@ -36,13 +36,13 @@ function Appbar() {
   const handleCreateNewTab = (type: 'tmux' | 'simple' = 'tmux') => {
     const terminalName = type === 'tmux' ? 'Tmux Terminal' : 'Bash Terminal';
     createTab(terminalName, type);
-    toast.success(`${terminalName} created`);
+    // toast.success(`${terminalName} created`);
   };
   
   const handleRename = () => {
     if (tabToRename && newTabName.trim()) {
       renameTab(tabToRename.id, newTabName.trim());
-      toast.success(`Renamed tab to "${newTabName.trim()}"`); 
+      // toast.success(`Renamed tab to "${newTabName.trim()}"`); 
       setIsRenameDialogOpen(false);
     }
   };
@@ -69,11 +69,11 @@ function Appbar() {
     if (pinnedTabs.has(tabId)) {
       // Unpin the tab
       newPinnedTabs = new Set();
-      toast.info('Terminal tab unpinned');
+      // toast.info('Terminal tab unpinned');
     } else {
       // Pin the new tab (replaces any previously pinned tab)
       newPinnedTabs = new Set([tabId]);
-      toast.success('Terminal tab pinned');
+      // toast.success('Terminal tab pinned');
     }
     
     setPinnedTabs(newPinnedTabs);
@@ -95,21 +95,21 @@ function Appbar() {
     
     const tabsToClose = tabs.slice(tabIndex + 1);
     tabsToClose.forEach(tab => closeTab(tab.id));
-    toast.success(`Closed ${tabsToClose.length} tab(s) to the right`);
+    // toast.success(`Closed ${tabsToClose.length} tab(s) to the right`);
   };
 
   // Close all other tabs except the specified one
   const handleCloseOtherTabs = (tabId: string) => {
     const otherTabs = tabs.filter(t => t.id !== tabId);
     otherTabs.forEach(tab => closeTab(tab.id));
-    toast.success(`Closed ${otherTabs.length} other tab(s)`);
+    // toast.success(`Closed ${otherTabs.length} other tab(s)`);
   };
 
   // Close all tabs
   const handleCloseAllTabs = () => {
     const tabCount = tabs.length;
     tabs.forEach(tab => closeTab(tab.id));
-    toast.success(`Closed all ${tabCount} tab(s)`);
+    // toast.success(`Closed all ${tabCount} tab(s)`);
   };
   
   return (
@@ -143,7 +143,7 @@ function Appbar() {
                       onClick={(e) => {
                         e.stopPropagation();
                         closeTab(tab.id);
-                        toast.info(`Closed terminal tab: ${tab.name}`);
+                        // toast.info(`Closed terminal tab: ${tab.name}`);
                       }}
                     >
                       <CloseIcon size={14} />

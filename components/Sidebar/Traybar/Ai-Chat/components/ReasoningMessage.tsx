@@ -24,27 +24,26 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
   const hasContent =
     orderedSteps.some((s) => s.kind === "text" && s.text.trim()) || textSteps.length > 0;
 
-  const [elapsed, setElapsed] = useState(0);
-  const startRef = React.useRef<number | null>(null);
+  const startedAt = message.reasoning?.startedAt;
+  const storedDuration = message.reasoning?.duration;
+  const [elapsed, setElapsed] = useState(() => {
+    if (storedDuration != null) return storedDuration;
+    if (startedAt != null) return Math.floor((Date.now() - startedAt) / 1000);
+    return 0;
+  });
   const [isOpen, setIsOpen] = useState(isStreaming);
 
   useEffect(() => {
     if (isStreaming) {
-      if (startRef.current === null) {
-        startRef.current = Date.now();
-      }
+      const startTime = startedAt ?? Date.now();
       const interval = setInterval(() => {
-        if (startRef.current !== null) {
-          setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
-        }
+        setElapsed(Math.floor((Date.now() - startTime) / 1000));
       }, 1000);
       return () => clearInterval(interval);
-    } else {
-      if (startRef.current !== null) {
-        setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
-      }
+    } else if (storedDuration != null) {
+      setElapsed(storedDuration);
     }
-  }, [isStreaming]);
+  }, [isStreaming, startedAt, storedDuration]);
 
   useEffect(() => {
     setIsOpen(isStreaming);

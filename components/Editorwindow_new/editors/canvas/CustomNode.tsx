@@ -210,7 +210,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   // Handle single node execution with WebSocket streaming
   const handleRunNode = async () => {
     if (!nodeData.filePath) {
-      toast.error('No file path specified for node execution');
+      // toast.error('No file path specified for node execution');
       return;
     }
 
@@ -235,7 +235,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           };
         })
       );
-      toast.info(`Executing node: ${nodeData.title}`);
+      // toast.info(`Executing node: ${nodeData.title}`);
 
       const requestPayload = {
         file_path: nodeData.filePath,
@@ -347,11 +347,11 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
             );
 
             if (msg.status === 'completed') {
-              toast.success(`Node "${nodeData.title}" completed successfully`);
+              // toast.success(`Node "${nodeData.title}" completed successfully`);
             } else if (msg.status === 'cancelled') {
-              toast.info(`Node "${nodeData.title}" execution cancelled`);
+              // toast.info(`Node "${nodeData.title}" execution cancelled`);
             } else {
-              toast.error(`Node "${nodeData.title}" failed: ${msg.error_message || 'Unknown error'}`);
+              // toast.error(`Node "${nodeData.title}" failed: ${msg.error_message || 'Unknown error'}`);
             }
 
             // Unsubscribe from WebSocket
@@ -371,7 +371,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       }
 
     } catch (error) {
-      toast.error(`Failed to execute node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to execute node: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsExecuting(false);
     }
   };
@@ -380,7 +380,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   const handleStopNode = async () => {
     const execId = executionIdRef.current;
     if (!execId) {
-      toast.error('No active execution to stop');
+      // toast.error('No active execution to stop');
       return;
     }
 
@@ -404,9 +404,9 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         })
       );
 
-      toast.success(`Stopped node "${nodeData.title}"`);
+      // toast.success(`Stopped node "${nodeData.title}"`);
     } catch (error) {
-      toast.error(`Failed to stop node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to stop node: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -422,14 +422,14 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         minZoom: 1,
         maxZoom: 1.5,
       });
-      toast.success(`Focused on "${nodeData.title}"`);
+      // toast.success(`Focused on "${nodeData.title}"`);
     }
   };
 
   const handleDeleteNode = () => {
     if (typeof nodeData.onNodeDelete === 'function') {
       nodeData.onNodeDelete(id);
-      toast.success(`Deleted node "${nodeData.title}"`);
+      // toast.success(`Deleted node "${nodeData.title}"`);
     }
   };
 
@@ -440,7 +440,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     // Get the current node to duplicate
     const currentNode = getNode(id);
     if (!currentNode) {
-      toast.error('Could not find node to duplicate');
+      // toast.error('Could not find node to duplicate');
       return;
     }
     
@@ -462,18 +462,18 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     // Add the duplicate to the canvas
     setNodes((nds: Node[]) => [...nds, duplicateNode]);
     
-    toast.success(`Duplicated "${nodeData.title}"`);
+    // toast.success(`Duplicated "${nodeData.title}"`);
   };
 
   const handleToggleLock = () => {
     setIsLocked(!isLocked);
-    toast.info(isLocked ? '🔓 Unlocked - Node is draggable' : '🔒 Locked - Text selection enabled');
+    // toast.info(isLocked ? '🔓 Unlocked - Node is draggable' : '🔒 Locked - Text selection enabled');
   };
 
   const handleSaveToNodebar = async () => {
     try {
       if (!token) {
-        toast.error('Please log in to save nodes');
+        // toast.error('Please log in to save nodes');
         return;
       }
 
@@ -494,16 +494,16 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       const savedNode = await createCustomNode(token, nodeToSave as Partial<import('@/lib/services/custom-node-service').CustomNodeData>);
       
       console.log('Node saved successfully:', savedNode);
-      toast.success(`Saved "${nodeData.title}" to Nodebar!`);
+      // toast.success(`Saved "${nodeData.title}" to Nodebar!`);
     } catch (error) {
       console.error('Error saving node to nodebar:', error);
-      toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleViewCode = () => {
     // TODO: Implement view code logic
-    toast.info(`Viewing code for "${nodeData.title}"`);
+    // toast.info(`Viewing code for "${nodeData.title}"`);
   };
 
   // Calculate handle position based on index and total count
@@ -583,7 +583,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           onDoubleClick={(e) => {
             e.stopPropagation();
             setIsLocked(!isLocked);
-            toast.info(isLocked ? '🔓 Unlocked - Node is draggable' : '🔒 Locked - Text selection enabled');
+            // toast.info(isLocked ? '🔓 Unlocked - Node is draggable' : '🔒 Locked - Text selection enabled');
           }}
           title={isLocked ? "Double-click to unlock (enable dragging)" : "Double-click to lock (enable text selection)"}
         >

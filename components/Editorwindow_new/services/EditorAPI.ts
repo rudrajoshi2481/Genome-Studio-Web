@@ -285,43 +285,32 @@ export class EditorAPIService {
   private getCurrentRootPath(): string {
     try {
       const stored = localStorage.getItem('fileExplorer_rootPath')
-      const rootPath = stored || '/app'
+      const rootPath = stored || '/home'
       console.log('📁 EditorAPI Root Path:', { stored, rootPath })
       return rootPath
     } catch (error) {
       console.warn('⚠️ EditorAPI Root Path fallback:', { error })
-      return '/app'
+      return '/home'
     }
   }
 
   // Check if file is large using the new API
   async getFileInfo(filePath: string): Promise<LargeFileInfo> {
-    console.log('📊 EditorAPI checking file size:', { filePath })
-    
     try {
-      // Use the new large-file-info endpoint
       const params = new URLSearchParams({ file_path: filePath })
-      const data = await makeRequest(`${buildUrl('/large-file-info')}?${params}`)
-      
-      console.log('📊 File size analysis:', { 
-        filePath, 
-        fileSize: `${(data.file_size / 1024 / 1024).toFixed(2)}MB`,
-        isLargeFile: data.is_large_file,
-        canReadDirectly: data.can_read_directly
-      })
-      
+      const url = `${buildUrl('/large-file-info')}?${params}`
+      const response = await fetch(url, { headers: { ...getAuthHeaders() } })
+      if (!response.ok) {
+        return { isLargeFile: false, fileSize: 0, recommendChunking: false }
+      }
+      const data = await response.json()
       return {
         isLargeFile: data.is_large_file || false,
         fileSize: data.file_size || 0,
         recommendChunking: !data.can_read_directly
       }
-    } catch (error) {
-      console.warn('⚠️ Could not get file info, assuming small file:', error)
-      return {
-        isLargeFile: false,
-        fileSize: 0,
-        recommendChunking: false
-      }
+    } catch {
+      return { isLargeFile: false, fileSize: 0, recommendChunking: false }
     }
   }
 
@@ -355,14 +344,16 @@ export class EditorAPIService {
   // Get file content using the new API
   async getFileContent(filePath: string, rootPath?: string): Promise<FileContent> {
     const actualRootPath = rootPath || this.getCurrentRootPath()
-    console.log('📖 EditorAPI getFileContent:', { filePath, actualRootPath })
+    console.log('� [EDITOR API] getFileContent START:', { filePath, actualRootPath })
     
     try {
       // First check if file is large using the new API
+      console.log('🔍 [EDITOR API] Checking file info for:', filePath)
       const fileInfo = await this.getFileInfo(filePath)
+      console.log('🔍 [EDITOR API] File info result:', { filePath, isLargeFile: fileInfo.isLargeFile, fileSize: fileInfo.fileSize, recommendChunking: fileInfo.recommendChunking })
       
       if (fileInfo.isLargeFile && fileInfo.recommendChunking) {
-        console.log('📄 EditorAPI: Large file detected, loading first chunk:', filePath)
+        console.log('� [EDITOR API] Large file detected, loading first chunk:', filePath)
         const chunk = await this.getFileChunk(filePath, 0, this.CHUNK_SIZE)
         return {
           content: chunk.content,
@@ -374,12 +365,14 @@ export class EditorAPIService {
       }
       
       // Load full file using the new API endpoint
+      console.log('🔍 [EDITOR API] Loading full file content:', filePath)
       const params = new URLSearchParams({
         path: filePath,
         root_path: actualRootPath
       })
       
       const data = await makeRequest(`${buildUrl('/file-content')}?${params}`)
+      console.log('🔍 [EDITOR API] getFileContent SUCCESS:', { filePath, contentLength: data.content?.length, version: data.version })
       
       return {
         content: data.content || '',
@@ -391,9 +384,10 @@ export class EditorAPIService {
         }
       }
     } catch (error) {
+      console.error('🔍 [EDITOR API] getFileContent ERROR:', { filePath, error })
       // Handle authentication errors gracefully
       if (error instanceof Error && (error.message.includes('Authentication failed') || error.message.includes('Not authenticated'))) {
-        console.warn('🔐 EditorAPI: Authentication failed, falling back to local file reading for:', filePath)
+        console.warn('� [EDITOR API] Auth failed, falling back to local:', filePath)
         return this.getFileContentLocal(filePath)
       }
       
@@ -405,7 +399,7 @@ export class EditorAPIService {
 
   // Update file content using the new API
   async updateFileContent(filePath: string, content: string, version?: number): Promise<void> {
-    console.log('💾 EditorAPI updateFileContent:', { filePath, contentLength: content.length, version })
+    console.log('� [EDITOR API] updateFileContent START:', { filePath, contentLength: content.length, version })
     
     const rootPath = this.getCurrentRootPath()
     const params = new URLSearchParams({ root_path: rootPath })
@@ -416,13 +410,14 @@ export class EditorAPIService {
         file_path: filePath,
         operation: {
           id: `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          type: 'full_replace', // Use full_replace instead of replace with end: -1
+          type: 'full_replace',
           text: content,
           timestamp: new Date().toISOString()
         },
         version: version || 1
       })
     })
+    console.log('🔍 [EDITOR API] updateFileContent SUCCESS:', { filePath, contentLength: content.length })
   }
 
   // Get file preview using the new API
@@ -461,10 +456,17 @@ export class EditorAPIService {
 
   // Get file metadata using the new API
   async getFileMetadata(filePath: string): Promise<Record<string, any>> {
-    console.log('📊 EditorAPI getFileMetadata:', { filePath })
-    
     const params = new URLSearchParams({ path: filePath })
-    return await makeRequest(`${buildUrl('/file-info')}?${params}`)
+    const url = `${buildUrl('/file-info')}?${params}`
+    try {
+      const response = await fetch(url, { headers: { ...getAuthHeaders() } })
+      if (!response.ok) {
+        return { size: 0, exists: false }
+      }
+      return await response.json()
+    } catch {
+      return { size: 0, exists: false }
+    }
   }
 
   // Local fallback for file content when API is not available

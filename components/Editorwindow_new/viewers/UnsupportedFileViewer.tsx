@@ -32,10 +32,10 @@ const UnsupportedFileViewer: React.FC<UnsupportedFileViewerProps> = ({ tabId, fi
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast.success('File downloaded successfully')
+      // toast.success('File downloaded successfully')
     } catch (error) {
       console.error('❌ UnsupportedFileViewer: Error downloading file:', error)
-      toast.error('Failed to download file')
+      // toast.error('Failed to download file')
     } finally {
       setIsDownloading(false)
     }

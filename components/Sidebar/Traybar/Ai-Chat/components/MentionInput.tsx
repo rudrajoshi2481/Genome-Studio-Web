@@ -49,6 +49,7 @@ interface MentionInputProps {
     left: number;
     onClose: () => void;
     onSelectMention: (item: { label: string; id: string }) => void;
+    onDeleteTrigger?: () => void;
     style?: React.CSSProperties;
   }>;
 }
@@ -275,6 +276,15 @@ export default function MentionInput({
         top={position.current?.top ?? 0}
         left={position.current?.left ?? 0}
         onClose={() => {
+          setOpen(false);
+          editor?.commands.focus();
+        }}
+        onDeleteTrigger={() => {
+          if (position.current) {
+            editor?.chain().focus().deleteRange(position.current.range).run();
+          } else {
+            editor?.commands.focus();
+          }
           setOpen(false);
         }}
         onSelectMention={(item) => {

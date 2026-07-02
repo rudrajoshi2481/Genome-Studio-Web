@@ -2,7 +2,10 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useChatStore, type ChatMentionItem, type UploadedFile } from '../components/chatStore';
 import { wsService } from './wsService';
 import { useTabStore } from '@/components/FileTabs/useTabStore';
+import { useFileExplorerStore } from '@/components/Sidebar/FileExplorer_New/store/fileExplorerStore';
 import { getAllCanvasStates } from '@/components/Editorwindow_new/editors/canvas/canvasStateStore';
+import { getApiBaseUrl } from '@/config/server';
+import * as authService from '@/lib/services/auth-service';
 
 export interface SendMessageOptions {
   mentions?: ChatMentionItem[];
@@ -306,6 +309,7 @@ export const useChatWebSocket = () => {
               reasoning: {
                 content: message.content || '',
                 isStreaming: true,
+                startedAt: Date.now(),
                 orderedSteps: [{ kind: 'text', id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, text: message.content || '' }],
               }
             });
@@ -317,10 +321,12 @@ export const useChatWebSocket = () => {
           const reasoningMsgs = sessionGetMessages();
           const lastMsg = reasoningMsgs[reasoningMsgs.length - 1];
           if (lastMsg && lastMsg.type === 'reasoning') {
+            const startedAt = lastMsg.reasoning?.startedAt;
+            const duration = startedAt ? Math.ceil((Date.now() - startedAt) / 1000) : undefined;
             sessionUpdateMessages(msgs =>
               msgs.map(m =>
                 m.id === lastMsg.id
-                  ? { ...m, reasoning: { ...m.reasoning!, isStreaming: false } }
+                  ? { ...m, reasoning: { ...m.reasoning!, isStreaming: false, duration } }
                   : m
               )
             );
@@ -479,12 +485,24 @@ export const useChatWebSocket = () => {
               const tabState = useTabStore.getState();
               const filePath = message.filePath;
               const fileName = filePath.split('/').pop() || 'workflow.flow';
-              // Check if tab already exists to avoid duplicates
-              const existingTab = tabState.getAllTabs().find(tab => tab.path === filePath);
-              if (!existingTab) {
-                const newTabId = tabState.addTab(filePath, fileName, '');
-                console.log('[AI Chat] Opened flow file in tab:', filePath, 'active:', newTabId ? 'yes' : 'no');
+              console.log('🔍 [AI CHAT] open_flow received:', { filePath, fileName });
+              console.log('🔍 [AI CHAT] Current tabs before open_flow:', tabState.getAllTabs().map(t => ({ id: t.id, path: t.path, name: t.name })));
+              // addTab already deduplicates by filePath and activates existing tab.
+              // It returns the tabId (existing or new). We activate it to ensure
+              // the user sees the flow that the AI just opened.
+              const tabId = tabState.addTab(filePath, fileName, '');
+              console.log('🔍 [AI CHAT] addTab returned:', { tabId, filePath });
+              if (tabId) {
+                tabState.activateTab(tabId);
+                console.log('🔍 [AI CHAT] Activated tab:', tabId);
               }
+              console.log('🔍 [AI CHAT] Current tabs after open_flow:', tabState.getAllTabs().map(t => ({ id: t.id, path: t.path, name: t.name })));
+              console.log('[AI Chat] Opened/activated flow file tab:', filePath);
+              // Refresh the file explorer tree so a newly created flow file
+              // shows up immediately without needing a manual refresh.
+              useFileExplorerStore.getState().refreshFileTree(true).catch((err: unknown) => {
+                console.error('[AI Chat] Failed to refresh file tree after open_flow:', err);
+              });
             } catch (e) {
               console.error('[AI Chat] Failed to open flow file:', e);
             }
@@ -525,20 +543,42 @@ export const useChatWebSocket = () => {
         }
         case 'tool_code': {
           const codeToolStepId = message.tool_message_id || `tool-${Date.now()}`;
-          sessionAddMessage({
-            type: 'tool_code',
-            role: 'assistant',
-            content: '',
-            toolName: message.tool_name || 'tool',
-            code: message.code || '',
-            codeLanguage: message.language || 'bash',
-            outputLines: [],
-            isRunning: true,
-            metadata: {
+          // Check if a tool_start message already exists for this tool_message_id
+          const existingToolMsg = sessionGetMessages().find(
+            m => m.type === 'tool' && m.metadata?.toolMessageId === codeToolStepId
+          );
+          if (existingToolMsg) {
+            // Update the existing tool message with code info instead of creating a duplicate
+            sessionUpdateMessages(msgs =>
+              msgs.map(m => {
+                if (m.type === 'tool' && m.metadata?.toolMessageId === codeToolStepId) {
+                  return {
+                    ...m,
+                    type: 'tool_code',
+                    code: message.code || '',
+                    codeLanguage: message.language || 'bash',
+                    outputLines: [],
+                  };
+                }
+                return m;
+              })
+            );
+          } else {
+            sessionAddMessage({
+              type: 'tool_code',
+              role: 'assistant',
+              content: '',
               toolName: message.tool_name || 'tool',
-              toolMessageId: codeToolStepId,
-            },
-          });
+              code: message.code || '',
+              codeLanguage: message.language || 'bash',
+              outputLines: [],
+              isRunning: true,
+              metadata: {
+                toolName: message.tool_name || 'tool',
+                toolMessageId: codeToolStepId,
+              },
+            });
+          }
           break;
         }
         case 'tool_output_stream': {
@@ -939,7 +979,7 @@ export const useChatWebSocket = () => {
     };
   }, []);
 
-  const sendMessage = (content: string, model?: string, options?: SendMessageOptions) => {
+  const sendMessage = async (content: string, model?: string, options?: SendMessageOptions) => {
     if (!wsService.isConnected()) {
       console.error('WebSocket is not connected');
       addMessage({
@@ -1000,6 +1040,26 @@ export const useChatWebSocket = () => {
 
       // Get the active file explorer root path
       const activeRootPath = options?.rootPath || (typeof window !== 'undefined' ? localStorage.getItem('fileExplorer_rootPath') || undefined : undefined);
+
+      // Fetch all workspace folders so the AI agent knows which workspaces exist
+      let workspaceFolders: { path: string; alias: string }[] | undefined;
+      try {
+        const baseUrl = getApiBaseUrl();
+        const token = authService.getToken();
+        const url = `${baseUrl}/file-explorer-new/workspace/folders`;
+        const response = await fetch(url, {
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          workspaceFolders = data.folders || undefined;
+        }
+      } catch (e) {
+        console.error('[AI Chat] Failed to fetch workspace folders:', e);
+      }
 
       // Collect open tabs info (paths + active tab) so the backend agent knows
       // which files are open, especially .flow files for the canvas agent
@@ -1071,6 +1131,7 @@ export const useChatWebSocket = () => {
         command: options?.command || undefined,
         command_args: options?.commandArgs || undefined,
         root_path: activeRootPath,
+        workspaces: workspaceFolders,
         keep_intermediate_files: options?.keepIntermediateFiles,
         open_tabs: openTabs,
         canvas_state: canvasState,
@@ -1116,7 +1177,9 @@ export const useChatWebSocket = () => {
   };
 
   const stopCommand = (toolMessageId: string) => {
-    wsService.sendMessage({ type: 'stop_command', tool_message_id: toolMessageId });
+    const state = useChatStore.getState();
+    const sessionIdToSend = state.currentConversationId || state.activeSessionId || undefined;
+    wsService.sendMessage({ type: 'stop_command', tool_message_id: toolMessageId, conversation_id: sessionIdToSend });
   };
 
   const sendAskUserResponse = (toolMessageId: string, response: string) => {
@@ -1127,17 +1190,17 @@ export const useChatWebSocket = () => {
     });
   };
 
-  const sendToolApproval = (toolMessageId: string, approved: boolean, reason?: string, approvalMode?: 'once' | 'always' | 'yolo') => {
+  const sendToolApproval = (toolMessageId: string, approved: boolean, reason?: string, approvalMode?: 'once' | 'always' | 'lytic') => {
     wsService.sendMessage({
       type: 'tool_approval_response',
       tool_message_id: toolMessageId,
       approved,
       reason: reason || '',
-      approval_mode: approvalMode || 'always',
+      approval_mode: approvalMode || 'once',
     });
   };
 
-  const sendYoloMode = () => {
+  const sendLyticMode = () => {
     wsService.sendMessage({
       type: 'set_permission_mode',
       mode: 'bypass',
@@ -1182,7 +1245,7 @@ export const useChatWebSocket = () => {
     stopCommand,
     sendAskUserResponse,
     sendToolApproval,
-    sendYoloMode,
+    sendLyticMode,
     sendCommand,
     isConnected
   };

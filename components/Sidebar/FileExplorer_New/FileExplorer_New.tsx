@@ -192,34 +192,40 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
 
   // Function to open a file in a tab (inspired by old FileExplorer)
   const openFileInTab = useCallback(async (filePath: string) => {
+    console.log('🔍 [FILE EXPLORER] openFileInTab called for:', filePath);
     try {
       // Get all existing tabs
       const tabs = useTabStore.getState().getAllTabs();
+      console.log('🔍 [FILE EXPLORER] Current tabs:', tabs.map(t => ({ id: t.id, path: t.path, name: t.name })));
       
       // Check if file is already open in a tab
       const existingTab = tabs.find(tab => tab.path === filePath);
       
       if (existingTab) {
         // If tab already exists, just activate it
+        console.log('🔍 [FILE EXPLORER] Found existing tab, activating:', { id: existingTab.id, path: existingTab.path });
         useTabStore.getState().activateTab(existingTab.id);
         console.log(`✅ Activated existing tab for: ${filePath}`);
       } else {
         // Extract file name from path
         const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
         
+        console.log('🔍 [FILE EXPLORER] No existing tab found, creating new tab:', { filePath, fileName });
         // Add the file to tabs with empty content initially
         // Content will be loaded in the EditorWindow component
         const tabId = useTabStore.getState().addTab(filePath, fileName, '');
-        console.log(`✅ Opened new tab for: ${filePath}`);
+        console.log(`✅ Opened new tab for: ${filePath}`, { tabId });
         
         // Activate the newly created tab
         if (tabId) {
           useTabStore.getState().activateTab(tabId);
+          console.log('🔍 [FILE EXPLORER] Activated new tab:', tabId);
+        } else {
+          console.warn('🔍 [FILE EXPLORER] addTab returned null — tab may already exist or max tabs reached');
         }
       }
     } catch (error) {
-      console.error('Error opening file in tab:', error);
-      // You could add a toast notification here if available
+      console.error('🔍 [FILE EXPLORER] Error opening file in tab:', error);
       alert(`Failed to open file: ${error instanceof Error ? error.message : String(error)}`);
     }
   }, []);
@@ -341,34 +347,34 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         let filesProcessed = 0;
         
         // Show initial loading toast
-        toast.loading('Preparing download...', {
-          description: 'Initializing ZIP creation',
-          duration: Infinity,
-          id: 'folder-download',
-        });
+        // toast.loading('Preparing download...', {
+          // description: 'Initializing ZIP creation',
+          // duration: Infinity,
+          // id: 'folder-download',
+        // });
         
         const downloader = new DownloadWebSocket(
           // Progress callback
           (progress) => {
             if (progress.type === 'start') {
-              toast.loading('Creating ZIP archive...', {
-                description: `Compressing ${node.name}`,
-                duration: Infinity,
-                id: 'folder-download',
-              });
+              // toast.loading('Creating ZIP archive...', {
+                // description: `Compressing ${node.name}`,
+                // duration: Infinity,
+                // id: 'folder-download',
+              // });
             } else if (progress.type === 'progress') {
               filesProcessed = progress.files_processed || 0;
-              toast.loading('Creating ZIP archive...', {
-                description: `Processed ${filesProcessed} files...`,
-                duration: Infinity,
-                id: 'folder-download',
-              });
+              // toast.loading('Creating ZIP archive...', {
+                // description: `Processed ${filesProcessed} files...`,
+                // duration: Infinity,
+                // id: 'folder-download',
+              // });
             } else if (progress.type === 'complete') {
-              toast.loading('Downloading...', {
-                description: `Receiving ${progress.filename} (${(progress.size! / 1024 / 1024).toFixed(2)} MB)`,
-                duration: Infinity,
-                id: 'folder-download',
-              });
+              // toast.loading('Downloading...', {
+                // description: `Receiving ${progress.filename} (${(progress.size! / 1024 / 1024).toFixed(2)} MB)`,
+                // duration: Infinity,
+                // id: 'folder-download',
+              // });
             }
           },
           // Complete callback
@@ -384,18 +390,18 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
             window.URL.revokeObjectURL(url);
             
             toast.dismiss('folder-download');
-            toast.success('Folder download complete!', {
-              description: `${filename} (${filesProcessed} files)`,
-              duration: 3000,
-            });
+            // toast.success('Folder download complete!', {
+              // description: `${filename} (${filesProcessed} files)`,
+              // duration: 3000,
+            // });
           },
           // Error callback
           (error) => {
             toast.dismiss('folder-download');
-            toast.error('Download failed', {
-              description: error,
-              duration: 5000,
-            });
+            // toast.error('Download failed', {
+              // description: error,
+              // duration: 5000,
+            // });
           }
         );
         
@@ -403,18 +409,18 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
       } else {
         // For files, use regular download
         await downloadFile(node.path);
-        toast.success('File download started', {
-          description: `Downloading ${node.name}`,
-          duration: 2000,
-        });
+        // toast.success('File download started', {
+          // description: `Downloading ${node.name}`,
+          // duration: 2000,
+        // });
       }
     } catch (error) {
       console.error('Download failed:', error);
       toast.dismiss('folder-download');
-      toast.error('Download failed', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-        duration: 5000,
-      });
+      // toast.error('Download failed', {
+        // description: error instanceof Error ? error.message : 'Unknown error',
+        // duration: 5000,
+      // });
     }
   }, [downloadFile]);
 
@@ -440,10 +446,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
       // Try modern clipboard API first
       await navigator.clipboard.writeText(node.path);
       console.log(`✅ Path copied to clipboard: ${node.path}`);
-      toast.success(`Path copied: ${node.path}`, {
-        description: 'Path has been copied to clipboard',
-        duration: 2000,
-      });
+      // toast.success(`Path copied: ${node.path}`, {
+        // description: 'Path has been copied to clipboard',
+        // duration: 2000,
+      // });
     } catch (error) {
       console.error('Clipboard API failed:', error);
       
@@ -478,10 +484,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         
         if (successful) {
           console.log(`✅ Path copied to clipboard (fallback): ${node.path}`);
-          toast.success(`Path copied: ${node.path}`, {
-            description: 'Path has been copied to clipboard',
-            duration: 2000,
-          });
+          // toast.success(`Path copied: ${node.path}`, {
+            // description: 'Path has been copied to clipboard',
+            // duration: 2000,
+          // });
         } else {
           throw new Error('execCommand failed');
         }
@@ -493,10 +499,10 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
         const isMac = userAgent.includes('mac');
         const copyKey = isMac ? 'Cmd+C' : 'Ctrl+C';
         
-        toast.error('Copy Path', {
-          description: `Please copy manually: ${node.path}`,
-          duration: 5000,
-        });
+        // toast.error('Copy Path', {
+          // description: `Please copy manually: ${node.path}`,
+          // duration: 5000,
+        // });
         
         // Show alert with path for manual copy
         alert(`Copy this path:\n\n${node.path}\n\nPress ${copyKey} to copy`);

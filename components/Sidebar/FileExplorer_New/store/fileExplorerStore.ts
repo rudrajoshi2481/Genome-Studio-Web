@@ -251,14 +251,28 @@ function updateNodeInTree(tree: FileNode, targetPath: string): boolean {
 
 export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: any) => {
   // Initialize localStorage with default root path if not set (only in browser)
+  // Also restore persisted expanded paths and active path
+  let _initialExpandedPaths: string[] = [];
+  let _initialActivePath: string | null = null;
+  let _initialRootPath = '/home';
   if (typeof window !== 'undefined') {
     try {
       const storedRootPath = localStorage.getItem('fileExplorer_rootPath');
-      if (!storedRootPath) {
+      if (storedRootPath) {
+        _initialRootPath = storedRootPath;
+      } else {
         localStorage.setItem('fileExplorer_rootPath', '/home');
       }
+      // Restore expanded paths from localStorage
+      const storedExpanded = localStorage.getItem('fileExplorer_expandedPaths');
+      if (storedExpanded) {
+        const parsed = JSON.parse(storedExpanded);
+        if (Array.isArray(parsed)) _initialExpandedPaths = parsed;
+      }
+      // Restore active path from localStorage
+      _initialActivePath = localStorage.getItem('fileExplorer_activePath');
     } catch (error) {
-      console.warn('Failed to initialize root path in localStorage:', error);
+      console.warn('Failed to initialize file explorer state from localStorage:', error);
     }
   }
 
@@ -266,10 +280,10 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
   // Initialize with empty state
   fileTree: null,
   nodes: new Map(),
-  rootPath: '/home', // Default to /home, but will be set dynamically
+  rootPath: _initialRootPath,
   selectedPaths: [],
-  expandedPaths: [],
-  activePath: null,
+  expandedPaths: _initialExpandedPaths,
+  activePath: _initialActivePath,
   isLoading: false,
   error: null,
   isConnected: false,
@@ -305,6 +319,9 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('fileExplorer_rootPath', path);
+        // Clear persisted expanded paths and active path when root changes
+        localStorage.removeItem('fileExplorer_expandedPaths');
+        localStorage.removeItem('fileExplorer_activePath');
       } catch (error) {
         console.warn('Failed to save root path to localStorage:', error);
       }
@@ -323,6 +340,15 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       });
     } else {
       set({ rootPath: path });
+    }
+
+    // Update the file watcher to monitor the new root path
+    const ws = (get() as any).ws;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'set_root_path',
+        root_path: path
+      }));
     }
   },
 
@@ -378,9 +404,31 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     
     buildTreeFromNode(rootNode, null);
     
-    // Restore expanded paths or set initial if empty
+    // Restore expanded paths: prefer savedExpandedPaths (from previous tree),
+    // fall back to persisted localStorage paths, or just expand root
     if (savedExpandedPaths.length > 0) {
       state.expandedPaths = savedExpandedPaths;
+    } else if (typeof window !== 'undefined') {
+      try {
+        const persisted = localStorage.getItem('fileExplorer_expandedPaths');
+        if (persisted) {
+          const parsed = JSON.parse(persisted);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Filter to only paths that still exist in the new tree
+            state.expandedPaths = parsed.filter((p: string) => state.nodes.has(p));
+            // Always include root if not already
+            if (!state.expandedPaths.includes(rootNode.path)) {
+              state.expandedPaths.push(rootNode.path);
+            }
+          } else {
+            state.expandedPaths = [rootNode.path];
+          }
+        } else {
+          state.expandedPaths = [rootNode.path];
+        }
+      } catch {
+        state.expandedPaths = [rootNode.path];
+      }
     } else {
       state.expandedPaths = [rootNode.path];
     }
@@ -415,6 +463,13 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
           console.log(`✓ Node already has ${node.children.length} children loaded`);
         }
       }
+    }
+    
+    // Persist expanded paths to localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('fileExplorer_expandedPaths', JSON.stringify(newExpandedPaths));
+      } catch {}
     }
     
     set({ 
@@ -548,7 +603,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       console.error('💥 Error:', error);
       console.error('📂 Path:', path);
       console.log('');
-      toast.error(`Failed to load folder contents`);
+      // toast.error(`Failed to load folder contents`);
     }
   },
 
@@ -578,6 +633,11 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       console.log('Active folder:', { path, name: node.name });
     }
     
+    // Persist active path to localStorage
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('fileExplorer_activePath', path); } catch {}
+    }
+    
     set({ 
       selectedPaths: newSelectedPaths,
       activePath: path,
@@ -592,6 +652,11 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     console.log('Set active path:', { path, isDirectory: node?.is_dir, name: node?.name });
     if (node?.is_dir) {
       console.log('Active folder:', { path, name: node.name });
+    }
+    
+    // Persist active path to localStorage
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('fileExplorer_activePath', path); } catch {}
     }
     
     set({ 
@@ -641,7 +706,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
             if (treeRefreshTimer) clearTimeout(treeRefreshTimer);
             treeRefreshTimer = setTimeout(() => {
               treeRefreshTimer = null;
-              get().loadFileTree(undefined, true).catch((error: unknown) => {
+              get().loadFileTree(true).catch((error: unknown) => {
                 console.error('Failed to refresh tree:', error);
               });
             }, 300);
@@ -854,6 +919,9 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
 
   collapseAll: () => {
     console.log('📁 Collapsing all nodes');
+    if (typeof window !== 'undefined') {
+      try { localStorage.removeItem('fileExplorer_expandedPaths'); } catch {}
+    }
     set({ 
       expandedPaths: [],
       lastTreeUpdate: Date.now()
@@ -869,13 +937,22 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     let currentPath = node.parent;
     
     while (currentPath) {
-      newExpandedPaths.push(currentPath);
+      if (!newExpandedPaths.includes(currentPath)) {
+        newExpandedPaths.push(currentPath);
+      }
       const parentNode = state.nodes.get(currentPath);
       if (parentNode) {
         currentPath = parentNode.parent;
       } else {
         break;
       }
+    }
+    
+    // Persist expanded paths to localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('fileExplorer_expandedPaths', JSON.stringify(newExpandedPaths));
+      } catch {}
     }
     
     set({ 
@@ -1132,7 +1209,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       await fileExplorerApi.createFile(fullPath, '');
       
       // Refresh tree to show new file
-      await get().loadFileTree();
+      await get().loadFileTree(true);
       set({ isLoading: false });
     } catch (error) {
       console.error('Create file failed:', error);
@@ -1154,7 +1231,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       await fileExplorerApi.createDirectory(fullPath);
       
       // Refresh tree to show new directory
-      await get().loadFileTree();
+      await get().loadFileTree(true);
       set({ isLoading: false });
     } catch (error) {
       console.error('Create directory failed:', error);
@@ -1196,8 +1273,8 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
         });
       }
       
-      // Refresh tree to remove deleted items
-      await get().loadFileTree();
+      // Refresh tree to remove deleted items (force fresh to bypass backend cache)
+      await get().loadFileTree(true);
       set({ isLoading: false });
     } catch (error) {
       console.error('Delete items failed:', error);
@@ -1269,7 +1346,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       });
       
       // Refresh tree to show renamed item
-      await get().loadFileTree();
+      await get().loadFileTree(true);
       set({ isLoading: false });
     } catch (error) {
       console.error('Rename item failed:', error);
@@ -1289,7 +1366,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
       
       // Force refresh tree to show duplicated item (bypass cache)
       console.log('🔄 Force refreshing tree after duplicate...');
-      await get().loadFileTree(undefined, true);
+      await get().loadFileTree(true);
       set({ isLoading: false });
     } catch (error) {
       console.error('Duplicate item failed:', error);
@@ -1366,7 +1443,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
             if (shouldOverwrite) {
               // Retry with overwrite=true by creating a custom upload request
               const filePath = `${targetPath}/${file.name}`;
-              const rootPath = (typeof window !== 'undefined' ? localStorage.getItem('fileExplorerRootPath') : null) || '/home';
+              const rootPath = (typeof window !== 'undefined' ? localStorage.getItem('fileExplorer_rootPath') : null) || '/home';
               const params = new URLSearchParams({
                 file_path: filePath,
                 root_path: rootPath,

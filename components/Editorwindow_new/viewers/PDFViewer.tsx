@@ -62,10 +62,10 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ tabId, filePath }) => {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast.success('PDF downloaded successfully')
+      // toast.success('PDF downloaded successfully')
     } catch (error) {
       console.error('❌ PDFViewer: Error downloading PDF:', error)
-      toast.error('Failed to download PDF')
+      // toast.error('Failed to download PDF')
     }
   }, [filePath])
 

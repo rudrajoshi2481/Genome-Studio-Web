@@ -77,7 +77,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
 
       if (!response.ok) {
    
-    toast.error(`Failed to fetch file content: ${response.statusText}`)
+    // toast.error(`Failed to fetch file content: ${response.statusText}`)
         // throw new Error(`Failed to fetch file content: ${response.statusText}`)
       }
 

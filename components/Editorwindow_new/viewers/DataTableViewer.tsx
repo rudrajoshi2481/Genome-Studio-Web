@@ -125,10 +125,10 @@ const DataTableViewer: React.FC<DataTableViewerProps> = ({ tabId, filePath }) =>
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast.success('Data downloaded successfully')
+      // toast.success('Data downloaded successfully')
     } catch (error) {
       console.error('❌ DataTableViewer: Error downloading data:', error)
-      toast.error('Failed to download data')
+      // toast.error('Failed to download data')
     }
   }, [filePath])
 
