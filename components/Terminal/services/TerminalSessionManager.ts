@@ -31,6 +31,7 @@ interface TerminalSession {
   isAttached: boolean; // Track if terminal is currently attached to DOM
   dataHandler: ((data: string) => void) | null; // Track data handler for cleanup
   reconnectAttempts: number; // Track reconnection attempts
+  tmuxUnavailable: boolean; // Track if tmux is not available on the server
 }
 
 class TerminalSessionManager {
@@ -121,7 +122,8 @@ class TerminalSessionManager {
         buffer: '',
         isAttached: false,
         dataHandler: null,
-        reconnectAttempts: 0
+        reconnectAttempts: 0,
+        tmuxUnavailable: false
       };
 
       // Store terminal output for persistence
@@ -280,6 +282,17 @@ class TerminalSessionManager {
           session.websocket = null;
           session.isConnected = false;
           
+          // tmux not available on server - don't reconnect, just inform the user
+          if (event.code === 4001) {
+            session.tmuxUnavailable = true;
+            if (session.terminal && session.isAttached) {
+              session.terminal.writeln('\r\n\x1b[33mCannot connect to TMUX. TMUX is not installed on the server.\x1b[0m\r\n');
+              session.terminal.writeln('\x1b[33mInstall tmux for persistent sessions: sudo apt-get install tmux\x1b[0m\r\n');
+            }
+            resolve(false);
+            return;
+          }
+          
           // Attempt automatic reconnection for abnormal closures
           if (event.code !== 1000 && session.reconnectAttempts < 3) {
             session.reconnectAttempts++;
@@ -369,6 +382,14 @@ class TerminalSessionManager {
    */
   hasSession(tabId: string): boolean {
     return this.sessions.has(tabId);
+  }
+
+  /**
+   * Check if tmux is unavailable for a session
+   */
+  isTmuxUnavailable(tabId: string): boolean {
+    const session = this.sessions.get(tabId);
+    return session?.tmuxUnavailable || false;
   }
 }
 

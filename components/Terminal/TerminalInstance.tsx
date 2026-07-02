@@ -187,7 +187,9 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
       const session = await sessionManager.getSession(tabId);
       if (session) {
         setConnected(session.isConnected);
-        // Error handling is managed by the session manager internally
+        if (sessionManager.isTmuxUnavailable(tabId)) {
+          setError('TMUX is not available on the server. Install tmux for persistent terminal sessions: sudo apt-get install tmux');
+        }
       }
     };
 

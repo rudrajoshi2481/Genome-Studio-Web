@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { CommandDialogComponent } from "@/components/command_dialog/Command_Dialog"
+import { ServerConnectionMonitor } from "@/components/ServerConnectionMonitor"
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -31,6 +32,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
+          <ServerConnectionMonitor />
           <CommandDialogComponent />
           {children}
           <Toaster position="bottom-center" richColors />
