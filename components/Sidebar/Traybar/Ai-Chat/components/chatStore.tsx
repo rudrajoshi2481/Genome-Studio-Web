@@ -60,7 +60,7 @@ export type ReasoningStep =
 
 export interface Message {
   id: string
-  type: 'human' | 'ai' | 'tool' | 'tool_code' | 'system' | 'thinking' | 'stream' | 'reasoning' | 'plan' | 'task' | 'confirmation'
+  type: 'human' | 'ai' | 'tool' | 'tool_code' | 'system' | 'thinking' | 'stream' | 'reasoning' | 'plan' | 'task' | 'confirmation' | 'separator'
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp?: string
@@ -352,13 +352,9 @@ export const useChatStore = create<ChatState>()(
         }
         return msg;
       }),
-      openSessions: state.activeSessionId
-        ? state.openSessions.map(s =>
-            s.id === state.activeSessionId
-              ? { ...s, isLoading: false, currentStreamingMessageId: null, currentReasoningId: null }
-              : s
-          )
-        : state.openSessions,
+      openSessions: state.openSessions.map(s =>
+        ({ ...s, isLoading: false, currentStreamingMessageId: null, currentReasoningId: null })
+      ),
     });
   },
     
@@ -835,6 +831,35 @@ export const useChatStore = create<ChatState>()(
         allowedTools: state.allowedTools,
       }),
       onRehydrateStorage: () => (state) => {
+        if (state && state.openSessions.length > 0) {
+          // Clean up stale empty temp sessions (no messages, no conversation)
+          state.openSessions = state.openSessions.filter(s => {
+            if (s.id.startsWith('temp-') && (!s.messages || s.messages.length === 0)) {
+              return false;
+            }
+            return true;
+          });
+          // If active session was removed, pick the last remaining one
+          if (state.activeSessionId && !state.openSessions.find(s => s.id === state.activeSessionId)) {
+            state.activeSessionId = state.openSessions.length > 0
+              ? state.openSessions[state.openSessions.length - 1].id
+              : null;
+          }
+          // If no sessions remain, create a fresh "New Chat"
+          if (state.openSessions.length === 0) {
+            const tempId = `temp-${Date.now()}`;
+            state.openSessions = [{
+              id: tempId, title: 'New Chat', messages: [], pendingFiles: [], isTemporary: true,
+              tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+              contextWindow: 0, contextTokens: 0, isLoading: false,
+              queuedMessages: [], queuedTodos: [], mentions: [], uploadedFiles: [], promptSuggestions: [],
+              permissionMode: 'bypass' as 'default' | 'bypass' | 'always', allowedTools: [],
+              currentStreamingMessageId: null, currentReasoningId: null, showFilePanel: false,
+              currentConversationId: null, isNewChat: true,
+            }];
+            state.activeSessionId = tempId;
+          }
+        }
         if (state && state.activeSessionId && state.openSessions.length > 0) {
           const activeSession = state.openSessions.find(s => s.id === state.activeSessionId);
           if (activeSession) {

@@ -94,12 +94,21 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
   // Use the node store for state management
   const { 
     nodeName, setNodeName,
-    nodeLanguage, setNodeLanguage,
+    nodeLanguage, setNodeLanguage, setNodeLanguageAuto,
     description, setDescription,
     tags, setTags, addTag, removeTag,
     code, setCode,
     resetNode
   } = useNodeStore()
+
+  // Auto-detect language from code content
+  const handleCodeChange = (newCode: string) => {
+    setCode(newCode)
+    const stripped = newCode.replace(/^\s+/, '')
+    if (stripped.startsWith('#!/bin/bash') || stripped.startsWith('#!/bin/sh') || stripped.startsWith('#!/usr/bin/env bash') || stripped.startsWith('#!/usr/bin/env sh')) {
+      if (nodeLanguage !== 'Bash') setNodeLanguageAuto('Bash')
+    }
+  }
   
   // State for test results
   const [testLoading, setTestLoading] = useState(false)
@@ -205,9 +214,6 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       const data = await response.json()
       console.log('API Response:', data)
       
-      // Dismiss loading toast
-      toast.dismiss(loadingToast)
-      
       if (data.status === 'success') {
         // Validate and normalize the test result
         const normalizedResult: TestResult = {
@@ -239,8 +245,6 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       console.error('Error testing node:', error)
       const errorMessage = 'Failed to connect to the API. Make sure the server is running.'
       setTestError(errorMessage)
-      toast.dismiss(loadingToast)
-      // toast.error(errorMessage)
     } finally {
       setTestLoading(false)
     }
@@ -335,8 +339,6 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             throw new Error('Node ID is missing for update operation');
           }
           
-          // Show success toast
-          toast.dismiss(loadingToast);
           // toast.success('Custom node updated successfully!');
           
           setSaveSuccess(true);
@@ -355,7 +357,6 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           }
         } catch (error) {
           console.error('Error updating node:', error);
-          toast.dismiss(loadingToast);
           const errorMessage = error instanceof Error ? error.message : 'Failed to update custom node';
           // toast.error(errorMessage);
           setSaveError(errorMessage);
@@ -370,7 +371,6 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           // toast.error('Invalid node data structure. Please test the node again.')
           setSaveError('Invalid node data structure. Please test the node again.')
           setIsSaving(false)
-          toast.dismiss(loadingToast)
           return
         }
         
@@ -418,7 +418,6 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           // toast.error('Invalid node data: missing function name')
           setSaveError('Invalid node data: missing function name')
           setIsSaving(false)
-          toast.dismiss(loadingToast)
           return
         }
         
@@ -440,9 +439,6 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         // Get the response text first to ensure we can see it even if JSON parsing fails
         const responseText = await response.text()
         console.log('Raw API response:', responseText)
-        
-        // Dismiss the loading toast
-        toast.dismiss(loadingToast)
         
         if (response.ok) {
           try {
@@ -618,7 +614,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                       <div className="flex-1 overflow-hidden">
                         <SimpleCodeEditor 
                           value={code} 
-                          onChange={setCode} 
+                          onChange={handleCodeChange} 
                           extension={nodeLanguage.toLowerCase()} 
                         />
                       </div>

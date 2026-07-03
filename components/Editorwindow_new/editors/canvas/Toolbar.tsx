@@ -349,6 +349,15 @@ function Toolbar({
       }
     } catch (error) {
       console.error('Error polling execution status:', error);
+      // If execution not found (404), stop polling — executor was cleaned up
+      if ((error as any).status === 404) {
+        if (!hasFinishedRef.current) {
+          hasFinishedRef.current = true;
+          updateExecutingState(false);
+          setProgress(null);
+        }
+        return;
+      }
       // Don't stop executing on poll error - WebSocket might still be working
       // Retry after a longer delay
       setTimeout(() => pollExecutionStatus(execId), 3000);

@@ -176,7 +176,9 @@ class WorkflowManagerAPI {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to get execution status: ${response.statusText}`);
+      const error = new Error(`Failed to get execution status: ${response.statusText}`);
+      (error as any).status = response.status;
+      throw error;
     }
 
     const data = await response.json();

@@ -35,6 +35,8 @@ import {
   isValidFlowFormat
 } from './utils/file-parser';
 import { setCanvasState, getCanvasState } from './canvasStateStore';
+import { isTypeCompatible, getHandleTypeInfo } from './handleTypes';
+import { toast } from 'sonner';
 
 interface CanvasProps {
   tabId: string;
@@ -504,8 +506,43 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
     }
   }, [filePath, tabId, updateContent, setSaved, setDirty, updateTab]);
 
-  // Handle edge connections
+  // Handle edge connections with type validation
   const onConnect = useCallback((params: Connection) => {
+    // Validate type compatibility between source output and target input
+    if (params.source && params.target && params.sourceHandle && params.targetHandle) {
+      const sourceNode = nodes.find(n => n.id === params.source);
+      const targetNode = nodes.find(n => n.id === params.target);
+      
+      if (sourceNode && targetNode) {
+        // Extract output type from source node
+        let sourceType = 'any';
+        if (sourceNode.type === 'dataType') {
+          sourceType = (sourceNode.data as any)?.dataType || 'string';
+        } else {
+          const outputs = (sourceNode.data as any)?.outputs || [];
+          const sourceHandleId = params.sourceHandle?.replace('output-', '') || '';
+          const outputMatch = outputs.find((o: any) => (o.id || '') === sourceHandleId || `output-${o.id || outputs.indexOf(o)}` === params.sourceHandle);
+          if (outputMatch) sourceType = outputMatch.type || 'any';
+        }
+        
+        // Extract input type from target node
+        let targetType = 'any';
+        const inputs = (targetNode.data as any)?.inputs || [];
+        const targetHandleId = params.targetHandle?.replace('input-', '') || '';
+        const inputMatch = inputs.find((i: any) => (i.id || '') === targetHandleId || `input-${i.id || inputs.indexOf(i)}` === params.targetHandle);
+        if (inputMatch) targetType = inputMatch.type || 'any';
+        
+        if (!isTypeCompatible(sourceType, targetType)) {
+          const srcInfo = getHandleTypeInfo(sourceType);
+          const tgtInfo = getHandleTypeInfo(targetType);
+          toast.warning(`Type mismatch: ${srcInfo.label} → ${tgtInfo.label}`, {
+            description: `Output type "${srcInfo.label}" is not compatible with input type "${tgtInfo.label}". Connection created anyway — verify your code handles the conversion.`,
+            duration: 5000,
+          });
+        }
+      }
+    }
+    
     const newEdge = {
       ...params,
       id: `edge-${params.source}-${params.target}-${Date.now()}`,
@@ -522,7 +559,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       setDirty(tabId, true);
       updateTab(tabId, { isDirty: true });
     }
-  }, [setEdges, setDirty, tabId, updateTab, isInitialLoad]);
+  }, [nodes, setEdges, setDirty, tabId, updateTab, isInitialLoad]);
 
   // Save file content using proper flow format
   const saveFileContent = useCallback(async () => {

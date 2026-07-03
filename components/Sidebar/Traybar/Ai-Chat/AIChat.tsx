@@ -148,10 +148,11 @@ function AIChat({ onClose }: { onClose?: () => void }) {
       return;
     }
     // Open a new tab for this conversation — openSession resets all session-specific state
-    openSession(conv.id, conv.title || 'Chat');
+    const sessionId = conv.id;
+    openSession(sessionId, conv.title || 'Chat');
     setShowConvList(false);
     try {
-      const url = `${getApiBaseUrl()}/ai-chat/conversations/${conv.id}/messages`;
+      const url = `${getApiBaseUrl()}/ai-chat/conversations/${sessionId}/messages`;
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
@@ -209,9 +210,14 @@ function AIChat({ onClose }: { onClose?: () => void }) {
             });
           }
         }
-        useChatStore.setState({ messages: transformed });
-        // Also update the session's messages in openSessions
-        useChatStore.getState().cacheCurrentSession();
+        // Use updateMessagesInSession to set messages on the correct session,
+        // even if the user switched to another tab during the fetch
+        const store = useChatStore.getState();
+        store.updateMessagesInSession(sessionId, () => transformed);
+        // Only update top-level messages if this session is still active
+        if (store.activeSessionId === sessionId) {
+          useChatStore.setState({ messages: transformed });
+        }
       }
     } catch (error) {
       console.error('Failed to load conversation messages:', error);
@@ -274,9 +280,9 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   };
 
   const renderMessage = (message: any, index: number) => {
-    const groupedTypes = ['tool', 'tool_code', 'reasoning', 'plan', 'task', 'confirmation'];
+    const groupedTypes = ['tool', 'tool_code', 'reasoning', 'plan', 'task', 'confirmation', 'thinking'];
     const isGrouped = index > 0 && groupedTypes.includes(message.type);
-    const wrapperClass = isGrouped ? '-mt-4' : '';
+    const wrapperClass = isGrouped ? '-mt-1' : '';
     const isLast = index === messages.length - 1;
 
     const content = (() => {
@@ -309,15 +315,27 @@ function AIChat({ onClose }: { onClose?: () => void }) {
       case 'thinking':
         return (
           <div key={message.id} className="py-1">
-            <PonderingIndicator verb={message.content || undefined} mode="thinking" />
+            <PonderingIndicator
+              verb={message.content || undefined}
+              mode="thinking"
+              startTime={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
+            />
           </div>
         );
       case 'stream':
         return <AIMessage key={message.id} message={message} isLast={isLast} isLoading={isLoadingConvs} onRegenerate={handleRegenerate} onDelete={handleDeleteMessage} />;
       case 'system':
         return (
-          <div key={message.id} className="text-xs text-muted-foreground text-center py-2 whitespace-pre-wrap">
+          <div key={message.id} className="text-sm text-muted-foreground text-center py-2 whitespace-pre-wrap font-source-sans">
             {message.content}
+          </div>
+        );
+      case 'separator':
+        return (
+          <div key={message.id} className="flex items-center gap-2 py-2 px-1 select-none">
+            <div className="flex-1 h-px bg-border/50" />
+            <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+            <div className="flex-1 h-px bg-border/50" />
           </div>
         );
       default:
@@ -341,7 +359,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
       }} showHistory={showConvList} onClose={onClose} />
 
       <Conversation className="flex-1">
-        <ConversationContent className="gap-2 p-3" ref={scrollRef}>
+        <ConversationContent className="gap-0.5 px-1 py-2" ref={scrollRef}>
           {messages.length === 0 ? (
             <ChatGreeting />
           ) : (
@@ -387,6 +405,13 @@ function AIChat({ onClose }: { onClose?: () => void }) {
               useChatStore.setState((state) => ({
                 conversations: state.conversations.filter((c) => c.id !== id),
               }));
+              // Close the session tab if it's open
+              const state = useChatStore.getState();
+              const session = state.openSessions.find(s => s.id === id);
+              if (session) {
+                state.closeSession(id);
+              }
+              // If the deleted conversation was active, start a new chat
               if (currentConversationId === id) {
                 handleNewConversation();
               }

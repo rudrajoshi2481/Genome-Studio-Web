@@ -105,10 +105,66 @@ export function cleanJsonContent(content: string): string {
   if (!content) return '{}';
   
   try {
-    // Remove comments (both // and /* */)
-    let cleanedContent = content
-      .replace(/\/\/.*$/gm, '') // Remove single-line comments
-      .replace(/\/\*[\s\S]*?\*\//g, ''); // Remove multi-line comments
+    // Remove comments (both // and /* */) but ONLY outside of string values
+    // A naive regex approach corrupts strings containing // (e.g. URLs like "https://...")
+    let cleanedContent = '';
+    let inString = false;
+    let escaped = false;
+    let i = 0;
+    
+    while (i < content.length) {
+      const char = content[i];
+      
+      if (inString) {
+        if (escaped) {
+          cleanedContent += char;
+          escaped = false;
+          i++;
+          continue;
+        }
+        if (char === '\\') {
+          cleanedContent += char;
+          escaped = true;
+          i++;
+          continue;
+        }
+        if (char === '"') {
+          inString = false;
+          cleanedContent += char;
+          i++;
+          continue;
+        }
+        cleanedContent += char;
+        i++;
+        continue;
+      }
+      
+      if (char === '"') {
+        inString = true;
+        cleanedContent += char;
+        i++;
+        continue;
+      }
+      
+      if (char === '/' && content[i + 1] === '/') {
+        while (i < content.length && content[i] !== '\n') {
+          i++;
+        }
+        continue;
+      }
+      
+      if (char === '/' && content[i + 1] === '*') {
+        i += 2;
+        while (i < content.length && !(content[i] === '*' && content[i + 1] === '/')) {
+          i++;
+        }
+        i += 2;
+        continue;
+      }
+      
+      cleanedContent += char;
+      i++;
+    }
     
     // Remove trailing commas
     cleanedContent = cleanedContent

@@ -54,10 +54,10 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
   }
 
   return (
-    <div className="px-3 py-0.5">
+    <div className="px-1 py-0.5">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors w-full py-0.5"
       >
         {isOpen ? (
           <ChevronDown className="size-3 shrink-0" />
@@ -66,16 +66,16 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
         )}
         <Brain className="size-3 shrink-0 text-muted-foreground" />
         {isStreaming ? (
-          <span className="font-medium animate-pulse text-muted-foreground">Reasoning</span>
+          <span className="font-medium animate-pulse text-muted-foreground text-sm">Reasoning</span>
         ) : (
-          <span className="font-medium text-muted-foreground">Reasoning</span>
+          <span className="font-medium text-muted-foreground text-sm">Reasoning</span>
         )}
         {elapsed > 0 && (
           <span className="text-muted-foreground/50 tabular-nums">{elapsed}s</span>
         )}
       </button>
       {isOpen && (
-        <div className="mt-1 ml-4 pl-2 border-l border-border/50 space-y-1">
+        <div className="mt-1.5 ml-4 pl-2.5 border-l border-border/40 space-y-1.5">
           {orderedSteps.length > 0 ? (
             orderedSteps.map((step, idx) => {
               if (step.kind === "text") {
@@ -84,10 +84,10 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
                   <div
                     key={`${step.id}-${lineIdx}`}
                     className={cn(
-                      "text-xs text-muted-foreground leading-relaxed flex items-start gap-1.5",
+                      "text-sm text-muted-foreground/80 leading-relaxed font-source-sans",
                     )}
                   >
-<span>{line}</span>
+                    <span>{line}</span>
                   </div>
                 ));
               }
@@ -97,9 +97,9 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
             textSteps.map((step, idx) => (
               <div
                 key={`reasoning-${idx}`}
-                className="text-xs text-muted-foreground leading-relaxed flex items-start gap-1.5"
+                className="text-sm text-muted-foreground/80 leading-relaxed font-source-sans"
               >
-<span>{step}</span>
+                <span>{step}</span>
               </div>
             ))
           )}

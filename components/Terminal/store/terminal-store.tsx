@@ -37,11 +37,19 @@ export const useTerminalStore = create<TerminalState>()(
       
       createTab: (name = 'Terminal', type: TerminalType = 'tmux') => {
         const newTabId = uuidv4();
+        // Get workspace path from localStorage (set by file explorer)
+        let defaultCwd = '/home';
+        if (typeof window !== 'undefined') {
+          const storedPath = localStorage.getItem('fileExplorer_rootPath');
+          if (storedPath) {
+            defaultCwd = storedPath;
+          }
+        }
         const newTab: TerminalTab = {
           id: newTabId,
           name: name,
           active: true,
-          cwd: '/home',
+          cwd: defaultCwd,
           createdAt: new Date().toISOString(),
           type: type,
         };
@@ -115,6 +123,19 @@ export const useTerminalStore = create<TerminalState>()(
     {
       name: 'terminal-storage',
       storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => (state) => {
+        // When tabs are restored from localStorage, update their cwd
+        // to the current workspace path from the file explorer
+        if (state?.tabs && typeof window !== 'undefined') {
+          const currentRootPath = localStorage.getItem('fileExplorer_rootPath');
+          if (currentRootPath) {
+            state.tabs = state.tabs.map(tab => ({
+              ...tab,
+              cwd: currentRootPath,
+            }));
+          }
+        }
+      },
     }
   )
 );

@@ -114,7 +114,13 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
 
         // Connect WebSocket if we have a token and not already connected
         if (token && !session.isConnected) {
-          const connected = await sessionManager.connectWebSocket(tabId, token, host, port, terminalType);
+          // Use the tab's cwd (set at creation time from the file explorer's root path)
+          // Fall back to localStorage if tab cwd is not available (e.g. persisted tab)
+          let workspaceCwd: string | undefined = currentTab?.cwd;
+          if (!workspaceCwd && typeof window !== 'undefined') {
+            workspaceCwd = localStorage.getItem('fileExplorer_rootPath') || undefined;
+          }
+          const connected = await sessionManager.connectWebSocket(tabId, token, host, port, terminalType, false, workspaceCwd);
           if (isMounted) {
             setConnected(connected);
             if (!connected) {

@@ -15,7 +15,9 @@ import EditorFactory from './components/EditorFactory'
 const EditorWindowContent = memo(() => {
   // Get active tab using selector to prevent infinite loops
   const activeTabId = useTabStore(state => state.activeTabId)
-  const allTabs = useTabStore(state => state.getAllTabs())
+  const tabOrder = useTabStore(state => state.tabOrder)
+  const tabs = useTabStore(state => state.tabs)
+  const allTabs = tabOrder.map(id => tabs.get(id)).filter(Boolean) as TabFile[]
   const [isMounted, setIsMounted] = React.useState(false)
   
   console.log('🔍 [EDITOR WINDOW] Content render:', { activeTabId, tabCount: allTabs.length, tabs: allTabs.map(t => ({ id: t.id, path: t.path, name: t.name })), isMounted })

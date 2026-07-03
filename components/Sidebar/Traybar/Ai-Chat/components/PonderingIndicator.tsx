@@ -231,7 +231,7 @@ function GlimmerText({
     : "rgb(100 116 139)";
   const shimmerColor = isStalled
     ? "rgb(251 146 60)"
-    : "rgb(148 163 184)";
+    : "rgb(99 102 241)";
 
   const chars = text.split("").map((char, i) => {
     const distance = Math.abs(i - glimmerPos);
@@ -254,7 +254,7 @@ function GlimmerText({
     );
   });
 
-  return <span className={className}>{chars}</span>;
+  return <span className={cn("font-source-sans", className)}>{chars}</span>;
 }
 
 interface PonderingIndicatorProps {
@@ -333,7 +333,7 @@ export function PonderingIndicator({
 
   if (compact) {
     return (
-      <div className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", className)}>
+      <div className={cn("flex items-center gap-1.5 text-sm text-muted-foreground font-source-sans", className)}>
         <span className={cn("font-mono text-sm", spinnerColorClass)}>
           {FRAMES[frameIdx]}
         </span>
@@ -344,7 +344,7 @@ export function PonderingIndicator({
   }
 
   return (
-    <div className={cn("flex flex-col gap-0.5 py-1.5 px-3", className)}>
+    <div className={cn("flex flex-col gap-0.5 py-1.5 px-1", className)}>
       <div className="flex items-center gap-2">
         <span className={cn("font-mono text-base", spinnerColorClass)}>
           {FRAMES[frameIdx]}
@@ -359,13 +359,13 @@ export function PonderingIndicator({
         {showTimer && elapsed > 0 && (
           <>
             <span className="text-muted-foreground/30">·</span>
-            <span className="text-xs text-muted-foreground/60 tabular-nums">{timerText}</span>
+            <span className="text-xs text-muted-foreground/60 tabular-nums font-source-sans">{timerText}</span>
           </>
         )}
         {showTokens && smoothTokenCount > 0 && (
           <>
             <span className="text-muted-foreground/30">·</span>
-            <span className="flex items-center gap-0.5 text-xs text-muted-foreground/60 tabular-nums">
+            <span className="flex items-center gap-0.5 text-xs text-muted-foreground/60 tabular-nums font-source-sans">
               <SpinnerGlyph mode={mode} stalledIntensity={stalledIntensity} />
               {smoothTokenCount.toLocaleString()} tokens
             </span>
@@ -373,7 +373,7 @@ export function PonderingIndicator({
         )}
       </div>
       {showTip && (
-        <div className="text-xs text-muted-foreground/40 pl-7 pt-0.5">
+        <div className="text-xs text-muted-foreground/40 pl-7 pt-0.5 font-source-sans">
           Tip: {TIPS[tipIdx]}
         </div>
       )}
@@ -391,7 +391,7 @@ export function ThinkingBadge({ durationSeconds, className }: ThinkingBadgeProps
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 text-xs italic text-muted-foreground/70",
+          "inline-flex items-center gap-1 text-sm italic text-muted-foreground/70 font-source-sans",
           className
         )}
       >
@@ -404,7 +404,7 @@ export function ThinkingBadge({ durationSeconds, className }: ThinkingBadgeProps
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 text-xs italic text-muted-foreground/50",
+        "inline-flex items-center gap-1 text-sm italic text-muted-foreground/50 font-source-sans",
         className
       )}
     >

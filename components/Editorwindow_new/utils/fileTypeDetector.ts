@@ -8,6 +8,7 @@ export enum FileType {
   IMAGE = 'image',
   DATA = 'data',
   PDF = 'pdf',
+  HTML = 'html',
   UNSUPPORTED = 'unsupported'
 }
 
@@ -44,6 +45,11 @@ export const getFileType = (filePath: string, extension?: string): FileType => {
     return FileType.PDF;
   }
   
+  // HTML files (rendered preview)
+  if (['html', 'htm', 'xhtml'].includes(ext)) {
+    return FileType.HTML;
+  }
+  
   // Code files (default for most text-based files)
   const codeExtensions = [
     // Programming languages
@@ -52,7 +58,7 @@ export const getFileType = (filePath: string, extension?: string): FileType => {
     'hs', 'ml', 'fs', 'elm', 'dart', 'lua', 'perl', 'r', 'matlab',
     
     // Web technologies
-    'html', 'htm', 'css', 'scss', 'sass', 'less', 'vue', 'svelte',
+    'css', 'scss', 'sass', 'less', 'vue', 'svelte',
     
     // Configuration and markup
     'json', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf',
@@ -84,7 +90,7 @@ export const getFileType = (filePath: string, extension?: string): FileType => {
  * Check if file type supports editing (vs view-only)
  */
 export const isEditableFileType = (fileType: FileType): boolean => {
-  return [FileType.CODE, FileType.WORKFLOW].includes(fileType);
+  return [FileType.CODE, FileType.WORKFLOW, FileType.HTML].includes(fileType);
 };
 
 /**
@@ -102,6 +108,8 @@ export const getFileTypeDescription = (fileType: FileType): string => {
       return 'Data File';
     case FileType.PDF:
       return 'PDF Document';
+    case FileType.HTML:
+      return 'HTML Document';
     case FileType.UNSUPPORTED:
       return 'Unsupported File';
     default:
@@ -124,6 +132,8 @@ export const getSuggestedExtensions = (fileType: FileType): string[] => {
       return ['csv', 'tsv'];
     case FileType.PDF:
       return ['pdf'];
+    case FileType.HTML:
+      return ['html', 'htm'];
     default:
       return [];
   }

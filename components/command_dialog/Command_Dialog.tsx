@@ -241,7 +241,7 @@ export const CommandDialogComponent = () => {
     } catch (error) {
       // toast.error(`Failed to create ${showCreateDialog.type}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setShowCreateDialog(null);
+      setTimeout(() => setShowCreateDialog(null), 300);
     }
   }, [showCreateDialog, createFile, createDirectory]);
 
@@ -255,7 +255,7 @@ export const CommandDialogComponent = () => {
     } catch (error) {
       // toast.error(`Failed to upload files: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setShowUploadDialog(null);
+      setTimeout(() => setShowUploadDialog(null), 300);
     }
   }, [showUploadDialog, uploadFiles]);
 
@@ -545,7 +545,7 @@ export const CommandDialogComponent = () => {
         type={showCreateDialog.type}
         parentPath={showCreateDialog.parentPath}
         onConfirm={handleCreateConfirm}
-        onCancel={() => setShowCreateDialog(null)}
+        onCancel={() => setTimeout(() => setShowCreateDialog(null), 300)}
       />
     )}
 
@@ -554,7 +554,7 @@ export const CommandDialogComponent = () => {
         open={true}
         targetPath={showUploadDialog.targetPath}
         onUpload={handleUploadConfirm}
-        onCancel={() => setShowUploadDialog(null)}
+        onCancel={() => setTimeout(() => setShowUploadDialog(null), 300)}
       />
     )}
     </>

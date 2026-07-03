@@ -20,7 +20,7 @@ function TaskMessage({ message }: TaskMessageProps) {
   if (!task) return null;
 
   return (
-    <div className="px-3 py-1">
+    <div className="px-1 py-1">
       <Task>
         <TaskTrigger title={task.title} />
         <TaskContent className="mt-2">

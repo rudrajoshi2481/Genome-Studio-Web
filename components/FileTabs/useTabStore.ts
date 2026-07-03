@@ -153,7 +153,7 @@ export const useTabStore = create<TabState>()(
         newTabs.set(tabId, newTab);
         
         const newTabOrder = [...state.tabOrder, tabId];
-        const newActiveTabId = state.tabs.size === 0 || !state.activeTabId ? tabId : state.activeTabId;
+        const newActiveTabId = tabId;
         
         set({ 
           tabs: newTabs,

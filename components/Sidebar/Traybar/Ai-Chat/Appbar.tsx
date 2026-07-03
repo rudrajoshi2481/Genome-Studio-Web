@@ -82,24 +82,33 @@ function Appbar({ onNewChat, onToggleHistory, showHistory, onClose }: { onNewCha
                     <div
                       className={cn(
                         'flex items-center gap-1.5 h-9 px-3 text-xs cursor-pointer group relative overflow-hidden flex-shrink-0',
-                        'transition-colors duration-150 border-r border-border',
+                        'transition-all duration-150 border-r border-border border-b-2',
                         isActive
-                          ? 'bg-background text-foreground font-medium border-b-2 border-b-green-500'
-                          : 'text-muted-foreground hover:bg-background/50 hover:text-foreground',
-                        isStreaming && !isActive && 'border-b-2 border-b-green-500',
+                          ? 'bg-background text-foreground font-medium border-b-green-500'
+                          : 'text-muted-foreground hover:bg-background/50 hover:text-foreground border-b-transparent',
+                        isStreaming && !isActive && 'border-b-green-500',
                       )}
                       onClick={() => switchSession(session.id)}
+                      onAuxClick={(e) => {
+                        if (e.button === 1) {
+                          e.preventDefault();
+                          closeSession(session.id);
+                        }
+                      }}
                       title={session.title}
                     >
                       {isStreaming && (
                         <div className="absolute inset-0 pointer-events-none running-stripes" />
                       )}
-                      <MessageSquare size={12} className="flex-shrink-0 opacity-60 relative z-10" />
+                      <MessageSquare size={12} className={cn('flex-shrink-0 relative z-10 transition-colors', isActive ? 'text-green-500' : 'opacity-60')} />
                       <span className="whitespace-nowrap max-w-[140px] truncate relative z-10">
                         {session.title}
                       </span>
                       <button
-                        className="ml-1 opacity-0 group-hover:opacity-100 rounded p-0.5 hover:bg-muted transition-all duration-150 relative z-10"
+                        className={cn(
+                          'ml-1 rounded p-0.5 hover:bg-muted transition-all duration-150 relative z-10',
+                          isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        )}
                         onClick={(e) => {
                           e.stopPropagation();
                           closeSession(session.id);

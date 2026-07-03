@@ -32,6 +32,7 @@ interface TerminalSession {
   dataHandler: ((data: string) => void) | null; // Track data handler for cleanup
   reconnectAttempts: number; // Track reconnection attempts
   tmuxUnavailable: boolean; // Track if tmux is not available on the server
+  cwd?: string; // Working directory for the terminal session
 }
 
 class TerminalSessionManager {
@@ -90,15 +91,36 @@ class TerminalSessionManager {
       const terminal = new Terminal({
         cursorBlink: true,
         fontSize: 14,
-        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", "Source Code Pro", Menlo, Monaco, "Courier New", monospace',
+        fontWeight: '400',
+        fontWeightBold: '500',
+        letterSpacing: 0.5,
         theme: {
           background: '#ffffff',
-          foreground: '#333333',
-          cursor: '#000000',
+          foreground: '#343b58',
+          cursor: '#343b58',
+          cursorAccent: '#ffffff',
           // Selection colors for better visibility
-          selectionBackground: 'rgba(59, 130, 246, 0.5)',
+          selectionBackground: 'rgba(122, 162, 247, 0.25)',
           selectionForeground: '#000000',
-          selectionInactiveBackground: 'rgba(59, 130, 246, 0.3)'
+          selectionInactiveBackground: 'rgba(122, 162, 247, 0.15)',
+          // Tokyo Night-inspired ANSI palette (adapted for white bg)
+          black: '#0f0f14',
+          red: '#f7768e',
+          green: '#9ece6a',
+          yellow: '#e0af68',
+          blue: '#7aa2f7',
+          magenta: '#9d7cd8',
+          cyan: '#7dcfff',
+          white: '#a9b1d6',
+          brightBlack: '#565f89',
+          brightRed: '#ff7a93',
+          brightGreen: '#b9f27c',
+          brightYellow: '#ffc777',
+          brightBlue: '#7da6ff',
+          brightMagenta: '#bb9af7',
+          brightCyan: '#89ddff',
+          brightWhite: '#c0caf5',
         },
         // Don't set fixed rows/cols - let fitAddon calculate based on container
         allowTransparency: true,
@@ -123,7 +145,8 @@ class TerminalSessionManager {
         isAttached: false,
         dataHandler: null,
         reconnectAttempts: 0,
-        tmuxUnavailable: false
+        tmuxUnavailable: false,
+        cwd: undefined
       };
 
       // Store terminal output for persistence
@@ -223,9 +246,14 @@ class TerminalSessionManager {
   /**
    * Connect WebSocket for a session
    */
-  async connectWebSocket(tabId: string, token: string, host: string, port: string, terminalType: string = 'tmux', isReconnect = false): Promise<boolean> {
+  async connectWebSocket(tabId: string, token: string, host: string, port: string, terminalType: string = 'tmux', isReconnect = false, cwd?: string): Promise<boolean> {
     const session = this.sessions.get(tabId);
     if (!session) return false;
+
+    // Store cwd in session for reconnections
+    if (cwd) {
+      session.cwd = cwd;
+    }
 
     // Close existing connection and clean up handlers
     if (session.websocket) {
@@ -255,7 +283,8 @@ class TerminalSessionManager {
       const cols = Math.max(rawCols, 40);
       // Use the browser's current hostname for WebSocket, falling back to config host
       const wsHost = typeof window !== 'undefined' ? window.location.hostname : host;
-      const wsUrl = `ws://${wsHost}:${port}/api/v1/terminal/ws?token=${encodeURIComponent(token)}&rows=${rows}&cols=${cols}&tab_id=${encodeURIComponent(tabId)}&terminal_type=${encodeURIComponent(terminalType)}`;
+      const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : '';
+      const wsUrl = `ws://${wsHost}:${port}/api/v1/terminal/ws?token=${encodeURIComponent(token)}&rows=${rows}&cols=${cols}&tab_id=${encodeURIComponent(tabId)}&terminal_type=${encodeURIComponent(terminalType)}${cwdParam}`;
       
       const ws = new WebSocket(wsUrl);
       
@@ -303,7 +332,7 @@ class TerminalSessionManager {
             }
             
             setTimeout(() => {
-              this.connectWebSocket(tabId, token, host, port, terminalType, true).catch(() => {});
+              this.connectWebSocket(tabId, token, host, port, terminalType, true, session.cwd).catch(() => {});
             }, delay);
           } else if (event.code !== 1000 && session.terminal && session.isAttached) {
             session.terminal.writeln('\r\n\x1b[31mConnection lost. Click refresh or restart the terminal to reconnect.\x1b[0m\r\n');

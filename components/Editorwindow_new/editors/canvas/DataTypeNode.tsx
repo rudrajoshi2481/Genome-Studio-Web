@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Pencil, Focus, Trash2, Copy, Save, Code, Type, Hash, Braces, ToggleLeft, List as ListIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -398,6 +399,25 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
     // toast.info(`Data type: ${nodeData.dataType}, Value: ${JSON.stringify(value)}`);
   };
 
+  // Get a short preview string of the value for collapsed display
+  const getValuePreview = (): string => {
+    if (value === undefined || value === null) return '—';
+    switch (nodeData.dataType) {
+      case 'string':
+        return value === '' ? '—' : value.length > 30 ? `"${value.slice(0, 30)}…"` : `"${value}"`;
+      case 'int':
+      case 'float':
+        return String(value);
+      case 'bool':
+        return value ? 'true' : 'false';
+      case 'list':
+      case 'dict':
+        return value.length > 40 ? `${value.slice(0, 40)}…` : value || '—';
+      default:
+        return String(value);
+    }
+  };
+
   // Render input based on data type
   const renderInput = () => {
     switch (nodeData.dataType) {
@@ -447,15 +467,15 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
       
       case 'bool':
         return (
-          <div className="flex items-center gap-2.5 py-1">
-            <Checkbox
+          <div className="flex items-center justify-between py-1">
+            <Label htmlFor={`bool-${id}`} className="text-sm cursor-pointer text-foreground">
+              {value ? 'True' : 'False'}
+            </Label>
+            <Switch
               id={`bool-${id}`}
               checked={value}
               onCheckedChange={(checked) => handleValueChange(checked)}
             />
-            <Label htmlFor={`bool-${id}`} className="text-sm cursor-pointer text-foreground">
-              {value ? 'True' : 'False'}
-            </Label>
           </div>
         );
       
@@ -595,6 +615,32 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         {labelError && (
           <div className="px-3 py-1.5 bg-destructive/5 border-b border-destructive/20">
             <p className="text-xs text-destructive">{labelError}</p>
+          </div>
+        )}
+
+        {/* Value preview when collapsed */}
+        {isCollapsed && (
+          <div className="px-3 py-1.5 border-t border-border/50 bg-muted/20">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs text-muted-foreground shrink-0">Value:</span>
+              {nodeData.dataType === 'bool' ? (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "shrink-0 text-xs",
+                    value
+                      ? 'bg-green-500/10 text-green-700 border-green-500/20'
+                      : 'bg-red-500/10 text-red-700 border-red-500/20'
+                  )}
+                >
+                  {value ? 'true' : 'false'}
+                </Badge>
+              ) : (
+                <span className="text-xs font-mono text-foreground truncate">
+                  {getValuePreview()}
+                </span>
+              )}
+            </div>
           </div>
         )}
 

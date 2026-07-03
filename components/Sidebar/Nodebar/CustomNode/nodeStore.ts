@@ -14,6 +14,7 @@ interface NodeState {
   // Actions
   setNodeName: (name: string) => void
   setNodeLanguage: (language: 'Python' | 'R' | 'Bash') => void
+  setNodeLanguageAuto: (language: 'Python' | 'R' | 'Bash') => void
   setDescription: (description: string) => void
   setTags: (tags: string[]) => void
   addTag: (tag: string) => void
@@ -44,8 +45,8 @@ INPUT_FILE="./files.fq"
 echo "Running alignment with $THREADS threads"
 alignmer $INPUT_FILE -p $THREADS
 
-# Fixed output variable (always 'done')
-done="completed"
+# Output variable — passes the result to downstream nodes
+echo "__BASH_OUTPUT__ result=alignment_complete"
 `
 }
 
@@ -65,6 +66,9 @@ export const useNodeStore = create<NodeState>()(
       setNodeLanguage: (language) => set({ 
         nodeLanguage: language,
         code: CODE_TEMPLATES[language] // Update code template when language changes
+      }),
+      setNodeLanguageAuto: (language) => set({ 
+        nodeLanguage: language // Only update language, don't change code
       }),
       setDescription: (description) => set({ description }),
       setTags: (tags) => set({ tags }),

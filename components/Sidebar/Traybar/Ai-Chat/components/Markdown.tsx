@@ -51,7 +51,7 @@ const components: Partial<Components> = {
   },
   code: ({ children }) => {
     return (
-      <code className="text-[11px] text-primary px-1.5 py-0.5 mx-0.5 font-mono">
+      <code className="text-[13px] text-primary px-1.5 py-0.5 mx-0.5 font-mono">
         {children}
       </code>
     );
@@ -67,42 +67,42 @@ const components: Partial<Components> = {
   },
   p: ({ children }) => {
     return (
-      <p className="leading-normal my-1 break-words text-xs">
+      <p className="leading-normal my-0 break-words text-sm font-source-sans">
         {children}
       </p>
     );
   },
   pre: ({ children }) => {
     return (
-      <div className="my-2">
+      <div className="my-1">
         <CodeBlock>{children}</CodeBlock>
       </div>
     );
   },
   ol: ({ children, ...props }) => {
     return (
-      <ol className="pl-5 list-decimal list-outside text-xs space-y-0.5" {...(props as any)}>
+      <ol className="pl-5 list-decimal list-outside text-sm space-y-0.5" {...(props as any)}>
         {children}
       </ol>
     );
   },
   li: ({ children, ...props }) => {
     return (
-      <li className="py-0.5 break-words text-xs leading-normal" {...(props as any)}>
+      <li className="py-0.5 break-words text-sm leading-normal font-source-sans" {...(props as any)}>
         {children}
       </li>
     );
   },
   ul: ({ children, ...props }) => {
     return (
-      <ul className="pl-5 list-outside list-disc text-xs space-y-0.5" {...(props as any)}>
+      <ul className="pl-5 list-outside list-disc text-sm space-y-0.5" {...(props as any)}>
         {children}
       </ul>
     );
   },
   strong: ({ children, ...props }) => {
     return (
-      <span className="font-semibold" {...(props as any)}>
+      <span className="font-semibold font-source-sans" {...(props as any)}>
         {children}
       </span>
     );
@@ -110,54 +110,54 @@ const components: Partial<Components> = {
   a: ({ children, ...props }) => {
     return (
       <a
-        className="text-primary hover:underline inline-flex gap-1 items-center text-xs font-medium"
+        className="text-blue-600 dark:text-blue-400 hover:underline inline-flex gap-1 items-center text-sm font-medium font-source-sans"
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         {...(props as any)}
       >
-        <LinkIcon className="size-3 shrink-0" />
+        <LinkIcon className="size-3.5 shrink-0" />
         {children}
       </a>
     );
   },
   h1: ({ children, ...props }) => {
     return (
-      <h1 className="text-sm font-semibold mt-3 mb-1 border-b border-border/50 pb-1" {...(props as any)}>
+      <h1 className="text-base font-semibold mt-3 mb-1 border-b border-border/50 pb-1 font-serif" {...(props as any)}>
         {children}
       </h1>
     );
   },
   h2: ({ children, ...props }) => {
     return (
-      <h2 className="text-sm font-semibold mt-2.5 mb-1" {...(props as any)}>
+      <h2 className="text-base font-semibold mt-2.5 mb-1 font-serif" {...(props as any)}>
         {children}
       </h2>
     );
   },
   h3: ({ children, ...props }) => {
     return (
-      <h3 className="text-xs font-semibold mt-2 mb-0.5" {...(props as any)}>
+      <h3 className="text-sm font-semibold mt-2 mb-0.5 font-serif" {...(props as any)}>
         {children}
       </h3>
     );
   },
   h4: ({ children, ...props }) => {
     return (
-      <h4 className="text-xs font-semibold mt-2 mb-0.5" {...(props as any)}>
+      <h4 className="text-sm font-semibold mt-2 mb-0.5 font-serif" {...(props as any)}>
         {children}
       </h4>
     );
   },
   h5: ({ children, ...props }) => {
     return (
-      <h5 className="text-xs font-semibold mt-1.5 mb-0.5" {...(props as any)}>
+      <h5 className="text-xs font-semibold mt-1.5 mb-0.5 font-serif" {...(props as any)}>
         {children}
       </h5>
     );
   },
   h6: ({ children, ...props }) => {
     return (
-      <h6 className="text-xs font-semibold mt-1.5 mb-0.5" {...(props as any)}>
+      <h6 className="text-xs font-semibold mt-1.5 mb-0.5 font-serif" {...(props as any)}>
         {children}
       </h6>
     );
@@ -171,7 +171,29 @@ const components: Partial<Components> = {
   hr: () => <hr className="my-2 border-border/60" />,
 };
 
+function autoLinkify(text: string): string {
+  let result = text;
+  // Linkify PubMed IDs: "PubMed ID: 42390754" or "(PubMed ID: 42390754)"
+  result = result.replace(
+    /\(?\s*PubMed ID:?\s*(\d+)\s*\)?/gi,
+    (_m, id: string) => `[PubMed ID: ${id}](https://pubmed.ncbi.nlm.nih.gov/${id}/)`,
+  );
+  // Linkify PMIDs: "PMID: 42390754" or "PMID 42390754"
+  result = result.replace(
+    /\bPMID:?\s*(\d+)\b/gi,
+    (_m, id: string) => `[PMID: ${id}](https://pubmed.ncbi.nlm.nih.gov/${id}/)`,
+  );
+  // Linkify bare URLs that aren't already inside markdown link syntax
+  // Negative lookbehind for ]( to avoid double-linking existing markdown links
+  result = result.replace(
+    /(?<!\]\()https?:\/\/(?!pubmed\.ncbi\.nlm\.nih\.gov\/\d)[^\s<)\]]+/g,
+    (url) => `[${url}](${url})`,
+  );
+  return result;
+}
+
 const NonMemoizedMarkdown = ({ children }: { children: string }) => {
+  const processed = autoLinkify(children);
   return (
     <article className="w-full max-w-full relative">
       <ReactMarkdown
@@ -179,7 +201,7 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
         remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
         rehypePlugins={[rehypeKatex]}
       >
-        {children}
+        {processed}
       </ReactMarkdown>
     </article>
   );

@@ -9,6 +9,7 @@ const Canvas = lazy(() => import('../editors/Canvas'))
 const ImageViewer = lazy(() => import('../viewers/ImageViewer'))
 const DataTableViewer = lazy(() => import('../viewers/DataTableViewer'))
 const PDFViewer = lazy(() => import('../viewers/PDFViewer'))
+const HtmlViewer = lazy(() => import('../viewers/HtmlViewer'))
 const UnsupportedFileViewer = lazy(() => import('../viewers/UnsupportedFileViewer'))
 
 interface EditorFactoryProps {
@@ -141,6 +142,9 @@ const EditorFactory: React.FC<EditorFactoryProps> = ({ tabId, filePath, extensio
       
       case FileType.PDF:
         return <PDFViewer tabId={tabId} filePath={filePath} />
+      
+      case FileType.HTML:
+        return <HtmlViewer tabId={tabId} filePath={filePath} extension={extension} isActive={isActive} />
       
       case FileType.CODE:
       case FileType.UNSUPPORTED:

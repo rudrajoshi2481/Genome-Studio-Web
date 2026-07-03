@@ -223,10 +223,6 @@ export const useChatWebSocket = () => {
           // Final completion - finalize streaming ai message and reasoning blocks
           if (isActiveSession) {
             const completeState = useChatStore.getState();
-            const hasRunningTools = completeState.messages.some(
-              m => m.type === 'tool' && m.isRunning
-            );
-            if (!hasRunningTools) {
               useChatStore.setState({
                 messages: completeState.messages
                   .filter(m => m.type !== 'thinking')
@@ -240,10 +236,19 @@ export const useChatWebSocket = () => {
                   return m;
                 })
               });
+              // Add a separator to visually mark the end of the AI response
+              const sepState = useChatStore.getState();
+              const lastMsg = sepState.messages[sepState.messages.length - 1];
+              if (lastMsg && lastMsg.type !== 'separator' && lastMsg.type !== 'human') {
+                sepState.addMessage({
+                  type: 'separator',
+                  role: 'system',
+                  content: '',
+                });
+              }
               setStreamingMessage(null);
               setCurrentReasoningId(null);
               sessionSetLoading(false);
-            }
           } else {
             // Background session — finalize streaming messages there
             sessionUpdateMessages(msgs =>
@@ -259,12 +264,35 @@ export const useChatWebSocket = () => {
                 return m;
               })
             );
+            // Add separator for background session too
+            const bgState = useChatStore.getState();
+            const bgSession = bgState.openSessions.find(s => s.id === msgSessionId);
+            if (bgSession) {
+              const lastBgMsg = bgSession.messages[bgSession.messages.length - 1];
+              if (lastBgMsg && lastBgMsg.type !== 'separator' && lastBgMsg.type !== 'human') {
+                sessionAddMessage({
+                  type: 'separator',
+                  role: 'system',
+                  content: '',
+                });
+              }
+            }
             sessionSetLoading(false);
           }
           break;
         }
         case 'thinking':
           // Remove any existing thinking messages to prevent stacking
+          sessionUpdateMessages(msgs => msgs.filter(m => m.type !== 'thinking'));
+          sessionAddMessage({
+            type: 'thinking',
+            role: 'system',
+            content: message.content
+          });
+          sessionSetLoading(true);
+          break;
+        case 'status_update':
+          // Replace existing thinking/status messages with the new short status
           sessionUpdateMessages(msgs => msgs.filter(m => m.type !== 'thinking'));
           sessionAddMessage({
             type: 'thinking',

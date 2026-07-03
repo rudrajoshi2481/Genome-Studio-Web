@@ -73,7 +73,22 @@ function FileTab({
 
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation()
+    e.preventDefault()
     onClose?.(id)
+  }
+
+  const handleAuxClick = (e: React.MouseEvent) => {
+    if (e.button === 1) {
+      e.preventDefault()
+      onClose?.(id)
+    }
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Prevent text selection on rapid clicks
+    if (e.detail > 1) {
+      e.preventDefault()
+    }
   }
 
   const handleCopyPath = () => {
@@ -126,14 +141,16 @@ function FileTab({
         <div 
           className={cn(
             'flex items-center h-9 px-3 py-1 text-sm cursor-pointer group relative overflow-hidden flex-shrink-0',
-            'transition-colors duration-150 border-t-2 border-t-transparent',
+            'transition-all duration-150 border-t-2',
             isActive
               ? 'bg-background text-foreground border-t-blue-500'
-              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground border-t-transparent',
             isDirty && !isExecuting && 'border-b-2 border-b-yellow-400',
             isExecuting && 'border-b-2 border-b-green-500',
           )}
           onClick={handleActivate}
+          onAuxClick={handleAuxClick}
+          onMouseDown={handleMouseDown}
           data-tab-id={id}
           title={path}
           suppressHydrationWarning
@@ -152,7 +169,10 @@ function FileTab({
         </span>
       )}
           <button 
-            className="ml-2 opacity-0 group-hover:opacity-100 rounded p-0.5 hover:bg-gray-200 transition-all duration-150"
+            className={cn(
+              'ml-2 rounded p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-150',
+              isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            )}
             onClick={handleClose}
             aria-label={`Close ${name} tab`}
             type="button"

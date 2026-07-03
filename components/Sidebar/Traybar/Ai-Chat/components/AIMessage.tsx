@@ -30,9 +30,9 @@ function AIMessage({ message, isLast, isLoading, onRegenerate, onDelete }: AIMes
   }, [message.id, onDelete]);
 
   return (
-    <div className="flex flex-col gap-1 my-1 px-3 group/msg">
+    <div className="flex flex-col gap-1 my-0 px-1 group/msg">
       <div className={cn(
-        "px-3 py-2 w-full",
+        "px-1 py-0.5 w-full",
       )}>
         {message.content ? (
           <Markdown>{message.content}</Markdown>
@@ -40,7 +40,7 @@ function AIMessage({ message, isLast, isLoading, onRegenerate, onDelete }: AIMes
           <PonderingIndicator compact mode="responding" />
         ) : null}
       </div>
-      {!message.isStreaming && message.content && isLast && (
+      {message.isComplete && message.content && isLast && (
         <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity">
           <Button
             variant="ghost"

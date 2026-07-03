@@ -68,7 +68,7 @@ function UserMessage({ message, isLast, onEdit, onDelete }: UserMessageProps) {
 
   if (mode === "edit") {
     return (
-      <div className="flex flex-col gap-1.5 items-end my-1 px-3">
+      <div className="flex flex-col gap-1.5 items-end my-1 px-1">
         <textarea
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
@@ -95,7 +95,7 @@ function UserMessage({ message, isLast, onEdit, onDelete }: UserMessageProps) {
   }
 
   return (
-    <div ref={ref} className="flex flex-col gap-1 items-end my-1 px-3 group/msg">
+    <div ref={ref} className="flex flex-col gap-1 items-end my-0 px-1 group/msg">
       <div className="flex items-center gap-1.5 mb-0.5">
         <span className="text-[9px] text-muted-foreground opacity-0 group-hover/msg:opacity-100 transition-opacity">
           {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], {
@@ -114,13 +114,13 @@ function UserMessage({ message, isLast, onEdit, onDelete }: UserMessageProps) {
       <div
         className={cn(
           "flex flex-col gap-1 max-w-[85%] ring-1 ring-input relative overflow-hidden",
-          isLast ? "bg-accent text-accent-foreground px-3 py-2" : "bg-muted/50 px-3 py-2",
+          isLast ? "bg-accent text-accent-foreground px-3 py-1.5" : "bg-muted/50 px-3 py-1.5",
         )}
       >
         {isLongText && !expanded && (
           <div className="absolute pointer-events-none bg-gradient-to-t from-accent to-transparent w-full h-16 bottom-0 left-0" />
         )}
-        <p className="whitespace-pre-wrap text-xs break-words">{displayText}</p>
+        <p className="whitespace-pre-wrap text-sm break-words font-source-sans">{displayText}</p>
         {isLongText && (
           <Button
             variant="ghost"

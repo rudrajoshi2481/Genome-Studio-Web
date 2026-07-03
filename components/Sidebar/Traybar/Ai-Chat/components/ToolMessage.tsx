@@ -125,9 +125,9 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
 
   // --- Generic tool rendering using ai-elements Tool ---
   return (
-    <div className="px-3 mt-4 py-0.5 group/tool">
+    <div className="px-1 mt-1 mb-1 py-0 group/tool">
       {explanation && (
-        <p className="text-xs text-foreground mb-1 leading-relaxed">{explanation}</p>
+        <p className="text-sm text-foreground mb-1 leading-relaxed font-source-sans">{explanation}</p>
       )}
       <Tool defaultOpen={needsApproval}>
         <ToolHeader
@@ -180,18 +180,6 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
       </Tool>
       {needsApproval && (
         <ApprovalButtons messageId={message.id} onApprove={onApprove} onReject={onReject} />
-      )}
-      {isLast && isToolComplete && (
-        <div className="flex items-center gap-0.5 mt-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-            onClick={handleCopyOutput}
-          >
-            {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
-          </Button>
-        </div>
       )}
     </div>
   );

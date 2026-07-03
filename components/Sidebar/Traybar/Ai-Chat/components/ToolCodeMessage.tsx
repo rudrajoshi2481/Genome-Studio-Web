@@ -67,7 +67,7 @@ function ToolCodeMessage({ message, isLast, onStopCommand }: ToolCodeMessageProp
   const headerCommand = toolSubtitles[toolName] ? toolSubtitles[toolName](toolArgs) || undefined : undefined;
 
   return (
-    <div className="px-3 mt-4 py-0.5 group/tool">
+    <div className="px-1 mt-4 py-0.5 group/tool">
       <Tool defaultOpen={false}>
         <ToolHeader
           title={toolName}
@@ -162,20 +162,6 @@ function ToolCodeMessage({ message, isLast, onStopCommand }: ToolCodeMessageProp
           )}
         </ToolContent>
       </Tool>
-
-      {/* Copy button for completed tool */}
-      {isLast && isToolComplete && (
-        <div className="flex items-center gap-0.5 mt-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-            onClick={handleCopyOutput}
-          >
-            {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

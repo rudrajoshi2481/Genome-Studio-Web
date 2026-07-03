@@ -17,8 +17,10 @@ import {
 } from "@/components/ui/context-menu";
 import { Focus, Trash2, Copy, Save, Eye, Code, Lock, Unlock, ChevronRight, ChevronDown, Terminal, Square } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { createCustomNode } from '@/lib/services/custom-node-service';
+import { HANDLE_TYPES, getHandleTypeInfo, getAvailableHandleTypes, HandleType } from './handleTypes';
 
 // Define NodeIO interface
 export interface NodeIO {
@@ -110,6 +112,73 @@ const formatDuration = (ms: number): string => {
   } else {
     return `${(seconds / 3600).toFixed(1)}h`;
   }
+};
+
+// Handle type badge with inline type selector
+const HandleTypeBadge: React.FC<{
+  nodeId: string;
+  handleKind: 'input' | 'output';
+  handleIndex: number;
+  type: string;
+  onTypeChange: (newType: HandleType) => void;
+}> = ({ nodeId, handleKind, handleIndex, type, onTypeChange }) => {
+  const [open, setOpen] = useState(false);
+  const typeInfo = getHandleTypeInfo(type);
+  const availableTypes = getAvailableHandleTypes();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "text-[10px] px-1.5 py-0.5 rounded border font-medium cursor-pointer hover:opacity-80 transition-opacity",
+            typeInfo.badgeClass
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(true);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title={`Type: ${typeInfo.label} — ${typeInfo.description} (click to change)`}
+        >
+          {typeInfo.label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-48 p-1 max-h-64 overflow-y-auto"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-xs text-muted-foreground px-2 py-1 border-b border-border mb-1">
+          {handleKind === 'input' ? 'Input' : 'Output'} type
+        </div>
+        {availableTypes.map((t) => {
+          const info = HANDLE_TYPES[t];
+          return (
+            <button
+              key={t}
+              className={cn(
+                "w-full flex items-center gap-2 px-2 py-1 rounded text-xs hover:bg-muted transition-colors",
+                t === type && "bg-muted"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTypeChange(t);
+                setOpen(false);
+              }}
+            >
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ background: info.handleColor }}
+              />
+              <span className="font-medium">{info.label}</span>
+              <span className="text-muted-foreground text-[10px] truncate">{info.description}</span>
+            </button>
+          );
+        })}
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 interface CustomNodeProps extends NodeProps {
@@ -741,7 +810,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                         left: 0,
                         top: 0,
                         transform: 'none',
-                        background: '#5D688A',
+                        background: getHandleTypeInfo(input.type || 'any').handleColor,
                         width: 10,
                         height: 10,
                         border: '2px solid hsl(var(--background))',
@@ -777,7 +846,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                         left: 0,
                         top: 0,
                         transform: 'none',
-                        background: '#5D688A',
+                        background: getHandleTypeInfo(output.type || 'any').handleColor,
                         width: 10,
                         height: 10,
                         border: '2px solid hsl(var(--background))',
@@ -926,7 +995,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                       left: 0,
                       top: 0,
                       transform: 'none',
-                      background: '#5D688A',
+                      background: getHandleTypeInfo(input.type || 'any').handleColor,
                       width: 10,
                       height: 10,
                       border: '2px solid hsl(var(--background))',
@@ -937,11 +1006,28 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                 </div>
                 {/* Input label */}
                 <div 
-                  className="text-xs font-medium text-foreground ml-2 select-text"
+                  className="text-xs font-medium text-foreground ml-2 select-text flex items-center gap-1"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   {input.name}
-                  <span className="text-muted-foreground ml-1">{input.type}</span>
+                  <HandleTypeBadge
+                    nodeId={id}
+                    handleKind="input"
+                    handleIndex={idx}
+                    type={input.type || 'any'}
+                    onTypeChange={(newType) => {
+                      setNodes((nds) =>
+                        nds.map((n) => {
+                          if (n.id === id) {
+                            const newInputs = [...(n.data.inputs || [])];
+                            newInputs[idx] = { ...newInputs[idx], type: newType };
+                            return { ...n, data: { ...n.data, inputs: newInputs } };
+                          }
+                          return n;
+                        })
+                      );
+                    }}
+                  />
                 </div>
               </div>
             ))}
@@ -955,11 +1041,28 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
               <div key={`port-${output.id || idx}`} className="relative h-8 flex items-center justify-end px-3">
                 {/* Output label */}
                 <div 
-                  className="text-xs font-medium text-foreground mr-2 text-right select-text"
+                  className="text-xs font-medium text-foreground mr-2 text-right select-text flex items-center gap-1"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   {output.name}
-                  <span className="text-muted-foreground ml-1">{output.type}</span>
+                  <HandleTypeBadge
+                    nodeId={id}
+                    handleKind="output"
+                    handleIndex={idx}
+                    type={output.type || 'any'}
+                    onTypeChange={(newType) => {
+                      setNodes((nds) =>
+                        nds.map((n) => {
+                          if (n.id === id) {
+                            const newOutputs = [...(n.data.outputs || [])];
+                            newOutputs[idx] = { ...newOutputs[idx], type: newType };
+                            return { ...n, data: { ...n.data, outputs: newOutputs } };
+                          }
+                          return n;
+                        })
+                      );
+                    }}
+                  />
                 </div>
                 {/* Output handle */}
                 <div 
@@ -976,7 +1079,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                       left: 0,
                       top: 0,
                       transform: 'none',
-                      background: '#5D688A',
+                      background: getHandleTypeInfo(output.type || 'any').handleColor,
                       width: 10,
                       height: 10,
                       border: '2px solid hsl(var(--background))',

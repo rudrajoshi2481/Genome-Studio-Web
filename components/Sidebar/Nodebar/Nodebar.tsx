@@ -421,8 +421,11 @@ function Nodebar() {
           onOpenChange={(open) => {
             setIsEditDialogOpen(open);
             if (!open) {
-              // Reset editing state when dialog closes
-              setEditingNode(null);
+              // Delay unmounting CustomNode so Radix can finish its closing animation
+              // and properly clean up focus trap / pointer-events
+              setTimeout(() => {
+                setEditingNode(null);
+              }, 300);
               // Refresh the node list to show updated data
               loadCustomNodes();
             }

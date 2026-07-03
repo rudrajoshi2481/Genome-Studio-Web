@@ -27,7 +27,7 @@ function ConfirmationMessage({ message, onApprove, onRespond }: ConfirmationMess
   const toolMessageId = message.metadata?.toolMessageId || message.id;
 
   return (
-    <div className="px-3 py-1">
+    <div className="px-1 py-1">
       <Confirmation
         state={conf.state as any}
         approval={conf.approved !== undefined ? { id: message.id, approved: conf.approved, reason: conf.reason } : { id: message.id }}
