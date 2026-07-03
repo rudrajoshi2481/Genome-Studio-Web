@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Settings as SettingsIcon, X, Upload, Trash2, User, Mail, Shield, LogOut, Camera, Calendar, Loader2, Check, IdCard, Clock, AlertTriangle } from 'lucide-react';
 import AdminPanel from './AdminPanel';
+import { Switch } from '@/components/ui/switch';
 
 interface AccountFormData {
   full_name: string;
@@ -36,6 +37,7 @@ interface AccountFormData {
 export default function Settings() {
   const { user, isAuthenticated, isLoading, logout } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
+  const [telemetryEnabled, setTelemetryEnabled] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -46,6 +48,10 @@ export default function Settings() {
     bio: '',
     avatar: '',
   });
+
+  useEffect(() => {
+    setTelemetryEnabled(localStorage.getItem('telemetry_enabled') === 'true');
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -574,6 +580,18 @@ export default function Settings() {
                       <Trash2 className="h-3.5 w-3.5" />
                       Clear Cache
                     </Button>
+                  </div>
+
+                  {/* Telemetry Toggle */}
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <p className="text-sm text-muted-foreground">Telemetry helps improve Genome Studio</p>
+                    <Switch
+                      checked={telemetryEnabled}
+                      onCheckedChange={(checked) => {
+                        setTelemetryEnabled(checked);
+                        localStorage.setItem('telemetry_enabled', String(checked));
+                      }}
+                    />
                   </div>
                 </div>
               </ScrollArea>

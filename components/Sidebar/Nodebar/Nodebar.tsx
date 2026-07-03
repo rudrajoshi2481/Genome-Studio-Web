@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
-import { RefreshCcw, Search, Star, X, Filter, ChevronDown, ChevronUp, ArrowDownUp, Folder, FolderOpen, Plus, Settings, Type, Hash, ToggleLeft, List as ListIcon, Braces } from 'lucide-react'
+import { RefreshCcw, Search, Star, X, Filter, ChevronDown, ChevronUp, ArrowDownUp, Plus, Settings, Type, Hash, ToggleLeft, List as ListIcon, Braces } from 'lucide-react'
 import CustomNode from './CustomNode/CustomNode'
 import CustomizeDialog from './CustomNode/CustomizeDialog'
 import NodeCard from './NodeCard'
@@ -31,7 +31,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-
 type SortOption = 'name' | 'date' | 'favorites'
 
 const NODES_PER_PAGE = 30
@@ -59,7 +58,6 @@ function Nodebar() {
   const [visibleCount, setVisibleCount] = useState(NODES_PER_PAGE)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isDataTypesOpen, setIsDataTypesOpen] = useState(true)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   // Ensure component only renders on client after hydration
   useEffect(() => {
@@ -345,41 +343,6 @@ function Nodebar() {
   useEffect(() => {
     setVisibleCount(NODES_PER_PAGE)
   }, [debouncedSearchQuery, activeTab, selectedTags, sortBy])
-
-  // Toggle group expansion
-  const toggleGroupExpand = (group: string) => {
-    setExpandedGroups(prev => {
-      const newGroups = new Set(prev)
-      if (newGroups.has(group)) {
-        newGroups.delete(group)
-      } else {
-        newGroups.add(group)
-      }
-      return newGroups
-    })
-  }
-
-  // Expand all tag groups
-  const expandAllGroups = () => {
-    setExpandedGroups(new Set(Object.keys(groupedNodes)))
-  }
-
-  // Collapse all tag groups
-  const collapseAllGroups = () => {
-    setExpandedGroups(new Set())
-  }
-
-  // Group filtered nodes by their first tag (or "Untagged")
-  const groupedNodes = useMemo(() => {
-    const groups: Record<string, CustomNodeType[]> = {}
-    filteredNodes.forEach(node => {
-      const nodeTags = (node as any).tags
-      const groupKey = (nodeTags && Array.isArray(nodeTags) && nodeTags.length > 0) ? nodeTags[0] : 'Untagged'
-      if (!groups[groupKey]) groups[groupKey] = []
-      groups[groupKey].push(node)
-    })
-    return groups
-  }, [filteredNodes])
 
   // Paginated nodes for flat (non-grouped) view
   const visibleNodes = useMemo(() => {
@@ -745,90 +708,27 @@ function Nodebar() {
                     <div className="text-[10px] text-muted-foreground px-1 pb-1">
                       Showing {visibleNodes.length} of {filteredNodes.length} node{filteredNodes.length !== 1 ? 's' : ''}
                     </div>
-                    {/* Grouped view when no search and multiple tags exist */}
-                    {!debouncedSearchQuery && selectedTags.size === 0 && Object.keys(groupedNodes).length > 1 ? (
-                      <>
-                      <div className="flex items-center gap-2 pb-1">
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={expandAllGroups}>
-                          <ChevronDown className="h-3 w-3 mr-1" />Expand All
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={collapseAllGroups}>
-                          <ChevronUp className="h-3 w-3 mr-1" />Collapse All
-                        </Button>
-                      </div>
-                      {Object.keys(groupedNodes).sort().map(groupName => {
-                        const groupNodes = groupedNodes[groupName]
-                        const isExpanded = expandedGroups.has(groupName)
-                        return (
-                          <Collapsible key={groupName} open={isExpanded} onOpenChange={() => toggleGroupExpand(groupName)}>
-                            <CollapsibleTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                className="w-full justify-between px-2 py-1.5 h-auto hover:bg-accent/50"
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  {isExpanded ? (
-                                    <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                                  ) : (
-                                    <Folder className="h-3.5 w-3.5 text-muted-foreground" />
-                                  )}
-                                  <span className="text-xs font-semibold">{groupName}</span>
-                                  <Badge variant="secondary" className="h-4 px-1 text-[10px]">
-                                    {groupNodes.length}
-                                  </Badge>
-                                </div>
-                                {isExpanded ? (
-                                  <ChevronUp className="h-3 w-3 text-muted-foreground" />
-                                ) : (
-                                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                )}
-                              </Button>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                              <div className="flex flex-col gap-2 pt-1">
-                                {groupNodes.map((node) => (
-                                  <NodeCard
-                                    key={node.id || node.node_id}
-                                    node={node}
-                                    isFavorite={favoriteNodes.has((node.id || node.node_id).toString())}
-                                    isDeleting={isDeleting}
-                                    onToggleFavorite={toggleFavorite}
-                                    onEdit={handleEditNode}
-                                    onDuplicate={handleDuplicateNode}
-                                    onDelete={handleDeleteNode}
-                                  />
-                                ))}
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        )
-                      })}
-                      </>
-                    ) : (
-                      <>
-                        {visibleNodes.map((node) => (
-                          <NodeCard
-                            key={node.id || node.node_id}
-                            node={node}
-                            isFavorite={favoriteNodes.has((node.id || node.node_id).toString())}
-                            isDeleting={isDeleting}
-                            onToggleFavorite={toggleFavorite}
-                            onEdit={handleEditNode}
-                            onDuplicate={handleDuplicateNode}
-                            onDelete={handleDeleteNode}
-                          />
-                        ))}
-                        {visibleCount < filteredNodes.length && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full text-xs"
-                            onClick={() => setVisibleCount(prev => prev + NODES_PER_PAGE)}
-                          >
-                            Show more ({filteredNodes.length - visibleCount} remaining)
-                          </Button>
-                        )}
-                      </>
+                    {visibleNodes.map((node) => (
+                      <NodeCard
+                        key={node.id || node.node_id}
+                        node={node}
+                        isFavorite={favoriteNodes.has((node.id || node.node_id).toString())}
+                        isDeleting={isDeleting}
+                        onToggleFavorite={toggleFavorite}
+                        onEdit={handleEditNode}
+                        onDuplicate={handleDuplicateNode}
+                        onDelete={handleDeleteNode}
+                      />
+                    ))}
+                    {visibleCount < filteredNodes.length && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => setVisibleCount(prev => prev + NODES_PER_PAGE)}
+                      >
+                        Show more ({filteredNodes.length - visibleCount} remaining)
+                      </Button>
                     )}
                   </>
                 ) : (
