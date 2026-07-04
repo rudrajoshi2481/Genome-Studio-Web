@@ -383,7 +383,7 @@ function Toolbar({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex items-center gap-2 px-3 py-2 bg-background border-b border-border shadow-sm">
+      <div className="flex items-center gap-1.5 px-3 py-2 bg-background border-b border-border shadow-sm">
         {/* File Operations (Left) */}
         <div className="flex items-center gap-1">
           <Tooltip>
@@ -392,9 +392,9 @@ function Toolbar({
                 variant="ghost"
                 size="icon"
                 onClick={handleSave}
-                className="h-8 w-8"
+                className="h-6 w-6"
               >
-                <Save className="h-4 w-4" />
+                <Save className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Save Workflow</TooltipContent>
@@ -406,19 +406,19 @@ function Toolbar({
                 variant="ghost"
                 size="icon"
                 onClick={handleDownload}
-                className="h-8 w-8"
+                className="h-6 w-6"
               >
-                <Download className="h-4 w-4" />
+                <Download className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Download Workflow</TooltipContent>
           </Tooltip>
         </div>
 
-        <Separator orientation="vertical" className="h-6" />
+        <Separator orientation="vertical" className="h-5" />
 
         {/* Execution Controls (Center) */}
-        <div className="flex-1 flex justify-center items-center gap-1.5">
+        <div className="flex-1 flex justify-center items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -426,12 +426,12 @@ function Toolbar({
                 size="sm"
                 onClick={handleRun}
                 disabled={isExecuting}
-                className="gap-1.5 h-8 px-3"
+                className="gap-1 h-6 px-2.5 text-xs"
               >
                 {isExecuting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
-                  <Play className="h-3.5 w-3.5 fill-current" />
+                  <Play className="h-3 w-3 fill-current" />
                 )}
                 {isExecuting ? 'Running...' : 'Run'}
               </Button>
@@ -446,9 +446,9 @@ function Toolbar({
                 size="sm"
                 onClick={handleStop}
                 disabled={!isExecuting}
-                className="gap-1.5 h-8 px-3"
+                className="gap-1 h-6 px-2.5 text-xs"
               >
-                <Square className="h-3.5 w-3.5 fill-current" />
+                <Square className="h-3 w-3 fill-current" />
                 Stop
               </Button>
             </TooltipTrigger>
@@ -457,23 +457,23 @@ function Toolbar({
 
           {executionStatus && (
             <>
-              <Separator orientation="vertical" className="h-5 mx-1" />
-              <div className="flex items-center gap-1.5">
+              <Separator orientation="vertical" className="h-4 mx-0.5" />
+              <div className="flex items-center gap-1">
                 {executionStatus.status === 'running' && (
-                  <Badge variant="outline" className="gap-1.5 bg-blue-500/5 text-blue-700 border-blue-500/20">
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                  <Badge variant="outline" className="gap-1 bg-blue-500/5 text-blue-700 border-blue-500/20 text-xs">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
                     {executionStatus.completed_nodes.length}/{executionStatus.total_nodes} nodes
                   </Badge>
                 )}
                 {executionStatus.status === 'completed' && (
-                  <Badge variant="outline" className="gap-1.5 bg-green-500/5 text-green-700 border-green-500/20">
-                    <CheckCircle className="h-3 w-3" />
+                  <Badge variant="outline" className="gap-1 bg-green-500/5 text-green-700 border-green-500/20 text-xs">
+                    <CheckCircle className="h-2.5 w-2.5" />
                     Completed
                   </Badge>
                 )}
                 {executionStatus.status === 'failed' && (
-                  <Badge variant="outline" className="gap-1.5 bg-destructive/5 text-destructive border-destructive/20">
-                    <AlertCircle className="h-3 w-3" />
+                  <Badge variant="outline" className="gap-1 bg-destructive/5 text-destructive border-destructive/20 text-xs">
+                    <AlertCircle className="h-2.5 w-2.5" />
                     Failed
                   </Badge>
                 )}
@@ -481,7 +481,7 @@ function Toolbar({
             </>
           )}
 
-          <Separator orientation="vertical" className="h-5 mx-1" />
+          <Separator orientation="vertical" className="h-4 mx-0.5" />
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -489,9 +489,9 @@ function Toolbar({
                 variant="ghost"
                 size="icon"
                 onClick={handleReset}
-                className="h-8 w-8"
+                className="h-6 w-6"
               >
-                <RotateCcw className="h-4 w-4" />
+                <RotateCcw className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Reset Workflow</TooltipContent>
@@ -503,23 +503,23 @@ function Toolbar({
                 variant="ghost"
                 size="icon"
                 onClick={onRefresh}
-                className="h-8 w-8"
+                className="h-6 w-6"
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Refresh File</TooltipContent>
           </Tooltip>
         </div>
 
-        <Separator orientation="vertical" className="h-6" />
+        <Separator orientation="vertical" className="h-5" />
 
         {/* Flow Info (Right) */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="secondary" className="gap-1.5 cursor-default">
-                <Network className="h-3 w-3" />
+              <Badge variant="secondary" className="gap-1 cursor-default text-xs">
+                <Network className="h-2.5 w-2.5" />
                 {nodes.length}
               </Badge>
             </TooltipTrigger>
@@ -528,8 +528,8 @@ function Toolbar({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="secondary" className="gap-1.5 cursor-default">
-                <GitBranch className="h-3 w-3" />
+              <Badge variant="secondary" className="gap-1 cursor-default text-xs">
+                <GitBranch className="h-2.5 w-2.5" />
                 {edges.length}
               </Badge>
             </TooltipTrigger>
@@ -542,9 +542,9 @@ function Toolbar({
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowSettings(true)}
-                className="h-8 w-8"
+                className="h-6 w-6"
               >
-                <Settings className="h-4 w-4" />
+                <Settings className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Node Settings</TooltipContent>

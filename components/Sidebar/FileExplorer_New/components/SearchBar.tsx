@@ -112,11 +112,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     <div className={cn("relative", className)}>
       {/* Modern Search Input */}
       <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
           {isSearching ? (
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
           ) : (
-            <Search className="h-4 w-4 text-muted-foreground" />
+            <Search className="h-3.5 w-3.5 text-muted-foreground" />
           )}
         </div>
         
@@ -127,17 +127,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Search files and folders..."
-          className="pl-10 pr-20 h-9 bg-background border-input focus-visible:ring-2 focus-visible:ring-ring"
+          className="pl-7 pr-16 h-7 text-xs bg-background border-input focus-visible:ring-2 focus-visible:ring-ring"
         />
         
-        <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
+        <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-1">
           {/* Clear button */}
           {query && (
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={handleClear}
-              className="h-6 w-6 p-0 hover:bg-accent"
+              className="h-5 w-5 p-0 hover:bg-accent"
             >
               <X className="h-3 w-3" />
             </Button>
@@ -148,9 +148,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             <PopoverTrigger asChild>
               <Button
                 variant={hasActiveFilters ? "default" : "ghost"}
-                size="sm"
+                size="icon"
                 className={cn(
-                  "h-6 w-6 p-0",
+                  "h-5 w-5 p-0",
                   hasActiveFilters 
                     ? "bg-primary text-primary-foreground hover:bg-primary/90" 
                     : "hover:bg-accent"

@@ -12,8 +12,6 @@ const TerminalStyleStats: React.FC<TerminalStyleStatsProps> = () => {
   const [error, setError] = useState<string | null>(null);
   const statusIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const systemStatsService = SystemStatsService.getInstance();
-
   const statsRef = useRef<SystemStats | null>(null);
 
   // Memoize callbacks to prevent re-renders
@@ -45,7 +43,8 @@ const TerminalStyleStats: React.FC<TerminalStyleStatsProps> = () => {
   }, []);
 
   const updateConnectionStatus = useCallback(() => {
-    const status = systemStatsService.getConnectionStatus();
+    const svc = SystemStatsService.getInstance();
+    const status = svc.getConnectionStatus();
     setConnectionStatus(prevStatus => {
       // Only update if status actually changed
       if (prevStatus !== status) {
@@ -53,18 +52,29 @@ const TerminalStyleStats: React.FC<TerminalStyleStatsProps> = () => {
       }
       return prevStatus;
     });
-  }, [systemStatsService]);
+  }, []);
+
+  // Refs to hold latest callbacks so the effect can use them without re-running
+  const handleStatsUpdateRef = useRef(handleStatsUpdate);
+  const handleErrorRef = useRef(handleError);
+  const updateConnectionStatusRef = useRef(updateConnectionStatus);
+  handleStatsUpdateRef.current = handleStatsUpdate;
+  handleErrorRef.current = handleError;
+  updateConnectionStatusRef.current = updateConnectionStatus;
 
   useEffect(() => {
+    const svc = SystemStatsService.getInstance();
+
     // Subscribe to real-time system stats updates
-    const unsubscribe = systemStatsService.subscribe(handleStatsUpdate);
+    const unsubscribe = svc.subscribe((stats) => handleStatsUpdateRef.current(stats));
 
     // Subscribe to error notifications
-    const unsubscribeError = systemStatsService.onError(handleError);
+    const unsubscribeError = svc.onError((err) => handleErrorRef.current(err));
 
     // Monitor connection status with reduced frequency
-    updateConnectionStatus(); // Initial status check
-    statusIntervalRef.current = setInterval(updateConnectionStatus, 2000); // Check every 2 seconds instead of 1
+    // Defer initial check to avoid synchronous setState in effect
+    setTimeout(() => updateConnectionStatusRef.current(), 0);
+    statusIntervalRef.current = setInterval(() => updateConnectionStatusRef.current(), 2000);
 
     // Cleanup subscriptions on unmount
     return () => {
@@ -75,7 +85,8 @@ const TerminalStyleStats: React.FC<TerminalStyleStatsProps> = () => {
         statusIntervalRef.current = null;
       }
     };
-  }, [handleStatsUpdate, handleError, updateConnectionStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isLoading || !stats) {
     return (

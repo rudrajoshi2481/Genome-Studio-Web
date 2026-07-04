@@ -1,9 +1,8 @@
-import { useState } from 'react'
-
 interface Environment {
   name: string
   path: string
   is_active: boolean
+  type?: string
 }
 
 interface Package {
@@ -25,14 +24,19 @@ interface SearchResult {
   all_versions: number
 }
 
+interface SearchResponse {
+  packages: SearchResult[]
+  is_wildcard: boolean
+  total_count: number
+  count: number
+}
+
 import { host } from '@/config/server'
 import { port } from '@/config/server'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || `http://${host}:${port}`
 
 export const usePackageManager = () => {
-  const [isLoading, setIsLoading] = useState(false)
-
   const getAuthToken = () => {
     if (typeof window === 'undefined') {
       return null
@@ -72,46 +76,29 @@ export const usePackageManager = () => {
   }
 
   const fetchEnvironments = async (): Promise<Environment[]> => {
-    try {
-      setIsLoading(true)
-      const data = await makeAuthenticatedRequest('/api/v1/package-manager/environments')
-      return data.environments || []
-    } catch (error) {
-      console.error('Error fetching environments:', error)
-      throw error
-    } finally {
-      setIsLoading(false)
-    }
+    const data = await makeAuthenticatedRequest('/api/v1/package-manager/environments')
+    return data.environments || []
   }
 
   const fetchPackagesInEnvironment = async (envName: string): Promise<Package[]> => {
-    try {
-      setIsLoading(true)
-      const data = await makeAuthenticatedRequest(`/api/v1/package-manager/environments/${encodeURIComponent(envName)}/packages`)
-      return data.packages || []
-    } catch (error) {
-      console.error('Error fetching packages:', error)
-      throw error
-    } finally {
-      setIsLoading(false)
-    }
+    const data = await makeAuthenticatedRequest(`/api/v1/package-manager/environments/${encodeURIComponent(envName)}/packages`)
+    return data.packages || []
   }
 
-  const searchPackages = async (query: string, channel?: string): Promise<SearchResult[]> => {
-    try {
-      setIsLoading(true)
-      const params = new URLSearchParams({ query })
-      if (channel) {
-        params.append('channel', channel)
-      }
-      
-      const data = await makeAuthenticatedRequest(`/api/v1/package-manager/search?${params.toString()}`)
-      return data.packages || []
-    } catch (error) {
-      console.error('Error searching packages:', error)
-      throw error
-    } finally {
-      setIsLoading(false)
+  const searchPackages = async (query: string, channel?: string, envName?: string, signal?: AbortSignal): Promise<{ packages: SearchResult[]; isWildcard: boolean; totalCount: number }> => {
+    const params = new URLSearchParams({ query })
+    if (channel) {
+      params.append('channel', channel)
+    }
+    if (envName) {
+      params.append('env_name', envName)
+    }
+    
+    const data = await makeAuthenticatedRequest(`/api/v1/package-manager/search?${params.toString()}`, { signal })
+    return {
+      packages: data.packages || [],
+      isWildcard: data.is_wildcard || false,
+      totalCount: data.total_count || 0,
     }
   }
 
@@ -120,49 +107,77 @@ export const usePackageManager = () => {
     envName: string,
     version?: string,
     channel?: string
-  ): Promise<void> => {
-    try {
-      setIsLoading(true)
-      const params = new URLSearchParams({
-        package_name: packageName,
-        env_name: envName,
-      })
-      
-      if (version) {
-        params.append('version', version)
-      }
-      if (channel) {
-        params.append('channel', channel)
-      }
-
-      await makeAuthenticatedRequest(`/api/v1/package-manager/install?${params.toString()}`, {
-        method: 'POST',
-      })
-    } catch (error) {
-      console.error('Error installing package:', error)
-      throw error
-    } finally {
-      setIsLoading(false)
+  ): Promise<{ message: string; package: string; environment: string }> => {
+    const params = new URLSearchParams({
+      package_name: packageName,
+      env_name: envName,
+    })
+    
+    if (version) {
+      params.append('version', version)
     }
+    if (channel) {
+      params.append('channel', channel)
+    }
+
+    return await makeAuthenticatedRequest(`/api/v1/package-manager/install?${params.toString()}`, {
+      method: 'POST',
+    })
   }
 
   const uninstallPackage = async (packageName: string, envName: string): Promise<void> => {
-    try {
-      setIsLoading(true)
-      const params = new URLSearchParams({
-        package_name: packageName,
-        env_name: envName,
-      })
+    const params = new URLSearchParams({
+      package_name: packageName,
+      env_name: envName,
+    })
 
-      await makeAuthenticatedRequest(`/api/v1/package-manager/uninstall?${params.toString()}`, {
-        method: 'DELETE',
-      })
-    } catch (error) {
-      console.error('Error uninstalling package:', error)
-      throw error
-    } finally {
-      setIsLoading(false)
+    await makeAuthenticatedRequest(`/api/v1/package-manager/uninstall?${params.toString()}`, {
+      method: 'DELETE',
+    })
+  }
+
+  const installBatch = async (
+    packageNames: string[],
+    envName: string,
+    channel?: string
+  ): Promise<void> => {
+    const params = new URLSearchParams({
+      package_names: packageNames.join(','),
+      env_name: envName,
+    })
+    if (channel) {
+      params.append('channel', channel)
     }
+
+    await makeAuthenticatedRequest(`/api/v1/package-manager/install-batch?${params.toString()}`, {
+      method: 'POST',
+    })
+  }
+
+  const createEnvironment = async (envName: string, pythonVersion?: string): Promise<void> => {
+    const params = new URLSearchParams({
+      env_name: envName,
+    })
+    if (pythonVersion) {
+      params.append('python_version', pythonVersion)
+    }
+
+    await makeAuthenticatedRequest(`/api/v1/package-manager/create-environment?${params.toString()}`, {
+      method: 'POST',
+    })
+  }
+
+  const createVenv = async (envName: string, pythonVersion?: string): Promise<void> => {
+    const params = new URLSearchParams({
+      env_name: envName,
+    })
+    if (pythonVersion) {
+      params.append('python_version', pythonVersion)
+    }
+
+    await makeAuthenticatedRequest(`/api/v1/package-manager/create-venv?${params.toString()}`, {
+      method: 'POST',
+    })
   }
 
   return {
@@ -170,7 +185,9 @@ export const usePackageManager = () => {
     fetchPackagesInEnvironment,
     searchPackages,
     installPackage,
+    installBatch,
     uninstallPackage,
-    isLoading,
+    createEnvironment,
+    createVenv,
   }
 }

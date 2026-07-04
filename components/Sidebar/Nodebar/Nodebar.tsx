@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
-import { RefreshCcw, Search, Star, X, Filter, ChevronDown, ChevronUp, ArrowDownUp, Plus, Settings, Type, Hash, ToggleLeft, List as ListIcon, Braces } from 'lucide-react'
+import { RefreshCcw, Search, Star, X, Filter, ChevronDown, ChevronUp, ArrowDownUp, Plus, Settings, Type, Hash, ToggleLeft, List as ListIcon, Braces, Workflow } from 'lucide-react'
 import CustomNode from './CustomNode/CustomNode'
 import CustomizeDialog from './CustomNode/CustomizeDialog'
 import NodeCard from './NodeCard'
@@ -353,11 +353,16 @@ function Nodebar() {
   if (!isClient) {
     return (
       <div className="h-[calc(100vh-56px)] flex flex-col border-r border-gray-200">
-        <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-gray-50">
-          <h3 className="text-xs font-medium">Nodebar</h3>
-          <button className="p-1 rounded hover:bg-gray-200" disabled>
-            <RefreshCcw className="w-4 h-4" />
-          </button>
+        <div className="flex-shrink-0 border-b px-3 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Workflow className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-xs font-medium">Nodebar</h3>
+            </div>
+            <button className="p-1 rounded hover:bg-gray-200" disabled>
+              <RefreshCcw className="h-3 w-3" />
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           <div className="text-center py-4 text-gray-500 text-xs">Loading...</div>
@@ -399,60 +404,65 @@ function Nodebar() {
       )}
       
       {/* Nodebar header with create, customize, and refresh buttons */}
-      <div className="flex items-center justify-between px-3 py-2 border-b">
-        <h3 className="text-xs font-semibold">Nodebar</h3>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="default"
-            size="sm"
-            className="h-7 text-xs gap-1"
-            onClick={() => setIsCreateDialogOpen(true)}
-            title="Create Custom Node"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Create
-          </Button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                title="Customize"
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </Button>
-            </DialogTrigger>
-            <CustomizeDialog />
-          </Dialog>
-          <Button 
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7" 
-            onClick={loadCustomNodes}
-            disabled={isLoading}
-            title="Refresh nodes"
-          >
-            <RefreshCcw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
+      <div className="flex-shrink-0 border-b px-3 py-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Workflow className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-xs font-medium">Nodebar</h3>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="default"
+              size="sm"
+              className="h-6 text-xs gap-1"
+              onClick={() => setIsCreateDialogOpen(true)}
+              title="Create Custom Node"
+            >
+              <Plus className="h-3 w-3" />
+              Create
+            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Customize"
+                >
+                  <Settings className="h-3 w-3" />
+                </Button>
+              </DialogTrigger>
+              <CustomizeDialog />
+            </Dialog>
+            <Button 
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6" 
+              onClick={loadCustomNodes}
+              disabled={isLoading}
+              title="Refresh nodes"
+            >
+              <RefreshCcw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Search Bar + Sort */}
-      <div className="p-3 border-b space-y-2">
+      <div className="px-3 py-2 border-b space-y-2">
         <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search nodes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 h-9"
+            className="pl-7 h-7 text-xs"
           />
           {searchQuery && (
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-1 top-1 h-7 w-7"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5"
               onClick={() => setSearchQuery('')}
             >
               <X className="h-3 w-3" />

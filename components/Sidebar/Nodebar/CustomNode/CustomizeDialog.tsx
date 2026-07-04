@@ -17,9 +17,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Download, Code2, Loader2, Search, X, Upload, FileJson, CheckCircle, XCircle, Settings2, RefreshCcw, ArrowUpDown, AlertTriangle } from "lucide-react"
+import { Download, Code2, Loader2, Search, X, Upload, FileJson, CheckCircle, XCircle, Settings2, RefreshCcw, ArrowUpDown, AlertTriangle, Trash2 } from "lucide-react"
 import { useAuthStore } from '@/lib/stores/auth-store'
-import { fetchCustomNodes, bulkUploadNodes, recompileAllNodes, CustomNode, RecompileResult } from '@/lib/services/custom-node-service'
+import { fetchCustomNodes, deleteCustomNode, bulkUploadNodes, recompileAllNodes, CustomNode, RecompileResult } from '@/lib/services/custom-node-service'
 import { toast } from 'sonner'
 
 export default function CustomizeDialog() {
@@ -35,6 +35,7 @@ export default function CustomizeDialog() {
   const [selectedPreviewNodes, setSelectedPreviewNodes] = useState<Set<number>>(new Set())
   const [isRecompiling, setIsRecompiling] = useState(false)
   const [recompileResult, setRecompileResult] = useState<RecompileResult | null>(null)
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false)
   const { token, isAuthenticated } = useAuthStore()
 
   // Fetch nodes on mount
@@ -197,6 +198,27 @@ export default function CustomizeDialog() {
     setUploadResult(null)
   }
 
+  const handleBatchDelete = async () => {
+    if (selectedNodes.size === 0 || !token) return
+    setIsBatchDeleting(true)
+    let successCount = 0
+    let failCount = 0
+    for (const nodeId of selectedNodes) {
+      try {
+        await deleteCustomNode(token, nodeId)
+        successCount++
+      } catch (err) {
+        console.error(`Failed to delete node ${nodeId}:`, err)
+        failCount++
+      }
+    }
+    if (successCount > 0) toast.success(`Deleted ${successCount} node${successCount !== 1 ? 's' : ''}`)
+    if (failCount > 0) toast.error(`Failed to delete ${failCount} node${failCount !== 1 ? 's' : ''}`)
+    setSelectedNodes(new Set())
+    setIsBatchDeleting(false)
+    loadNodes()
+  }
+
   const handleRecompileAll = async () => {
     if (!token || !isAuthenticated) {
       toast.error('You must be logged in to recompile')
@@ -354,6 +376,19 @@ export default function CustomizeDialog() {
                 >
                   <Download className="h-4 w-4 mr-1" />
                   Download ({selectedNodes.size})
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBatchDelete}
+                  disabled={selectedNodes.size === 0 || isBatchDeleting}
+                >
+                  {isBatchDeleting ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-1" />
+                  )}
+                  Delete ({selectedNodes.size})
                 </Button>
               </div>
             </div>

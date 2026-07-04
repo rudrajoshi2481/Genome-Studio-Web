@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, Play, RefreshCcw, Clock, Calendar, Save, Pencil, ScrollText, CheckCircle2, XCircle, Loader2, CircleDot } from 'lucide-react'
+import { Plus, Trash2, Play, RefreshCcw, TimerReset, Calendar, Save, Pencil, ScrollText, CheckCircle2, XCircle, Loader2, CircleDot, Search, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { getServerConfig } from '@/config/server'
 import { toast } from 'sonner'
@@ -92,6 +92,7 @@ function CronJobs() {
   const [isSaving, setIsSaving] = useState(false)
   const [schedulePreset, setSchedulePreset] = useState('*/5 * * * *')
   const [editSchedulePreset, setEditSchedulePreset] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const [newJob, setNewJob] = useState({
     name: '',
@@ -110,16 +111,20 @@ function CronJobs() {
   const loadJobs = useCallback(async () => {
     if (!token) return
     setIsLoading(true)
+    const minDelay = new Promise(resolve => setTimeout(resolve, 500))
     try {
-      const res = await fetch(`${API_URL}/cron-jobs`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const [res] = await Promise.all([
+        fetch(`${API_URL}/cron-jobs`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        minDelay,
+      ])
       if (!res.ok) throw new Error('Failed to fetch cron jobs')
       const data = await res.json()
       setJobs(data.jobs || [])
     } catch (err) {
       console.error('Error fetching cron jobs:', err)
-      // toast.error('Failed to load cron jobs')
+      toast.error('Failed to load cron jobs')
     } finally {
       setIsLoading(false)
     }
@@ -134,7 +139,7 @@ function CronJobs() {
   const handleCreate = async () => {
     if (!token) return
     if (!newJob.name.trim() || !newJob.command.trim() || !newJob.schedule.trim()) {
-      // toast.error('Name, command, and schedule are required')
+      toast.error('Name, command, and schedule are required')
       return
     }
 
@@ -154,14 +159,14 @@ function CronJobs() {
         }),
       })
       if (!res.ok) throw new Error('Failed to create cron job')
-      // toast.success('Cron job created')
+      toast.success('Cron job created')
       setNewJob({ name: '', command: '', schedule: '*/5 * * * *', description: '' })
       setSchedulePreset('*/5 * * * *')
       setIsCreateOpen(false)
       loadJobs()
     } catch (err) {
       console.error('Error creating cron job:', err)
-      // toast.error('Failed to create cron job')
+      toast.error('Failed to create cron job')
     }
   }
 
@@ -173,13 +178,13 @@ function CronJobs() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to delete cron job')
-      // toast.success(`"${job.name}" deleted`)
+      toast.success(`"${job.name}" deleted`)
       setDeleteTarget(null)
       setDetailJob(null)
       loadJobs()
     } catch (err) {
       console.error('Error deleting cron job:', err)
-      // toast.error('Failed to delete cron job')
+      toast.error('Failed to delete cron job')
     }
   }
 
@@ -195,11 +200,11 @@ function CronJobs() {
         body: JSON.stringify({ enabled: !job.enabled }),
       })
       if (!res.ok) throw new Error('Failed to toggle cron job')
-      // toast.success(job.enabled ? 'Cron job disabled' : 'Cron job enabled')
+      toast.success(job.enabled ? 'Cron job disabled' : 'Cron job enabled')
       loadJobs()
     } catch (err) {
       console.error('Error toggling cron job:', err)
-      // toast.error('Failed to toggle cron job')
+      toast.error('Failed to toggle cron job')
     }
   }
 
@@ -211,11 +216,11 @@ function CronJobs() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to run cron job')
-      // toast.success('Cron job triggered')
+      toast.success('Cron job triggered')
       setTimeout(() => loadJobs(), 2000)
     } catch (err) {
       console.error('Error running cron job:', err)
-      // toast.error('Failed to run cron job')
+      toast.error('Failed to run cron job')
     }
   }
 
@@ -255,7 +260,7 @@ function CronJobs() {
   const handleSaveEdit = async () => {
     if (!token || !detailJob) return
     if (!editJob.name.trim() || !editJob.command.trim() || !editJob.schedule.trim()) {
-      // toast.error('Name, command, and schedule are required')
+      toast.error('Name, command, and schedule are required')
       return
     }
     setIsSaving(true)
@@ -274,14 +279,14 @@ function CronJobs() {
         }),
       })
       if (!res.ok) throw new Error('Failed to update cron job')
-      // toast.success('Cron job updated')
+      toast.success('Cron job updated')
       setIsEditing(false)
       const updated = await res.json()
       setDetailJob(updated)
       loadJobs()
     } catch (err) {
       console.error('Error updating cron job:', err)
-      // toast.error('Failed to update cron job')
+      toast.error('Failed to update cron job')
     } finally {
       setIsSaving(false)
     }
@@ -299,7 +304,7 @@ function CronJobs() {
     if (status === 'success') return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
     if (status === 'running') return <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />
     if (status.startsWith('failed') || status.startsWith('error')) return <XCircle className="h-3.5 w-3.5 text-destructive" />
-    if (status === 'timeout') return <Clock className="h-3.5 w-3.5 text-destructive" />
+    if (status === 'timeout') return <TimerReset className="h-3.5 w-3.5 text-destructive" />
     return <CircleDot className="h-3.5 w-3.5 text-muted-foreground/40" />
   }
 
@@ -357,10 +362,12 @@ function CronJobs() {
 
   if (!isAuthenticated) {
     return (
-      <div className="h-[calc(100vh-56px)] flex flex-col border-r">
-        <div className="flex items-center gap-2 px-3 py-3 border-b bg-muted/30">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Cron Jobs</span>
+      <div className="h-full flex flex-col">
+        <div className="flex-shrink-0 border-b px-3 py-2">
+          <div className="flex items-center gap-2">
+            <TimerReset className="h-4 w-4 text-muted-foreground" />
+            <h1 className="text-xs font-medium">Cron Jobs</h1>
+          </div>
         </div>
         <div className="flex-1 flex items-center justify-center p-4">
           <p className="text-xs text-muted-foreground">Please log in to view cron jobs.</p>
@@ -371,44 +378,69 @@ function CronJobs() {
 
   return (
     <TooltipProvider>
-      <div className="h-[calc(100vh-56px)] flex flex-col border-r bg-background">
+      <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2.5 border-b bg-muted/30">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">Cron Jobs</span>
-            {jobs.length > 0 && (
-              <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{jobs.length}</Badge>
-            )}
+        <div className="flex-shrink-0 border-b px-3 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TimerReset className="h-4 w-4 text-muted-foreground" />
+              <h1 className="text-xs font-medium">Cron Jobs</h1>
+              {jobs.length > 0 && (
+                <span className="text-xs text-muted-foreground">{jobs.length}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 transition-colors hover:bg-accent hover:text-accent-foreground"
+                    onClick={loadJobs}
+                    disabled={isLoading}
+                  >
+                    <RefreshCcw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Refresh</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="icon"
+                    className="h-6 w-6 transition-colors hover:bg-primary/90"
+                    onClick={() => setIsCreateOpen(true)}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Create cron job</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={loadJobs}
-                  disabled={isLoading}
-                >
-                  <RefreshCcw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Refresh</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="default"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setIsCreateOpen(true)}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Create cron job</TooltipContent>
-            </Tooltip>
+        </div>
+
+        {/* Search */}
+        <div className="flex-shrink-0 px-3 py-2 border-b">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search jobs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 pl-7 text-xs"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5"
+                onClick={() => setSearchQuery('')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -432,7 +464,7 @@ function CronJobs() {
               ) : jobs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <div className="rounded-full bg-muted/50 p-4 mb-3">
-                    <Clock className="h-8 w-8 text-muted-foreground/50" />
+                    <TimerReset className="h-8 w-8 text-muted-foreground/50" />
                   </div>
                   <p className="text-sm font-medium text-muted-foreground">No cron jobs yet</p>
                   <p className="text-xs text-muted-foreground/70 mt-1 mb-4">Create your first scheduled task</p>
@@ -441,8 +473,21 @@ function CronJobs() {
                     New Cron Job
                   </Button>
                 </div>
+              ) : jobs.filter(job =>
+                job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                job.command.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                job.description.toLowerCase().includes(searchQuery.toLowerCase())
+              ).length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Search className="h-6 w-6 mb-2 opacity-50" />
+                  <p className="text-xs">No jobs match "{searchQuery}"</p>
+                </div>
               ) : (
-                jobs.map((job) => {
+                jobs.filter(job =>
+                  job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  job.command.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  job.description.toLowerCase().includes(searchQuery.toLowerCase())
+                ).map((job) => {
                   const lastRunRel = formatRelative(job.last_run)
                   return (
                   <div
@@ -475,7 +520,7 @@ function CronJobs() {
                         </span>
                         {lastRunRel && (
                           <span className="flex items-center gap-0.5">
-                            <Clock className="h-2.5 w-2.5" />
+                            <TimerReset className="h-2.5 w-2.5" />
                             {lastRunRel}
                           </span>
                         )}
@@ -500,7 +545,7 @@ function CronJobs() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-6 w-6 transition-colors hover:bg-accent hover:text-accent-foreground"
                             onClick={() => handleRunNow(job.id)}
                             disabled={!job.enabled}
                           >

@@ -109,11 +109,18 @@ export const ToolHeader = ({
         <div className="flex items-center gap-1.5 min-w-0">
           <WrenchIcon className="size-3.5 text-muted-foreground shrink-0" />
           <span className="font-bold text-xs shrink-0">{title ?? derivedName}</span>
-          {command && (
-            <span className="font-mono text-xs text-muted-foreground truncate">{command}</span>
-          )}
+          {command && (() => {
+            const isPath = command.startsWith("/") || command.startsWith("./") || command.startsWith("~/");
+            return isPath ? (
+              <span dir="rtl" className="font-mono text-xs text-muted-foreground truncate min-w-0 max-w-[60%]">
+                <span dir="ltr" className="inline-block">{command}</span>
+              </span>
+            ) : (
+              <span className="font-mono text-xs text-muted-foreground truncate">{command}</span>
+            );
+          })()}
           {fileParts && (
-            <span className="flex items-center gap-0.5 min-w-0">
+            <span className="flex items-center gap-0.5 min-w-0 max-w-[60%]">
               {fileParts.dir && (
                 <span dir="rtl" className="font-mono text-xs text-muted-foreground truncate min-w-0">
                   <span dir="ltr" className="inline-block">{fileParts.dir}/</span>

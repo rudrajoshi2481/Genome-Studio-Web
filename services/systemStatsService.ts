@@ -57,9 +57,9 @@ export class SystemStatsService {
   subscribe(callback: SystemStatsCallback): () => void {
     this.callbacks.add(callback);
     
-    // Send current stats immediately if available
+    // Send current stats if available (deferred to avoid synchronous setState in useEffect)
     if (this.lastStats) {
-      callback(this.lastStats);
+      setTimeout(() => callback(this.lastStats!), 0);
     }
     
     // Connect WebSocket if not already connected

@@ -614,6 +614,13 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
               ...existingNodeData,
               ...flowNodeData,
             };
+            // Preserve lastExecution from file if canvas version is missing output_variables
+            // (frontend WebSocket may have a partial lastExecution that overwrites the backend's full one)
+            const existingLastExec = existingNodeData.lastExecution as Record<string, unknown> | undefined;
+            const canvasLastExec = flowNodeData.lastExecution as Record<string, unknown> | undefined;
+            if (existingLastExec?.output_variables && !(canvasLastExec?.output_variables)) {
+              mergedData.lastExecution = existingLastExec;
+            }
             return {
               ...existingNode,
               position: flowNode.position,

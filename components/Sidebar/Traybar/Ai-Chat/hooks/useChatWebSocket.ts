@@ -19,22 +19,10 @@ export interface SendMessageOptions {
 }
 
 export const useChatWebSocket = () => {
-  const {
-    addMessage,
-    updateStreamingMessage,
-    setStreamingMessage,
-    setConnectionStatus,
-    setLoading,
-    isConnected,
-    currentStreamingMessageId,
-    currentConversationId,
-    isNewChat,
-    setTokenUsage,
-    setContextWindow,
-    setContextTokens,
-    stopGeneration,
-    setCurrentReasoningId,
-  } = useChatStore();
+  // Only subscribe to isConnected — everything else is read via getState()
+  // to avoid re-rendering on every store change (which causes infinite loops
+  // when WebSocket messages trigger rapid setState calls).
+  const isConnected = useChatStore(s => s.isConnected);
 
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingAskUserResolverRef = useRef<((response: string) => void) | null>(null);
@@ -43,13 +31,13 @@ export const useChatWebSocket = () => {
     const connectWebSocket = async () => {
       try {
         await wsService.connect();
-        setConnectionStatus(true);
+        useChatStore.getState().setConnectionStatus(true);
       } catch (error) {
         // Silently handle connection failures - will retry automatically
         if (process.env.NODE_ENV === 'development') {
           console.debug('WebSocket connection attempt failed (will retry):', error);
         }
-        setConnectionStatus(false);
+        useChatStore.getState().setConnectionStatus(false);
         // Retry connection after delay
         reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
       }
@@ -64,7 +52,7 @@ export const useChatWebSocket = () => {
       // Session-aware helpers: route to active messages or background session
       const sessionAddMessage = (msg: any) => {
         if (isActiveSession || !msgSessionId) {
-          return addMessage(msg);
+          return useChatStore.getState().addMessage(msg);
         }
         return useChatStore.getState().addMessageToSession(msgSessionId, msg);
       };
@@ -103,7 +91,7 @@ export const useChatWebSocket = () => {
       };
       const sessionSetLoading = (loading: boolean) => {
         if (isActiveSession || !msgSessionId) {
-          setLoading(loading);
+          useChatStore.getState().setLoading(loading);
         } else {
           useChatStore.setState(state => ({
             openSessions: state.openSessions.map(s =>
@@ -115,7 +103,7 @@ export const useChatWebSocket = () => {
 
       switch (message.type) {
         case 'system':
-          setConnectionStatus(true);
+          useChatStore.getState().setConnectionStatus(true);
           // Skip adding connection confirmation messages to the chat
           if (message.content && message.content !== 'Connected to Genome Studio AI') {
             sessionAddMessage({
@@ -191,16 +179,16 @@ export const useChatWebSocket = () => {
                   if (!msgs.some(m => m.type === 'thinking')) return msgs;
                   return msgs.filter(m => m.type !== 'thinking');
                 });
-                const messageId = addMessage({
+                const messageId = useChatStore.getState().addMessage({
                   type: 'ai',
                   role: 'assistant',
                   content: message.content,
                   isStreaming: true,
                   isComplete: false
                 });
-                setStreamingMessage(messageId);
+                useChatStore.getState().setStreamingMessage(messageId);
               } else if (streamingId) {
-                updateStreamingMessage(message.content, message.is_complete);
+                useChatStore.getState().updateStreamingMessage(message.content, message.is_complete);
               }
               if (message.is_complete) {
                 const streamCompleteState = useChatStore.getState();
@@ -208,9 +196,9 @@ export const useChatWebSocket = () => {
                   m => (m.type === 'tool' || m.type === 'tool_code') && m.isRunning
                 );
                 if (!hasRunningTools) {
-                  setStreamingMessage(null);
-                  setCurrentReasoningId(null);
-                  setLoading(false);
+                  useChatStore.getState().setStreamingMessage(null);
+                  useChatStore.getState().setCurrentReasoningId(null);
+                  useChatStore.getState().setLoading(false);
                 }
               }
             } else {
@@ -267,8 +255,8 @@ export const useChatWebSocket = () => {
                 content: '',
               });
             }
-              setStreamingMessage(null);
-              setCurrentReasoningId(null);
+              useChatStore.getState().setStreamingMessage(null);
+              useChatStore.getState().setCurrentReasoningId(null);
               sessionSetLoading(false);
           } else {
             // Background session — finalize streaming messages there
@@ -376,7 +364,7 @@ export const useChatWebSocket = () => {
                 orderedSteps: [{ kind: 'text', id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, text: message.content || '' }],
               }
             });
-            if (isActiveSession) setCurrentReasoningId(reasoningId);
+            if (isActiveSession) useChatStore.getState().setCurrentReasoningId(reasoningId);
           }
           break;
         }
@@ -497,8 +485,8 @@ export const useChatWebSocket = () => {
               isComplete: false
             });
             if (isActiveSession) {
-              setStreamingMessage(messageId);
-              setCurrentReasoningId(null);
+              useChatStore.getState().setStreamingMessage(messageId);
+              useChatStore.getState().setCurrentReasoningId(null);
             }
           }
           break;
@@ -514,9 +502,9 @@ export const useChatWebSocket = () => {
                 isStreaming: true,
                 isComplete: false
               });
-              setStreamingMessage(messageId);
+              useChatStore.getState().setStreamingMessage(messageId);
             } else {
-              updateStreamingMessage(message.full_content, false);
+              useChatStore.getState().updateStreamingMessage(message.full_content, false);
             }
           } else {
             const sessionMessages = sessionGetMessages();
@@ -836,13 +824,13 @@ export const useChatWebSocket = () => {
             cacheWriteTokens: message.cache_write_tokens || 0,
           };
           if (message.context_window) {
-            setContextWindow(message.context_window);
+            useChatStore.getState().setContextWindow(message.context_window);
           }
           if (message.context_tokens !== undefined) {
-            setContextTokens(message.context_tokens);
+            useChatStore.getState().setContextTokens(message.context_tokens);
           }
           if (isActiveSession || !msgSessionId) {
-            setTokenUsage(usage);
+            useChatStore.getState().setTokenUsage(usage);
           } else {
             useChatStore.setState(state => ({
               openSessions: state.openSessions.map(s =>
@@ -902,10 +890,10 @@ export const useChatWebSocket = () => {
         case 'compaction':
         case 'reactive_compact':
           if (message.context_window) {
-            setContextWindow(message.context_window);
+            useChatStore.getState().setContextWindow(message.context_window);
           }
           if (message.context_tokens !== undefined) {
-            setContextTokens(message.context_tokens);
+            useChatStore.getState().setContextTokens(message.context_tokens);
           }
           sessionAddMessage({
             type: 'system',
@@ -1033,7 +1021,7 @@ export const useChatWebSocket = () => {
   const sendMessage = async (content: string, model?: string, options?: SendMessageOptions) => {
     if (!wsService.isConnected()) {
       console.error('WebSocket is not connected');
-      addMessage({
+      useChatStore.getState().addMessage({
         type: 'system',
         role: 'system',
         content: 'WebSocket is not connected. Attempting to reconnect...'
@@ -1057,7 +1045,7 @@ export const useChatWebSocket = () => {
 
       // Finalize any ongoing reasoning/streaming from the active session only
       if (activeId && (state.currentReasoningId || state.currentStreamingMessageId)) {
-        stopGeneration();
+        state.stopGeneration();
       }
 
       // Always send conversation_id so the backend uses the correct session.
@@ -1066,7 +1054,7 @@ export const useChatWebSocket = () => {
       const sessionIdToSend = convId || activeId || undefined;
 
       // Add user message immediately for better UX
-      addMessage({
+      useChatStore.getState().addMessage({
         type: 'human',
         role: 'user',
         content: content
@@ -1074,7 +1062,7 @@ export const useChatWebSocket = () => {
 
       // Add a thinking message immediately so the PonderingIndicator shows
       // right away — the backend will replace it when real content arrives
-      addMessage({
+      useChatStore.getState().addMessage({
         type: 'thinking',
         role: 'system',
         content: ''
@@ -1215,15 +1203,15 @@ export const useChatWebSocket = () => {
           s.id === activeId ? { ...s, isLoading: true } : s
         ),
       }));
-      setLoading(true);
+      useChatStore.getState().setLoading(true);
     } catch (error) {
       console.error('Failed to send message:', error);
-      addMessage({
+      useChatStore.getState().addMessage({
         type: 'system',
         role: 'system',
         content: 'Failed to send message. Please check your connection.'
       });
-      setLoading(false);
+      useChatStore.getState().setLoading(false);
     }
   };
 
@@ -1231,7 +1219,7 @@ export const useChatWebSocket = () => {
     const state = useChatStore.getState();
     const sessionIdToSend = state.currentConversationId || state.activeSessionId || undefined;
     wsService.sendMessage({ type: 'stop', conversation_id: sessionIdToSend });
-    stopGeneration();
+    useChatStore.getState().stopGeneration();
   };
 
   const stopCommand = (toolMessageId: string) => {
@@ -1268,7 +1256,7 @@ export const useChatWebSocket = () => {
   const sendCommand = (command: string, commandArgs?: string[], model?: string) => {
     if (!wsService.isConnected()) {
       console.error('WebSocket is not connected');
-      addMessage({
+      useChatStore.getState().addMessage({
         type: 'system',
         role: 'system',
         content: 'WebSocket is not connected. Attempting to reconnect...'
@@ -1282,18 +1270,18 @@ export const useChatWebSocket = () => {
     const sessionIdToSend = state.currentConversationId || activeId || undefined;
     // Show the command as a user message in the chat
     const argsStr = commandArgs && commandArgs.length > 0 ? ' ' + commandArgs.join(' ') : '';
-    addMessage({
+    useChatStore.getState().addMessage({
       type: 'human',
       role: 'user',
       content: `/${command}${argsStr}`
     });
     // Add a thinking message immediately so the PonderingIndicator shows
-    addMessage({
+    useChatStore.getState().addMessage({
       type: 'thinking',
       role: 'system',
       content: ''
     });
-    setLoading(true);
+    useChatStore.getState().setLoading(true);
     // Sync loading state to the session
     useChatStore.setState((state) => ({
       openSessions: state.openSessions.map(s =>

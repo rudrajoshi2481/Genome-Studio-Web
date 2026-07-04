@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, Clock } from 'lucide-react'
+import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, TimerReset, Puzzle, Server } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { host, port } from '@/config/server'
@@ -24,6 +24,8 @@ import Nodebar from './Nodebar/Nodebar'
 import Settings from '../settings/Settings'
 import PackageManager from './PackageManager/PackageManager'
 import CronJobs from './CronJobs/CronJobs'
+import Extensions from './Extensions/Extensions'
+import ServerPanel from './ServerPanel/ServerPanel'
 
 /**
  * ToolbarItem represents an item in the sidebar toolbar
@@ -38,8 +40,8 @@ type ToolbarItem = {
 )
 
 interface ToolbarProps {
-  /** Callback when a sidebar component is selected */
-  onComponentChange: (component: React.ReactNode) => void
+  /** Callback when the active sidebar item changes */
+  onActiveItemChange: (itemName: string) => void
   /** Whether the sidebar content panel is open */
   sidebarOpen?: boolean
   /** Toggle the sidebar content panel */
@@ -50,7 +52,7 @@ interface ToolbarProps {
  * Toolbar component that displays sidebar navigation items
  * Handles both sidebar components and page navigation
  */
-function Toolbar({ onComponentChange, sidebarOpen, onToggleSidebar }: ToolbarProps) {
+function Toolbar({ onActiveItemChange, sidebarOpen, onToggleSidebar }: ToolbarProps) {
   const router = useRouter()
   const { user, isAuthenticated, token, logout } = useAuthStore()
 
@@ -111,9 +113,21 @@ function Toolbar({ onComponentChange, sidebarOpen, onToggleSidebar }: ToolbarPro
     },
     {
       name: "Cron Jobs",
-      icon: Clock,
+      icon: TimerReset,
       type: "sidebar",
       component: () => <CronJobs />
+    },
+    {
+      name: "Extensions",
+      icon: Puzzle,
+      type: "sidebar",
+      component: () => <Extensions />
+    },
+    {
+      name: "Server",
+      icon: Server,
+      type: "sidebar",
+      component: () => <ServerPanel />
     },
     // {
     //   name: "Git",
@@ -156,7 +170,7 @@ function Toolbar({ onComponentChange, sidebarOpen, onToggleSidebar }: ToolbarPro
 
     // Switching to a different item — set it active and open sidebar
     setActiveItem(item.name)
-    onComponentChange(item.component())
+    onActiveItemChange(item.name)
     // If sidebar is closed, open it to show the new component
     if (!sidebarOpen && onToggleSidebar) onToggleSidebar()
   }
@@ -175,7 +189,7 @@ function Toolbar({ onComponentChange, sidebarOpen, onToggleSidebar }: ToolbarPro
             const pinnedItem = TOOLBAR_ITEMS.find(item => pinnedArray.includes(item.name))
             if (pinnedItem && pinnedItem.type === "sidebar") {
               setActiveItem(pinnedItem.name)
-              onComponentChange(pinnedItem.component())
+              onActiveItemChange(pinnedItem.name)
               return
             }
           }
@@ -189,9 +203,9 @@ function Toolbar({ onComponentChange, sidebarOpen, onToggleSidebar }: ToolbarPro
     const fileExplorer = TOOLBAR_ITEMS.find(item => item.name === "File Explorer (New)")
     if (fileExplorer && fileExplorer.type === "sidebar") {
       setActiveItem(fileExplorer.name)
-      onComponentChange(fileExplorer.component())
+      onActiveItemChange(fileExplorer.name)
     }
-  }, [onComponentChange])
+  }, [onActiveItemChange])
 
   // Handle pin/unpin functionality - only one item can be pinned at a time
   const handlePinToggle = (itemName: string) => {

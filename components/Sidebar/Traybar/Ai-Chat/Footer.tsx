@@ -31,6 +31,12 @@ import { SlashCommandSuggestion, type SlashCommand } from './components/SlashCom
 import { Editor } from '@tiptap/react'
 import { cn } from '@/lib/utils'
 
+interface ModelPricing {
+  input: number | null
+  output: number | null
+  is_free: boolean
+}
+
 interface OllamaModel {
   name: string
   provider?: string
@@ -38,6 +44,7 @@ interface OllamaModel {
   digest?: string
   modified_at?: string
   context_length?: number
+  pricing?: ModelPricing
   capabilities?: {
     context_length?: number
     supports_tools?: boolean
@@ -416,6 +423,15 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
     return display.replace(/[:]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   }
 
+  const formatPricing = (pricing?: ModelPricing) => {
+    if (!pricing) return null
+    if (pricing.is_free) return 'Free'
+    if (pricing.input != null && pricing.output != null) {
+      return `$${pricing.input}/$${pricing.output}`
+    }
+    return null
+  }
+
   const formatModelSize = (size?: number) => {
     if (!size) return ''
     const gb = size / (1024 ** 3)
@@ -589,6 +605,11 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                                       {model.size && (
                                         <span>{formatModelSize(model.size)}</span>
                                       )}
+                                      {formatPricing(model.pricing) && (
+                                        <span className={model.pricing?.is_free ? 'text-green-500 font-semibold' : ''}>
+                                          {formatPricing(model.pricing)}
+                                        </span>
+                                      )}
                                     </div>
                                     <Button
                                       size="icon"
@@ -702,6 +723,11 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                                   )}
                                   {model.capabilities?.supports_vision && (
                                     <span>vision</span>
+                                  )}
+                                  {formatPricing(model.pricing) && (
+                                    <span className={model.pricing?.is_free ? 'text-green-500 font-semibold' : ''}>
+                                      {formatPricing(model.pricing)}
+                                    </span>
                                   )}
                                 </div>
                                 <Button

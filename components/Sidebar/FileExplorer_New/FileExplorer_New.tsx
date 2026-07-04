@@ -699,11 +699,14 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
     >
       {/* Modern Header with Shadcn Components */}
       <TooltipProvider>
-        <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xs font-semibold tracking-tight text-foreground/80">
-              FILES
-            </h2>
+        <div className="flex-shrink-0 border-b px-3 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Folder className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-xs font-medium">
+                Files
+              </h2>
+            </div>
             
             {/* WebSocket status indicator */}
             {/* <div className={cn(
@@ -722,20 +725,19 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                 <><div className="w-2 h-2 bg-red-500 rounded-full" />Offline</>
               )}
             </div> */}
-          </div>
-          
-          <div className="flex items-center gap-0.5">
+
+          <div className="flex items-center gap-1">
             {/* Primary action buttons */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => refreshFileTree(true)}
                   disabled={isLoading}
-                  className="h-7 w-7 p-0 hover:bg-accent"
+                  className="h-6 w-6"
                 >
-                  <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+                  <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -747,14 +749,14 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => setShowCreateDialog({ 
                     type: 'file', 
                     parentPath: getTargetDirectoryPath(activePath || rootPath)
                   })}
-                  className="h-7 w-7 p-0 hover:bg-accent"
+                  className="h-6 w-6"
                 >
-                  <FilePlus className="h-3.5 w-3.5" />
+                  <FilePlus className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -766,14 +768,14 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => setShowCreateDialog({ 
                     type: 'directory', 
                     parentPath: getTargetDirectoryPath(activePath || rootPath)
                   })}
-                  className="h-7 w-7 p-0 hover:bg-accent"
+                  className="h-6 w-6"
                 >
-                  <FolderPlus className="h-3.5 w-3.5" />
+                  <FolderPlus className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -785,14 +787,14 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => {
                     const targetPath = getTargetDirectoryPath(activePath || rootPath);
                     setShowUploadDialog({ targetPath });
                   }}
-                  className="h-7 w-7 p-0 hover:bg-accent"
+                  className="h-6 w-6"
                 >
-                  <Upload className="h-3.5 w-3.5" />
+                  <Upload className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -804,11 +806,11 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => collapseAll()}
-                  className="h-7 w-7 p-0 hover:bg-accent"
+                  className="h-6 w-6"
                 >
-                  <FoldVertical className="h-3.5 w-3.5" />
+                  <FoldVertical className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -817,11 +819,12 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
             </Tooltip>
             
           </div>
+          </div>
         </div>
       </TooltipProvider>
 
       {/* Search bar */}
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b">
         <SearchBar
           onSearch={handleSearch}
           isSearching={isSearching}

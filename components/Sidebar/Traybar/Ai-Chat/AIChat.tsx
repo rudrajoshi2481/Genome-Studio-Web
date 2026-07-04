@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useChatStore } from './components/chatStore';
+import { shallow } from 'zustand/shallow';
 import { useChatWebSocket } from './hooks/useChatWebSocket';
 import Appbar from './Appbar';
 import Footer from './Footer';
@@ -60,26 +61,43 @@ function AIChat({ onClose }: { onClose?: () => void }) {
     allowedTools,
     tokenUsage,
     resetPermissionMode,
-  } = useChatStore();
+  } = useChatStore(s => ({
+    setCurrentConversation: s.setCurrentConversation,
+    clearMessages: s.clearMessages,
+    messages: s.messages,
+    queuedMessages: s.queuedMessages,
+    queuedTodos: s.queuedTodos,
+    conversations: s.conversations,
+    setConversations: s.setConversations,
+    currentConversationId: s.currentConversationId,
+    setLoading: s.setLoading,
+    isLoading: s.isLoading,
+    clearMentions: s.clearMentions,
+    clearUploadedFiles: s.clearUploadedFiles,
+    mentions: s.mentions,
+    uploadedFiles: s.uploadedFiles,
+    promptSuggestions: s.promptSuggestions,
+    enabledDatabases: s.enabledDatabases,
+    keepIntermediateFiles: s.keepIntermediateFiles,
+    pendingFiles: s.pendingFiles,
+    addPendingFiles: s.addPendingFiles,
+    showFilePanel: s.showFilePanel,
+    openSessions: s.openSessions,
+    activeSessionId: s.activeSessionId,
+    openSession: s.openSession,
+    switchSession: s.switchSession,
+    closeSession: s.closeSession,
+    cacheCurrentSession: s.cacheCurrentSession,
+    permissionMode: s.permissionMode,
+    allowedTools: s.allowedTools,
+    tokenUsage: s.tokenUsage,
+    resetPermissionMode: s.resetPermissionMode,
+  }), shallow);
   const { sendMessage, stopSending, stopCommand, sendAskUserResponse, sendToolApproval, sendCommand } = useChatWebSocket();
 
   const [showAllConvs, setShowAllConvs] = useState(false);
   const [showConvList, setShowConvList] = useState(false);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const wasLoadingRef = useRef(false);
-  const prevMessageCountRef = useRef(0);
-
-  // Auto-scroll to bottom when new messages arrive or streaming content updates
-  useEffect(() => {
-    if (scrollRef.current) {
-      const el = scrollRef.current;
-      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
-      if (isNearBottom) {
-        el.scrollTop = el.scrollHeight;
-      }
-    }
-    prevMessageCountRef.current = messages.length;
-  }, [messages]);
 
   // Auto-process queued messages when loading finishes
   useEffect(() => {
@@ -360,7 +378,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
       }} showHistory={showConvList} onClose={onClose} />
 
       <Conversation className="flex-1">
-        <ConversationContent className="gap-0.5 px-1 py-2" ref={scrollRef}>
+        <ConversationContent className="gap-0.5 px-1 py-2">
           {messages.length === 0 ? (
             <ChatGreeting />
           ) : (

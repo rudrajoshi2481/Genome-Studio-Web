@@ -87,8 +87,8 @@ function NodeCard({
         >
           <Code2 className={`h-4 w-4 shrink-0 ${langStyle.iconColor}`} />
           <div className="flex-1 min-w-0">
-            <div className="flex items-start gap-1.5">
-              <span className="text-xs font-medium break-words">{node.title}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium break-words flex-1 min-w-0">{node.title}</span>
               {nodeTags && Array.isArray(nodeTags) && nodeTags.length > 0 && (
                 <Badge variant="secondary" className="text-[10px] h-4 px-1 shrink-0">
                   {nodeTags[0]}

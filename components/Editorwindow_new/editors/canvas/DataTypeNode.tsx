@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import { Handle, Position, NodeProps, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,6 +39,7 @@ interface DataTypeNodeProps extends NodeProps {
 export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
   const nodeData: DataTypeNodeData = data as DataTypeNodeData;
   const { setNodes, fitView, getNode } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
   const { token } = useAuthStore();
   const nodeRef = useRef<HTMLDivElement>(null);
   const [value, setValue] = useState<any>(
@@ -102,6 +103,12 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
       if (nodeData.dataType === 'float') setFloatStr(String(nodeData.value));
     }
   }, [nodeData.value]);
+
+  // Ensure ReactFlow knows the handle positions when collapse state changes (including initial load)
+  useEffect(() => {
+    const timer = setTimeout(() => updateNodeInternals(id), 50);
+    return () => clearTimeout(timer);
+  }, [id, isCollapsed, updateNodeInternals]);
 
   // Focus label input when editing starts
   useEffect(() => {
@@ -425,7 +432,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return value ? 'true' : 'false';
       case 'list':
       case 'dict':
-        return value.length > 40 ? `${value.slice(0, 40)}…` : value || '—';
+        return value.length > 40 ? `…${value.slice(-40)}` : value || '—';
       default:
         return String(value);
     }
@@ -552,7 +559,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
           className={cn(
             "rounded-none border border-border shadow-md transition-all duration-200 bg-background overflow-visible",
             selected && "ring-2 ring-primary shadow-lg",
-            "min-w-[220px]"
+            "min-w-[280px]"
           )}
           style={{ position: 'relative' }}
         >
@@ -581,6 +588,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
                 if (typeof window !== 'undefined' && nodeData.filePath) {
                   localStorage.setItem(`canvas_node_collapsed_${nodeData.filePath}_${id}`, String(newCollapsed));
                 }
+                // Force ReactFlow to recalculate handle positions after collapse/expand
+                setTimeout(() => updateNodeInternals(id), 50);
               }}
               className="shrink-0 p-0.5 hover:bg-muted/50 rounded transition-colors"
               title={isCollapsed ? "Expand" : "Collapse"}
@@ -664,8 +673,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
                 </Badge>
               ) : (
                 <span
-                  className="text-xs font-mono text-foreground truncate"
-                  style={nodeData.dataType === 'string' ? { direction: 'rtl', textAlign: 'left', unicodeBidi: 'plaintext' } : undefined}
+                  className="text-xs font-mono text-foreground overflow-hidden whitespace-nowrap"
+                  style={['string', 'list', 'dict'].includes(nodeData.dataType) ? { direction: 'rtl', textAlign: 'left', unicodeBidi: 'plaintext' } : undefined}
                 >
                   {getValuePreview()}
                 </span>

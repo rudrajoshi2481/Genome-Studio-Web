@@ -12,12 +12,19 @@ import {
 import Terminal from '@/components/Terminal/Terminal'
 import Traybar from '@/components/Sidebar/Traybar/Traybar'
 import EditorWindow from '@/components/Editorwindow_new/EditorWindow'
+import { cn } from '@/lib/utils'
+import { FileExplorer_New } from '@/components/Sidebar/FileExplorer_New'
+import Nodebar from '@/components/Sidebar/Nodebar/Nodebar'
+import PackageManager from '@/components/Sidebar/PackageManager/PackageManager'
+import CronJobs from '@/components/Sidebar/CronJobs/CronJobs'
+import Extensions from '@/components/Sidebar/Extensions/Extensions'
+import ServerPanel from '@/components/Sidebar/ServerPanel/ServerPanel'
 
 function Page() {
   const [mounted, setMounted] = useState(false)
   const [traybarOpen, setTraybarOpen] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [activeComponent, setActiveComponent] = useState<React.ReactNode>(null)
+  const [activeItem, setActiveItem] = useState<string>('File Explorer (New)')
 
   useEffect(() => {
     setTraybarOpen(localStorage.getItem('dashboard_traybarOpen') !== 'false')
@@ -35,12 +42,19 @@ function Page() {
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden">
-      <Toolbar onComponentChange={setActiveComponent} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <Toolbar onActiveItemChange={setActiveItem} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
       <ResizablePanelGroup key="dashboard-main" direction="horizontal" className="h-full flex-1">
         <ResizablePanel defaultSize={sidebarOpen ? 20 : 0} minSize={sidebarOpen ? 10 : 0} maxSize={30} className={!sidebarOpen ? 'hidden' : ''}>
           <div className="flex flex-col h-full overflow-y-hidden border-r">
             <Appbar />
-            {activeComponent}
+            <div className="flex-1 min-h-0 relative">
+              <div className={cn("absolute inset-0", activeItem === 'File Explorer (New)' ? 'block' : 'hidden')}><FileExplorer_New /></div>
+              <div className={cn("absolute inset-0", activeItem === 'Nodebar' ? 'block' : 'hidden')}><Nodebar /></div>
+              <div className={cn("absolute inset-0", activeItem === 'Package Manager' ? 'block' : 'hidden')}><PackageManager /></div>
+              <div className={cn("absolute inset-0", activeItem === 'Cron Jobs' ? 'block' : 'hidden')}><CronJobs /></div>
+              <div className={cn("absolute inset-0", activeItem === 'Extensions' ? 'block' : 'hidden')}><Extensions /></div>
+              <div className={cn("absolute inset-0", activeItem === 'Server' ? 'block' : 'hidden')}><ServerPanel /></div>
+            </div>
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle={true} className={!sidebarOpen ? 'hidden' : ''} />

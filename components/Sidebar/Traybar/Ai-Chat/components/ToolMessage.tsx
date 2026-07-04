@@ -82,11 +82,16 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
     log_experiment: (a) => a.experiment_name || a.name || "",
     ask_user: (a) => a.question || "",
     todo_write: () => "",
+    query_entrez_database: (a) => a.database || "",
+    bio_query: (a) => a.database || "",
   };
   const toolSubtitle = toolSubtitles[toolName] ? toolSubtitles[toolName](toolArgs) : "";
 
-  // For file path tools that also have a subtitle, prefer the subtitle
-  const headerCommand = toolSubtitle || (isCommandTool ? command : "") || undefined;
+  // For file path tools, don't pass the path as command — filePath prop handles display with left truncation
+  const isFilePathTool = filePathTools.includes(toolName);
+  const headerCommand = isFilePathTool
+    ? (isCommandTool ? command : "") || undefined
+    : toolSubtitle || (isCommandTool ? command : "") || undefined;
 
   const headerTitle = toolName;
 
