@@ -212,6 +212,11 @@
   100% { background-position: 12px 0; }
 }
 
+@keyframes pondering-dot {
+  0%, 80%, 100% { opacity: 0.2; }
+  40% { opacity: 0.7; }
+}
+
 .running-stripes {
   background-image: repeating-linear-gradient(
     -45deg,

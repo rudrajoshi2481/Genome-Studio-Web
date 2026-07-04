@@ -318,7 +318,6 @@ function AIChat({ onClose }: { onClose?: () => void }) {
             <PonderingIndicator
               verb={message.content || undefined}
               mode="thinking"
-              startTime={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
             />
           </div>
         );
@@ -352,7 +351,9 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex h-full w-full flex-col bg-background">
       <Appbar onNewChat={handleNewConversation} onToggleHistory={() => {
-        if (!showConvList && conversations.length === 0) {
+        if (!showConvList) {
+          // Open a new chat session and show history in it
+          handleNewConversation();
           fetchConversations(false);
         }
         setShowConvList(!showConvList);
@@ -370,9 +371,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
                 const spinnerMode: SpinnerMode = hasRunningTools ? 'tool-use' : 'requesting';
                 return (
                   <PonderingIndicator
-                    tokenCount={tokenUsage.outputTokens || undefined}
                     mode={spinnerMode}
-                    hasActiveTools={hasRunningTools}
                   />
                 );
               })()}

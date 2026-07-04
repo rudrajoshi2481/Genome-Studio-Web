@@ -24,26 +24,7 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
   const hasContent =
     orderedSteps.some((s) => s.kind === "text" && s.text.trim()) || textSteps.length > 0;
 
-  const startedAt = message.reasoning?.startedAt;
-  const storedDuration = message.reasoning?.duration;
-  const [elapsed, setElapsed] = useState(() => {
-    if (storedDuration != null) return storedDuration;
-    if (startedAt != null) return Math.floor((Date.now() - startedAt) / 1000);
-    return 0;
-  });
   const [isOpen, setIsOpen] = useState(isStreaming);
-
-  useEffect(() => {
-    if (isStreaming) {
-      const startTime = startedAt ?? Date.now();
-      const interval = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - startTime) / 1000));
-      }, 1000);
-      return () => clearInterval(interval);
-    } else if (storedDuration != null) {
-      setElapsed(storedDuration);
-    }
-  }, [isStreaming, startedAt, storedDuration]);
 
   useEffect(() => {
     setIsOpen(isStreaming);
@@ -57,22 +38,15 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
     <div className="px-1 py-0.5">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors w-full py-0.5"
+        className="flex items-center gap-1.5 text-sm text-muted-foreground/70 hover:text-muted-foreground transition-colors w-full py-0.5"
       >
         {isOpen ? (
           <ChevronDown className="size-3 shrink-0" />
         ) : (
           <ChevronRight className="size-3 shrink-0" />
         )}
-        <Brain className="size-3 shrink-0 text-muted-foreground" />
-        {isStreaming ? (
-          <span className="font-medium animate-pulse text-muted-foreground text-sm">Reasoning</span>
-        ) : (
-          <span className="font-medium text-muted-foreground text-sm">Reasoning</span>
-        )}
-        {elapsed > 0 && (
-          <span className="text-muted-foreground/50 tabular-nums">{elapsed}s</span>
-        )}
+        <Brain className="size-3 shrink-0 text-muted-foreground/70" />
+        <span className="font-medium text-muted-foreground/70 text-sm">Reasoning</span>
       </button>
       {isOpen && (
         <div className="mt-1.5 ml-4 pl-2.5 border-l border-border/40 space-y-1.5">

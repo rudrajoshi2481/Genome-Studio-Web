@@ -183,7 +183,7 @@ export const useChatWebSocket = () => {
               if (message.is_complete) {
                 const streamCompleteState = useChatStore.getState();
                 const hasRunningTools = streamCompleteState.messages.some(
-                  m => m.type === 'tool' && m.isRunning
+                  m => (m.type === 'tool' || m.type === 'tool_code') && m.isRunning
                 );
                 if (!hasRunningTools) {
                   setStreamingMessage(null);
@@ -554,8 +554,16 @@ export const useChatWebSocket = () => {
         }
         case 'tool_start': {
           const toolStepId = message.tool_message_id || `tool-${Date.now()}`;
-          // Remove thinking messages — the agent is now executing a tool, not pondering
-          sessionUpdateMessages(msgs => msgs.filter(m => m.type !== 'thinking'));
+          // Remove thinking messages and close streaming reasoning — the agent is now executing a tool
+          sessionUpdateMessages(msgs =>
+            msgs
+              .filter(m => m.type !== 'thinking')
+              .map(m =>
+                m.type === 'reasoning' && m.reasoning?.isStreaming
+                  ? { ...m, reasoning: { ...m.reasoning, isStreaming: false } }
+                  : m
+              )
+          );
           sessionAddMessage({
             type: 'tool',
             role: 'assistant',
@@ -697,29 +705,9 @@ export const useChatWebSocket = () => {
               }));
             }
           }
-          // Safety net: if all tools done, finalize streaming/loading state
-          {
-            const postMessages = sessionGetMessages();
-            const stillRunning = postMessages.some(m => (m.type === 'tool' || m.type === 'tool_code') && m.isRunning);
-            if (!stillRunning) {
-              sessionUpdateMessages(msgs =>
-                msgs.map(m => {
-                  if (m.type === 'ai' && m.isStreaming) {
-                    return { ...m, isStreaming: false, isComplete: true };
-                  }
-                  if (m.type === 'reasoning' && m.reasoning?.isStreaming) {
-                    return { ...m, reasoning: { ...m.reasoning, isStreaming: false } };
-                  }
-                  return m;
-                })
-              );
-              if (isActiveSession) {
-                setStreamingMessage(null);
-                setCurrentReasoningId(null);
-                sessionSetLoading(false);
-              }
-            }
-          }
+          // Safety net removed — the 'complete' handler finalizes streaming/loading
+          // state when the agent is truly done. Setting loading=false here was
+          // premature because the agent often continues after a tool completes.
           break;
         }
         case 'tool_approval_resolved': {

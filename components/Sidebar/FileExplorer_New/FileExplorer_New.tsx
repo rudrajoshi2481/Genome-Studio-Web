@@ -10,12 +10,9 @@ import {
   FolderPlus, 
   Upload,
   Search,
-  Trash2,
-  MoreHorizontal,
   Wifi,
   WifiOff,
   Loader2,
-  Settings,
   X,
   Folder,
   FoldVertical
@@ -47,15 +44,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
@@ -827,40 +816,6 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
               </TooltipContent>
             </Tooltip>
             
-            <Separator orientation="vertical" className="h-5 mx-0.5" />
-            
-            {/* More actions dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-7 w-7 p-0 hover:bg-accent"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (selectedPaths.length > 0) {
-                      const names = selectedPaths.map(path => path.split('/').pop() || path);
-                      setShowDeleteDialog({ paths: selectedPaths, names });
-                    }
-                  }}
-                  disabled={selectedPaths.length === 0}
-                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete selected ({selectedPaths.length})
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </TooltipProvider>
