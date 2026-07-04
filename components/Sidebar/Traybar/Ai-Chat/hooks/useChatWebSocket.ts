@@ -70,9 +70,28 @@ export const useChatWebSocket = () => {
       };
       const sessionUpdateMessages = (updater: (messages: any[]) => any[]) => {
         if (isActiveSession || !msgSessionId) {
-          useChatStore.setState({ messages: updater(useChatStore.getState().messages) });
+          const currentMessages = useChatStore.getState().messages;
+          const newMessages = updater(currentMessages);
+          // Only call setState if the array actually changed — Zustand always
+          // creates a new state object via Object.assign, so we must bail out
+          // BEFORE calling setState to avoid useless re-renders.
+          if (newMessages === currentMessages) return;
+          if (newMessages.length === currentMessages.length &&
+              newMessages.every((m, i) => m === currentMessages[i])) {
+            return;
+          }
+          useChatStore.setState({ messages: newMessages });
         } else {
-          useChatStore.getState().updateMessagesInSession(msgSessionId, updater);
+          const state = useChatStore.getState();
+          const session = state.openSessions.find(s => s.id === msgSessionId);
+          const currentMessages = session?.messages || [];
+          const newMessages = updater(currentMessages);
+          if (newMessages === currentMessages) return;
+          if (newMessages.length === currentMessages.length &&
+              newMessages.every((m, i) => m === currentMessages[i])) {
+            return;
+          }
+          state.updateMessagesInSession(msgSessionId, updater);
         }
       };
       const sessionGetMessages = () => {
@@ -168,7 +187,10 @@ export const useChatWebSocket = () => {
               const { currentStreamingMessageId: streamingId } = useChatStore.getState();
               if (!streamingId && message.content) {
                 // Remove thinking messages — actual content is now streaming
-                sessionUpdateMessages(msgs => msgs.filter(m => m.type !== 'thinking'));
+                sessionUpdateMessages(msgs => {
+                  if (!msgs.some(m => m.type === 'thinking')) return msgs;
+                  return msgs.filter(m => m.type !== 'thinking');
+                });
                 const messageId = addMessage({
                   type: 'ai',
                   role: 'assistant',
@@ -222,11 +244,10 @@ export const useChatWebSocket = () => {
         case 'complete': {
           // Final completion - finalize streaming ai message and reasoning blocks
           if (isActiveSession) {
-            const completeState = useChatStore.getState();
-              useChatStore.setState({
-                messages: completeState.messages
-                  .filter(m => m.type !== 'thinking')
-                  .map(m => {
+            useChatStore.setState((state) => ({
+              messages: state.messages
+                .filter(m => m.type !== 'thinking')
+                .map(m => {
                   if (m.type === 'ai' && m.isStreaming) {
                     return { ...m, isStreaming: false, isComplete: true };
                   }
@@ -235,17 +256,17 @@ export const useChatWebSocket = () => {
                   }
                   return m;
                 })
+            }));
+            // Add a separator to visually mark the end of the AI response
+            const sepState = useChatStore.getState();
+            const lastMsg = sepState.messages[sepState.messages.length - 1];
+            if (lastMsg && lastMsg.type !== 'separator' && lastMsg.type !== 'human') {
+              sepState.addMessage({
+                type: 'separator',
+                role: 'system',
+                content: '',
               });
-              // Add a separator to visually mark the end of the AI response
-              const sepState = useChatStore.getState();
-              const lastMsg = sepState.messages[sepState.messages.length - 1];
-              if (lastMsg && lastMsg.type !== 'separator' && lastMsg.type !== 'human') {
-                sepState.addMessage({
-                  type: 'separator',
-                  role: 'system',
-                  content: '',
-                });
-              }
+            }
               setStreamingMessage(null);
               setCurrentReasoningId(null);
               sessionSetLoading(false);
@@ -283,7 +304,10 @@ export const useChatWebSocket = () => {
         }
         case 'thinking':
           // Remove any existing thinking messages to prevent stacking
-          sessionUpdateMessages(msgs => msgs.filter(m => m.type !== 'thinking'));
+          sessionUpdateMessages(msgs => {
+            if (!msgs.some(m => m.type === 'thinking')) return msgs;
+            return msgs.filter(m => m.type !== 'thinking');
+          });
           sessionAddMessage({
             type: 'thinking',
             role: 'system',
@@ -293,7 +317,10 @@ export const useChatWebSocket = () => {
           break;
         case 'status_update':
           // Replace existing thinking/status messages with the new short status
-          sessionUpdateMessages(msgs => msgs.filter(m => m.type !== 'thinking'));
+          sessionUpdateMessages(msgs => {
+            if (!msgs.some(m => m.type === 'thinking')) return msgs;
+            return msgs.filter(m => m.type !== 'thinking');
+          });
           sessionAddMessage({
             type: 'thinking',
             role: 'system',
@@ -441,22 +468,26 @@ export const useChatWebSocket = () => {
           const lastMsg = currentMessages[currentMessages.length - 1];
           if (lastMsg && lastMsg.type === 'ai' && lastMsg.isStreaming) {
             const newContent = (lastMsg.content || '') + message.content;
-            sessionUpdateMessages(msgs =>
-              msgs.map(m =>
-                m.id === lastMsg.id ? { ...m, content: newContent } : m
-              )
-            );
+            sessionUpdateMessages(msgs => {
+              const idx = msgs.findIndex(m => m.id === lastMsg.id);
+              if (idx === -1) return msgs;
+              const updated = msgs.slice();
+              updated[idx] = { ...msgs[idx], content: newContent };
+              return updated;
+            });
           } else {
-            const closed = currentMessages.map(m =>
-              m.type === 'reasoning' && m.reasoning?.isStreaming
-                ? { ...m, reasoning: { ...m.reasoning, isStreaming: false } }
-                : m
-            );
-            // Also remove thinking messages — the pondering indicator is no longer needed
-            // since actual content is now streaming
-            const cleaned = closed.filter(m => m.type !== 'thinking');
-            if (cleaned.some((m, i) => m !== currentMessages[i])) {
-              sessionUpdateMessages(() => cleaned);
+            const hasStreamingReasoning = currentMessages.some(m => m.type === 'reasoning' && m.reasoning?.isStreaming);
+            const hasThinking = currentMessages.some(m => m.type === 'thinking');
+            if (hasStreamingReasoning || hasThinking) {
+              sessionUpdateMessages(msgs =>
+                msgs
+                  .filter(m => m.type !== 'thinking')
+                  .map(m =>
+                    m.type === 'reasoning' && m.reasoning?.isStreaming
+                      ? { ...m, reasoning: { ...m.reasoning, isStreaming: false } }
+                      : m
+                  )
+              );
             }
             const messageId = sessionAddMessage({
               type: 'ai',
@@ -555,15 +586,18 @@ export const useChatWebSocket = () => {
         case 'tool_start': {
           const toolStepId = message.tool_message_id || `tool-${Date.now()}`;
           // Remove thinking messages and close streaming reasoning — the agent is now executing a tool
-          sessionUpdateMessages(msgs =>
-            msgs
+          sessionUpdateMessages(msgs => {
+            const hasThinking = msgs.some(m => m.type !== 'thinking' ? false : true);
+            const hasStreamingReasoning = msgs.some(m => m.type === 'reasoning' && m.reasoning?.isStreaming);
+            if (!hasThinking && !hasStreamingReasoning) return msgs;
+            return msgs
               .filter(m => m.type !== 'thinking')
               .map(m =>
                 m.type === 'reasoning' && m.reasoning?.isStreaming
                   ? { ...m, reasoning: { ...m.reasoning, isStreaming: false } }
                   : m
-              )
-          );
+              );
+          });
           sessionAddMessage({
             type: 'tool',
             role: 'assistant',

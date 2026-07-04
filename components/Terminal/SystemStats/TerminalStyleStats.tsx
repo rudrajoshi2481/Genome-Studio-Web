@@ -14,8 +14,26 @@ const TerminalStyleStats: React.FC<TerminalStyleStatsProps> = () => {
 
   const systemStatsService = SystemStatsService.getInstance();
 
+  const statsRef = useRef<SystemStats | null>(null);
+
   // Memoize callbacks to prevent re-renders
   const handleStatsUpdate = useCallback((newStats: SystemStats) => {
+    const prev = statsRef.current;
+    if (prev &&
+        prev.cpu_usage === newStats.cpu_usage &&
+        prev.ram_usage === newStats.ram_usage &&
+        prev.ram_total === newStats.ram_total &&
+        prev.ram_used === newStats.ram_used &&
+        prev.ram_available === newStats.ram_available &&
+        prev.disk_usage === newStats.disk_usage &&
+        prev.disk_total === newStats.disk_total &&
+        prev.disk_used === newStats.disk_used &&
+        prev.disk_free === newStats.disk_free &&
+        prev.uptime === newStats.uptime &&
+        prev.server_ip === newStats.server_ip) {
+      return;
+    }
+    statsRef.current = newStats;
     setStats(newStats);
     setIsLoading(false);
     setError(null);

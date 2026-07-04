@@ -737,18 +737,18 @@ export const useChatStore = create<ChatState>()(
   },
 
   updateMessagesInSession: (sessionId: string, updater: (messages: any[]) => any[]) => {
-    const state = get();
-    if (state.activeSessionId === sessionId) {
-      set({ messages: updater(state.messages) });
-    } else {
-      set({
+    set((state) => {
+      if (state.activeSessionId === sessionId) {
+        return { messages: updater(state.messages) };
+      }
+      return {
         openSessions: state.openSessions.map(s =>
           s.id === sessionId
             ? { ...s, messages: updater(s.messages) }
             : s
         ),
-      });
-    }
+      };
+    });
   },
 
   addPendingFile: (file) =>

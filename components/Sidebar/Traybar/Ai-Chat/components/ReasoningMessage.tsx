@@ -38,7 +38,7 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
     <div className="px-1 py-0.5">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground/70 hover:text-muted-foreground transition-colors w-full py-0.5"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors w-full py-0.5"
       >
         {isOpen ? (
           <ChevronDown className="size-3 shrink-0" />
@@ -46,7 +46,7 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
           <ChevronRight className="size-3 shrink-0" />
         )}
         <Brain className="size-3 shrink-0 text-muted-foreground/70" />
-        <span className="font-medium text-muted-foreground/70 text-sm">Reasoning</span>
+        <span className="font-medium text-muted-foreground/70 text-xs">Reasoning</span>
       </button>
       {isOpen && (
         <div className="mt-1.5 ml-4 pl-2.5 border-l border-border/40 space-y-1.5">
@@ -58,7 +58,7 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
                   <div
                     key={`${step.id}-${lineIdx}`}
                     className={cn(
-                      "text-sm text-muted-foreground/80 leading-relaxed font-source-sans",
+                      "text-xs text-muted-foreground/80 leading-relaxed font-source-sans",
                     )}
                   >
                     <span>{line}</span>
@@ -71,7 +71,7 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
             textSteps.map((step, idx) => (
               <div
                 key={`reasoning-${idx}`}
-                className="text-sm text-muted-foreground/80 leading-relaxed font-source-sans"
+                className="text-xs text-muted-foreground/80 leading-relaxed font-source-sans"
               >
                 <span>{step}</span>
               </div>
