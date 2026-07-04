@@ -46,6 +46,16 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
       ? nodeData.value 
       : getDefaultValue(nodeData.dataType)
   );
+  // Local string state for int/float inputs so user can type freely without
+  // the controlled numeric value collapsing intermediate states like "05" → "5"
+  const [intStr, setIntStr] = useState<string>(() => {
+    const v = nodeData.value !== undefined && nodeData.value !== null ? nodeData.value : getDefaultValue(nodeData.dataType);
+    return String(v);
+  });
+  const [floatStr, setFloatStr] = useState<string>(() => {
+    const v = nodeData.value !== undefined && nodeData.value !== null ? nodeData.value : getDefaultValue(nodeData.dataType);
+    return String(v);
+  });
   const [label, setLabel] = useState<string>(nodeData.label || nodeData.dataType);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [labelError, setLabelError] = useState<string>('');
@@ -87,6 +97,9 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
   useEffect(() => {
     if (nodeData.value !== undefined && nodeData.value !== value) {
       setValue(nodeData.value);
+      // Also sync the string states for int/float
+      if (nodeData.dataType === 'int') setIntStr(String(nodeData.value));
+      if (nodeData.dataType === 'float') setFloatStr(String(nodeData.value));
     }
   }, [nodeData.value]);
 
@@ -437,10 +450,17 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return (
           <Input
             type="number"
-            value={value}
+            value={intStr}
             onChange={(e) => {
+              setIntStr(e.target.value);
               const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-              handleValueChange(isNaN(val) ? 0 : val);
+              if (!isNaN(val)) handleValueChange(val);
+            }}
+            onBlur={() => {
+              const val = intStr === '' ? 0 : parseInt(intStr);
+              const finalVal = isNaN(val) ? 0 : val;
+              setIntStr(String(finalVal));
+              handleValueChange(finalVal);
             }}
             onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
             placeholder="0"
@@ -453,10 +473,17 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return (
           <Input
             type="number"
-            value={value}
+            value={floatStr}
             onChange={(e) => {
+              setFloatStr(e.target.value);
               const val = e.target.value === '' ? 0.0 : parseFloat(e.target.value);
-              handleValueChange(isNaN(val) ? 0.0 : val);
+              if (!isNaN(val)) handleValueChange(val);
+            }}
+            onBlur={() => {
+              const val = floatStr === '' ? 0.0 : parseFloat(floatStr);
+              const finalVal = isNaN(val) ? 0.0 : val;
+              setFloatStr(String(finalVal));
+              handleValueChange(finalVal);
             }}
             onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
             placeholder="0.0"

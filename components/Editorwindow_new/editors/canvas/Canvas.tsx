@@ -81,8 +81,16 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
   // or store hydration) while ReactFlow had zero dimensions — e.g. a freshly
   // mounted tab or a tab that was created already-active. Without this, nodes
   // exist in state but don't appear until the tab is closed and reopened.
+  // IMPORTANT: Only fit when nodes go from 0 → >0 (initial load). Fitting on
+  // every node count change would reset the viewport when dropping nodes.
+  const prevNodeCountRef = useRef(0);
   useEffect(() => {
+    const wasEmpty = prevNodeCountRef.current === 0;
+    prevNodeCountRef.current = nodes.length;
+
     if (!isActive || nodes.length === 0 || !reactFlowInstance) return;
+    if (!wasEmpty) return; // Skip fitView when adding nodes to an existing canvas
+
     const id = requestAnimationFrame(() => {
       reactFlowInstance.fitView({ padding: 0.2, duration: 0 });
     });
@@ -548,7 +556,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       id: `edge-${params.source}-${params.target}-${Date.now()}`,
       animated: true,
       style: { 
-        stroke: '#555',
+        stroke: '#a8a29e',
         strokeDasharray: '5,5'
       }
     };

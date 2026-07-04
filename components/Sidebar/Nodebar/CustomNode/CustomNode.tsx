@@ -20,7 +20,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { 
   Card, 
@@ -37,6 +36,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { host, port } from '@/config/server'
+import { getHandleTypeInfo } from '@/components/Editorwindow_new/editors/canvas/handleTypes'
 
 // Define interfaces for proper type safety
 interface NodeIO {
@@ -629,109 +629,139 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                       <div className="px-4 py-2.5 border-b shrink-0">
                         <h3 className="font-semibold text-xs">Node Connections</h3>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-6">
+                      <div className="flex-1 overflow-y-auto p-4">
                         {testResult && testResult.node && (
-                          <div className="space-y-6 pt-6">
-                            
-                            {/* React Flow-style Node using Shadcn Card */}
-                            <div className="relative mx-auto w-[320px] mb-12">
-                              {/* Node Container */}
-                              <Card className="border shadow-sm hover:shadow-md transition-transform duration-200 overflow-hidden">
-                                {/* Node Header */}
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-center">
-                                    {testResult.node.data.title || 'Node'}
-                                  </CardTitle>
-                                  <CardDescription className="text-center text-xs max-w-[90%] mx-auto">
-                                    {testResult.node.data.description}
-                                  </CardDescription>
-                                </CardHeader>
-                                
-                                {/* Node Body - Handles Section */}
-                                <CardContent className="p-4 pt-2">
-                                  <div className="relative">
-                                    {/* Handles Container */}
-                                    <div className={`flex justify-between items-start ${Math.max(testResult.node.data.inputs.length, testResult.node.data.outputs.length) > 3 ? 'min-h-[120px]' : 'min-h-[80px]'}`}>
-                                      
-                                      {/* Input Handles */}
-                                      <div className="flex flex-col gap-3 items-start">
-                                        {testResult.node.data.inputs.map((input: NodeIO, index: number) => (
-                                          <div key={input.id} className="flex items-center gap-2 group relative">
-                                            <div className="w-4 h-4 rounded-full bg-red-500 group-hover:scale-110 transition-transform border-2 border-background relative">
-                                              <div className="absolute -left-16 -top-1 invisible group-hover:visible bg-popover border text-popover-foreground text-[10px] px-2 py-1 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
-                                                {input.type}
-                                              </div>
-                                            </div>
-                                            <span className="text-xs font-medium">{input.name}</span>
-                                          </div>
-                                        ))}
-                                      </div>
+                          <div className="flex gap-4 h-full">
+                            {/* ── Left: Node Preview (how it looks on canvas) ── */}
+                            <div className="flex-1 flex items-start justify-center pt-4">
+                              <div className="relative w-[280px]">
+                                {/* Connection lines decoration */}
+                                <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-3 h-px bg-stone-300" />
+                                <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-3 h-px bg-stone-300" />
 
-                                      {/* Output Handles */}
-                                      <div className="flex flex-col gap-3 items-end">
-                                        {testResult.node.data.outputs.map((output: NodeIO, index: number) => (
-                                          <div key={output.id} className="flex items-center gap-2 group relative">
-                                            <span className="text-xs font-medium">{output.name}</span>
-                                            <div className="w-4 h-4 rounded-full bg-blue-500 group-hover:scale-110 transition-transform border-2 border-background relative">
-                                              <div className="absolute -right-16 -top-1 invisible group-hover:visible bg-popover border text-popover-foreground text-[10px] px-2 py-1 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
-                                                {output.type}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
+                                {/* Node Container */}
+                                <Card className="border shadow-sm hover:shadow-md transition-shadow overflow-hidden bg-card">
+                                  {/* Node Header */}
+                                  <CardHeader className="pb-2 pt-3 px-3">
+                                    <CardTitle className="text-center text-xs">
+                                      {testResult.node.data.title || 'Node'}
+                                    </CardTitle>
+                                    {testResult.node.data.description && (
+                                      <CardDescription className="text-center text-[10px] max-w-[90%] mx-auto line-clamp-2">
+                                        {testResult.node.data.description}
+                                      </CardDescription>
+                                    )}
+                                  </CardHeader>
 
+                                  {/* Node Body - Handles Section */}
+                                  <CardContent className="p-3 pt-1">
+                                    <div className="relative">
+                                      <div className={`flex justify-between items-start gap-4 ${Math.max(testResult.node.data.inputs.length, testResult.node.data.outputs.length) > 3 ? 'min-h-[110px]' : 'min-h-[70px]'}`}>
+
+                                        {/* Input Handles */}
+                                        <div className="flex flex-col gap-2.5 items-start">
+                                          {testResult.node.data.inputs.map((input: NodeIO, index: number) => {
+                                            const info = getHandleTypeInfo(input.type || 'any');
+                                            return (
+                                              <div key={input.id} className="flex items-center gap-1.5 group relative">
+                                                <div
+                                                  className="w-3 h-3 rounded-full group-hover:scale-125 transition-transform border-2 border-background shrink-0"
+                                                  style={{ background: info.handleColor }}
+                                                />
+                                                <span className="text-[10px] font-medium text-muted-foreground">{input.name}</span>
+                                                <div className="absolute -left-2 -top-6 invisible group-hover:visible bg-popover border text-popover-foreground text-[9px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-50 pointer-events-none">
+                                                  {info.label}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+
+                                        {/* Output Handles */}
+                                        <div className="flex flex-col gap-2.5 items-end">
+                                          {testResult.node.data.outputs.map((output: NodeIO, index: number) => {
+                                            const info = getHandleTypeInfo(output.type || 'any');
+                                            return (
+                                              <div key={output.id} className="flex items-center gap-1.5 group relative">
+                                                <span className="text-[10px] font-medium text-muted-foreground">{output.name}</span>
+                                                <div
+                                                  className="w-3 h-3 rounded-full group-hover:scale-125 transition-transform border-2 border-background shrink-0"
+                                                  style={{ background: info.handleColor }}
+                                                />
+                                                <div className="absolute -right-2 -top-6 invisible group-hover:visible bg-popover border text-popover-foreground text-[9px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-50 pointer-events-none">
+                                                  {info.label}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
+                                  </CardContent>
+                                </Card>
+
+                                {/* Function name badge below node */}
+                                <div className="mt-3 flex items-center justify-center gap-2">
+                                  <span className="text-[10px] font-mono text-muted-foreground">{testResult.node.data.function_name}</span>
+                                  <Badge variant="secondary" className="text-[9px] h-4 capitalize">
+                                    {testResult.node.data.language}
+                                  </Badge>
+                                </div>
+                              </div>
                             </div>
 
-                            {/* Node Details */}
-                            <Card className="mt-9 border-none bg-transparent shadow-none">
-                              <Separator/> 
-                              <CardContent className="border-none p-0 pt-4">
-                                <div className="grid grid-cols-2 gap-6">
-                                  <div className="space-y-2">
-                                    <h5 className="font-medium text-xs flex items-center gap-2">
-                                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                                      Inputs
-                                    </h5>
-                                    <ul className="space-y-1.5">
-                                      {testResult.node.data.inputs.map((input: NodeIO) => (
-                                        <li key={input.id} className="flex items-center gap-2">
-                                          <Badge variant="outline" className="font-mono bg-background">{input.name}</Badge>
-                                          <span className="text-xs text-muted-foreground">({input.type})</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <h5 className="font-medium text-xs flex items-center gap-2">
-                                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                      Outputs
-                                    </h5>
-                                    <ul className="space-y-1.5">
-                                      {testResult.node.data.outputs.map((output: NodeIO) => (
-                                        <li key={output.id} className="flex items-center gap-2">
-                                          <Badge variant="outline" className="font-mono bg-background">{output.name}</Badge>
-                                          <span className="text-xs text-muted-foreground">({output.type})</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
+                            {/* ── Right: Data Type Details ── */}
+                            <div className="flex-1 flex flex-col gap-3 min-w-0">
+                              {/* Inputs */}
+                              <div className="space-y-2">
+                                <h5 className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">Inputs</h5>
+                                <div className="space-y-1.5">
+                                  {testResult.node.data.inputs.map((input: NodeIO) => {
+                                    const info = getHandleTypeInfo(input.type || 'any');
+                                    return (
+                                      <div key={input.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border bg-card/50 hover:bg-card transition-colors">
+                                        <div
+                                          className="w-2.5 h-2.5 rounded-full shrink-0 border border-background"
+                                          style={{ background: info.handleColor }}
+                                        />
+                                        <span className="text-xs font-mono font-medium truncate flex-1">{input.name}</span>
+                                        <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${info.badgeClass} border-0`}>
+                                          {info.label}
+                                        </Badge>
+                                      </div>
+                                    );
+                                  })}
+                                  {testResult.node.data.inputs.length === 0 && (
+                                    <p className="text-[10px] text-muted-foreground italic px-2.5">No inputs</p>
+                                  )}
                                 </div>
-                                <div className="mt-4 pt-3 border-t">
-                                  <h5 className="font-medium text-xs mb-2">Function:</h5>
-                                  <div className="bg-background border p-2 rounded-md text-xs font-mono flex items-center justify-between">
-                                    <span>{testResult.node.data.function_name}</span>
-                                    <Badge variant="secondary">
-                                      {testResult.node.data.language}
-                                    </Badge>
-                                  </div>
+                              </div>
+
+                              {/* Outputs */}
+                              <div className="space-y-2">
+                                <h5 className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">Outputs</h5>
+                                <div className="space-y-1.5">
+                                  {testResult.node.data.outputs.map((output: NodeIO) => {
+                                    const info = getHandleTypeInfo(output.type || 'any');
+                                    return (
+                                      <div key={output.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border bg-card/50 hover:bg-card transition-colors">
+                                        <div
+                                          className="w-2.5 h-2.5 rounded-full shrink-0 border border-background"
+                                          style={{ background: info.handleColor }}
+                                        />
+                                        <span className="text-xs font-mono font-medium truncate flex-1">{output.name}</span>
+                                        <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${info.badgeClass} border-0`}>
+                                          {info.label}
+                                        </Badge>
+                                      </div>
+                                    );
+                                  })}
+                                  {testResult.node.data.outputs.length === 0 && (
+                                    <p className="text-[10px] text-muted-foreground italic px-2.5">No outputs</p>
+                                  )}
                                 </div>
-                              </CardContent>
-                            </Card>
+                              </div>
+                            </div>
                           </div>
                         )}
                         {testError && (
