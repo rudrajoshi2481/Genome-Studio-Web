@@ -417,7 +417,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
     if (value === undefined || value === null) return '—';
     switch (nodeData.dataType) {
       case 'string':
-        return value === '' ? '—' : value.length > 30 ? `"${value.slice(0, 30)}…"` : `"${value}"`;
+        return value === '' ? '—' : value.length > 30 ? `"…${value.slice(-30)}"` : `"${value}"`;
       case 'int':
       case 'float':
         return String(value);
@@ -663,7 +663,10 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
                   {value ? 'true' : 'false'}
                 </Badge>
               ) : (
-                <span className="text-xs font-mono text-foreground truncate">
+                <span
+                  className="text-xs font-mono text-foreground truncate"
+                  style={nodeData.dataType === 'string' ? { direction: 'rtl', textAlign: 'left', unicodeBidi: 'plaintext' } : undefined}
+                >
                   {getValuePreview()}
                 </span>
               )}

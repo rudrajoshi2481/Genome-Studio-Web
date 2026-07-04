@@ -459,3 +459,76 @@ export const getFavoriteNodes = async (token: string): Promise<string[]> => {
     throw error;
   }
 };
+
+export interface RecompileResult {
+  message: string;
+  verification: {
+    total_nodes: number;
+    recompiled: number;
+    changed: number;
+    errors: number;
+    output_file: string;
+    error_details: Array<{ id: number; title: string; error: string }>;
+    any_type_inputs: number;
+    any_type_outputs: number;
+  };
+  nodes: Array<{
+    id: number;
+    node_id: string;
+    title: string;
+    description: string;
+    function_name: string;
+    language: string;
+    source_code: string;
+    inputs: CustomNodeIO[];
+    outputs: CustomNodeIO[];
+    tags: string[];
+    inputs_changed: boolean;
+    outputs_changed: boolean;
+    old_inputs: CustomNodeIO[];
+    old_outputs: CustomNodeIO[];
+  }>;
+}
+
+/**
+ * Recompile all custom nodes by re-analyzing their source code
+ * @param token JWT authentication token
+ * @returns Recompile result with verification summary and updated nodes
+ */
+export const recompileAllNodes = async (token: string): Promise<RecompileResult> => {
+  try {
+    console.log('Recompiling all nodes');
+
+    if (!token) {
+      console.error('No authentication token provided');
+      throw new Error('Authentication token is required');
+    }
+
+    const fullUrl = `${API_URL}/workflow-manager/custom-nodes/recompile-all`;
+    console.log(`Making POST request to: ${fullUrl}`);
+
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    });
+
+    console.log('API response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error recompiling nodes:', response.status, errorText);
+      throw new Error(`Failed to recompile nodes: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Recompile result:', data.message);
+    return data;
+  } catch (error) {
+    console.error('Error in recompileAllNodes:', error);
+    throw error;
+  }
+};

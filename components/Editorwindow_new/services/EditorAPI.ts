@@ -174,6 +174,17 @@ const makeRequest = async (url: string, options: RequestInit = {}) => {
         throw new Error(`Authentication failed: ${errorData?.detail || errorData?.message || response.statusText}`)
       }
       
+      // Handle file not found specifically
+      if (response.status === 404) {
+        throw new Error('File not found')
+      }
+      
+      // Handle binary/unprocessable files
+      if (response.status === 422) {
+        const msg = errorData?.detail || 'This file cannot be opened in the text editor'
+        throw new Error(msg)
+      }
+      
       const errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`
       throw new Error(`API request failed (${response.status}): ${errorMessage}`)
     }
