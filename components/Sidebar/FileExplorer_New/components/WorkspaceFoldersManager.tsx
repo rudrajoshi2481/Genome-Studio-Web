@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
-import { Folder, FolderPlus, X, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Folder, FolderPlus, X, RefreshCw, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
 import {
@@ -32,9 +32,12 @@ export const WorkspaceFoldersManager: React.FC<WorkspaceFoldersManagerProps> = (
   const [isLoading, setIsLoading] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadFolders = async (silent = false) => {
     setIsLoading(true);
+    setLoadFailed(false);
     try {
       const baseUrl = getApiBaseUrl();
       const token = authService.getToken();
@@ -51,11 +54,18 @@ export const WorkspaceFoldersManager: React.FC<WorkspaceFoldersManagerProps> = (
         const data = await response.json();
         setFolders(data.folders || []);
       } else {
-        // if (!silent) toast.error('Failed to load workspace folders');
+        setLoadFailed(true);
+        if (!silent) {
+          // Retry after 2s if auth token might not be ready
+          if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+          retryTimerRef.current = setTimeout(() => loadFolders(true), 2000);
+        }
       }
     } catch (error) {
+      setLoadFailed(true);
       if (!silent) {
-        // toast.error(`Error loading folders: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = setTimeout(() => loadFolders(true), 2000);
       }
     } finally {
       setIsLoading(false);
@@ -64,6 +74,9 @@ export const WorkspaceFoldersManager: React.FC<WorkspaceFoldersManagerProps> = (
 
   useEffect(() => {
     loadFolders(true);
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
   }, []);
 
   const handleRemoveFolder = async (folderPath: string) => {
@@ -177,37 +190,55 @@ export const WorkspaceFoldersManager: React.FC<WorkspaceFoldersManagerProps> = (
       {/* Folder List */}
       {isExpanded && (
         <div className="px-2 pb-2 space-y-0.5">
-          {folders.map((folder) => (
+          {loadFailed && folders.length === 0 ? (
             <div
-              key={folder.path}
-              className="flex items-center justify-between pl-6 pr-2 py-1.5 rounded-md hover:bg-accent/50 group cursor-pointer transition-colors"
-              onClick={() => {
-                console.log('📁 Switching to workspace folder:', folder.path);
-                onFolderSelect?.(folder.path);
-              }}
-              title={`Click to view ${folder.alias}`}
+              className="flex items-center gap-2 pl-6 pr-2 py-1.5 rounded-md hover:bg-accent/50 cursor-pointer transition-colors"
+              onClick={() => loadFolders(false)}
             >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <Folder className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                <span className="text-xs font-medium truncate">
-                  {folder.alias}
-                </span>
-              </div>
-              {folders.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveFolder(folder.path);
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
+              <AlertCircle className="h-3.5 w-3.5 text-yellow-500 flex-shrink-0" />
+              <span className="text-xs text-muted-foreground">Failed to load. Click to retry.</span>
             </div>
-          ))}
+          ) : folders.length === 0 ? (
+            <div
+              className="flex items-center gap-2 pl-6 pr-2 py-1.5 rounded-md hover:bg-accent/50 cursor-pointer transition-colors"
+              onClick={() => setShowAddDialog(true)}
+            >
+              <FolderPlus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="text-xs text-muted-foreground">No folders. Click to add one.</span>
+            </div>
+          ) : (
+            folders.map((folder) => (
+              <div
+                key={folder.path}
+                className="flex items-center justify-between pl-6 pr-2 py-1.5 rounded-md hover:bg-accent/50 group cursor-pointer transition-colors"
+                onClick={() => {
+                  console.log('📁 Switching to workspace folder:', folder.path);
+                  onFolderSelect?.(folder.path);
+                }}
+                title={`Click to view ${folder.alias}`}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Folder className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                  <span className="text-xs font-medium truncate">
+                    {folder.alias}
+                  </span>
+                </div>
+                {folders.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveFolder(folder.path);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            ))
+          )}
         </div>
       )}
 

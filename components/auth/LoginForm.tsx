@@ -14,7 +14,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { host, port } from '@/config/server';
 import { Eye, EyeOff, Lock, Mail, User, UserPlus, LogIn, Info } from 'lucide-react';
-import { ThemeAwareLogo } from '@/components/ThemeAwareLogo';
+import Image from 'next/image';
 
 export default function LoginForm() {
   const [username, setUsername] = useState('');
@@ -109,7 +109,7 @@ export default function LoginForm() {
     <Card className="w-full max-w-[420px] shadow-lg">
       <CardHeader className="text-center">
         <div className="mx-auto mb-2">
-          <ThemeAwareLogo width={120} height={60} priority />
+          <Image src="/black_genome_studio.svg" alt="Genome Studio" width={120} height={60} priority />
         </div>
         
         <CardDescription className="text-muted-foreground">Sign in or create a new account</CardDescription>

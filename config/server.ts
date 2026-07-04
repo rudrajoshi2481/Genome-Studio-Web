@@ -74,16 +74,19 @@ export function getServerConfig(): ServerConfig {
  * Get the API base URL (including protocol, host, port, and base path)
  */
 export function getApiBaseUrl(): string {
-  const { protocol, host, port, baseUrl } = defaultConfig.api;
-  return `${protocol}://${host}:${port}${baseUrl}`;
+  const { protocol, port, baseUrl } = defaultConfig.api;
+  // Use window.location.hostname when in browser so remote clients resolve correctly
+  const resolvedHost = typeof window !== 'undefined' ? window.location.hostname : defaultConfig.api.host;
+  return `${protocol}://${resolvedHost}:${port}${baseUrl}`;
 }
 
 /**
  * Get the WebSocket URL (including protocol, host, port, and path)
  */
 export function getWebsocketUrl(endpoint: string = ''): string {
-  const { protocol, host, port, path } = defaultConfig.websocket;
-  return `${protocol}://${host}:${port}${path}${endpoint}`;
+  const { protocol, port, path } = defaultConfig.websocket;
+  const resolvedHost = typeof window !== 'undefined' ? window.location.hostname : defaultConfig.websocket.host;
+  return `${protocol}://${resolvedHost}:${port}${path}${endpoint}`;
 }
 
 /**

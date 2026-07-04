@@ -150,25 +150,6 @@ const makeRequest = async (url: string, options: RequestInit = {}) => {
         errorData = { status: response.status, statusText: response.statusText }
       }
       
-      console.error(`❌ [${requestId}] EditorAPI Error:`, {
-        url,
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText || 'No error text',
-        errorData: errorData || {},
-        duration: `${duration}ms`,
-        timestamp: new Date().toISOString()
-      })
-      
-      // Also log individual components for debugging
-      console.error(`❌ [${requestId}] Status: ${response.status} ${response.statusText}`)
-      if (errorText) {
-        console.error(`❌ [${requestId}] Error Text:`, errorText)
-      }
-      if (errorData && Object.keys(errorData).length > 0) {
-        console.error(`❌ [${requestId}] Error Data:`, JSON.stringify(errorData, null, 2))
-      }
-      
       // Handle authentication errors specifically
       if (response.status === 401 || response.status === 403) {
         throw new Error(`Authentication failed: ${errorData?.detail || errorData?.message || response.statusText}`)
@@ -184,6 +165,8 @@ const makeRequest = async (url: string, options: RequestInit = {}) => {
         const msg = errorData?.detail || 'This file cannot be opened in the text editor'
         throw new Error(msg)
       }
+
+      console.error(`❌ [${requestId}] EditorAPI ${response.status} ${response.statusText}:`, errorText, url)
       
       const errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`
       throw new Error(`API request failed (${response.status}): ${errorMessage}`)
@@ -218,62 +201,14 @@ const makeRequest = async (url: string, options: RequestInit = {}) => {
     return data
   } catch (error) {
     const duration = Date.now() - startTime
-    
-    // Log the raw error for debugging
-    console.error(`🔍 [${requestId}] Raw error:`, error)
-    
-    // Enhanced error information extraction
-    let errorInfo: any = {}
-    
-    if (error instanceof Error) {
-      errorInfo = {
-        message: error.message || 'No error message',
-        name: error.name || 'Error',
-        stack: error.stack?.split('\n').slice(0, 5).join('\n') || 'No stack trace'
-      }
-      
-      // Add additional error properties if they exist
-      if ('code' in error) errorInfo.code = (error as any).code
-      if ('status' in error) errorInfo.status = (error as any).status
-      if ('statusText' in error) errorInfo.statusText = (error as any).statusText
-      
-    } else if (typeof error === 'string') {
-      errorInfo = { message: error, type: 'string' }
-    } else if (error && typeof error === 'object') {
-      // Try to extract useful information from object errors
-      errorInfo = {
-        message: (error as any).message || (error as any).error || 'Object error',
-        type: 'object',
-        keys: Object.keys(error),
-        stringified: JSON.stringify(error, null, 2).substring(0, 500) // Limit size
-      }
-    } else {
-      errorInfo = { 
-        message: 'Unknown error type', 
-        type: typeof error,
-        value: String(error)
-      }
+    const errorMsg = error instanceof Error ? error.message : String(error)
+
+    // Don't log or re-wrap File not found - let getFileContent handle it gracefully
+    if (errorMsg.includes('File not found')) {
+      throw error
     }
-    
-    console.error(`💥 [${requestId}] EditorAPI Exception:`, {
-      url,
-      method: options.method || 'GET',
-      errorInfo: errorInfo || {},
-      duration: `${duration}ms`,
-      timestamp: new Date().toISOString()
-    })
-    
-    // Also log individual components for debugging
-    console.error(`💥 [${requestId}] Exception Details:`, {
-      message: error instanceof Error ? error.message : String(error),
-      name: error instanceof Error ? error.name : 'Unknown',
-      url,
-      method: options.method || 'GET'
-    })
-    
-    if (error instanceof Error && error.stack) {
-      console.error(`💥 [${requestId}] Stack Trace:`, error.stack.split('\n').slice(0, 5).join('\n'))
-    }
+
+    console.error(`EditorAPI error [${requestId}]:`, errorMsg, url, `${duration}ms`)
     
     // Re-throw with more context
     if (error instanceof Error) {
@@ -395,13 +330,26 @@ export class EditorAPIService {
         }
       }
     } catch (error) {
-      console.error('🔍 [EDITOR API] getFileContent ERROR:', { filePath, error })
       // Handle authentication errors gracefully
       if (error instanceof Error && (error.message.includes('Authentication failed') || error.message.includes('Not authenticated'))) {
         console.warn('� [EDITOR API] Auth failed, falling back to local:', filePath)
         return this.getFileContentLocal(filePath)
       }
-      
+
+      // Handle file not found gracefully - return empty content instead of throwing
+      if (error instanceof Error && error.message.includes('File not found')) {
+        console.warn(`File not found: ${filePath}`)
+        return {
+          content: '',
+          version: 1,
+          metadata: {
+            size: 0,
+            modified: new Date().toISOString(),
+            permissions: 'rw-r--r--'
+          }
+        }
+      }
+
       throw error
     }
   }
