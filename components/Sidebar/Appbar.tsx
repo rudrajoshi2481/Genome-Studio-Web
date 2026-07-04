@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
+import { ThemeAwareLogo } from "@/components/ThemeAwareLogo"
 
 function Appbar() {
   // Get user data from auth store

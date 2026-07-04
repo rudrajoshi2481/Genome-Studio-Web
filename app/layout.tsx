@@ -6,6 +6,7 @@ import { AuthProvider } from "@/contexts/AuthContext"
 import { CommandDialogComponent } from "@/components/command_dialog/Command_Dialog"
 import { ServerConnectionMonitor } from "@/components/ServerConnectionMonitor"
 import { RadixCleanupProvider } from "@/components/RadixCleanupProvider"
+import { ThemeProvider } from "@/components/ThemeProvider"
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -33,7 +34,13 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Genome Studio",
-  description: "Genome Studio", 
+  description: "Genome Studio",
+  icons: {
+    icon: [
+      { url: '/light_GS.svg', media: '(prefers-color-scheme: light)' },
+      { url: '/dark_GS.svg', media: '(prefers-color-scheme: dark)' },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -50,13 +57,15 @@ export default function RootLayout({
         className={`${poppins.variable} ${youngSerif.variable} ${sourceSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
-        <AuthProvider>
-          <RadixCleanupProvider />
-          <ServerConnectionMonitor />
-          <CommandDialogComponent />
-          {children}
-          <Toaster position="bottom-center" richColors />
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light" enableSystem={false}>
+          <AuthProvider>
+            <RadixCleanupProvider />
+            <ServerConnectionMonitor />
+            <CommandDialogComponent />
+            {children}
+            <Toaster position="bottom-center" richColors />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
