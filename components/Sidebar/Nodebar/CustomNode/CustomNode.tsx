@@ -43,6 +43,7 @@ interface NodeIO {
   id: string;
   name: string;
   type: string;
+  description?: string;
 }
 
 interface NodePosition {
@@ -124,6 +125,9 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
   const [isEditMode, setIsEditMode] = useState(false)
   const [editNodeId, setEditNodeId] = useState<string | number | null>(null)
   
+  // State for IO descriptions (keyed by IO id)
+  const [ioDescriptions, setIoDescriptions] = useState<Record<string, string>>({})
+  
   // Helper function to validate and normalize NodeIO objects
   const normalizeNodeIO = (items: any[]): NodeIO[] => {
     if (!Array.isArray(items)) return [];
@@ -131,7 +135,8 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
     return items.map((item, index) => ({
       id: item?.id || `item_${Date.now()}_${index}`,
       name: item?.name || `item_${index + 1}`,
-      type: item?.type || 'any'
+      type: item?.type || 'any',
+      description: item?.description || ''
     }));
   }
   
@@ -154,9 +159,50 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       } else {
         setTags([]);
       }
+      
+      // Populate ioDescriptions from existing node's inputs/outputs
+      const existingDescs: Record<string, string> = {};
+      if (Array.isArray(nodeToEdit.inputs)) {
+        nodeToEdit.inputs.forEach((inp: any) => {
+          if (inp?.id && inp?.description) {
+            existingDescs[inp.id] = inp.description;
+          }
+        });
+      }
+      if (Array.isArray(nodeToEdit.outputs)) {
+        nodeToEdit.outputs.forEach((out: any) => {
+          if (out?.id && out?.description) {
+            existingDescs[out.id] = out.description;
+          }
+        });
+      }
+      setIoDescriptions(existingDescs);
+      
+      // If the node already has inputs/outputs, set testResult so they're visible without re-testing
+      if (nodeToEdit.inputs && nodeToEdit.outputs) {
+        setTestResult({
+          status: 'success',
+          node: {
+            id: nodeToEdit.node_id || `node_${Date.now()}`,
+            type: 'custom',
+            position: { x: 100, y: 100 },
+            data: {
+              title: nodeToEdit.title || '',
+              description: nodeToEdit.description || '',
+              language: (nodeToEdit.language || 'python').toLowerCase(),
+              function_name: nodeToEdit.function_name || 'custom_function',
+              source: nodeToEdit.source_code || '',
+              inputs: normalizeNodeIO(nodeToEdit.inputs),
+              outputs: normalizeNodeIO(nodeToEdit.outputs)
+            }
+          }
+        });
+      }
     } else {
       setIsEditMode(false);
       setEditNodeId(null);
+      setIoDescriptions({});
+      setTestResult(null);
     }
   }, [nodeToEdit, setNodeName, setDescription, setNodeLanguage, setCode, setTags]);
   
@@ -170,6 +216,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       setSaveSuccess(false);
       setTestResult(null);
       setTestError(null);
+      setIoDescriptions({});
     }
     
     // Call parent's onOpenChange if provided
@@ -234,6 +281,36 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             }
           }
         }
+        
+        // Preserve descriptions from previous test result and ioDescriptions state
+        // by matching on input/output name (since IDs are index-based and may not
+        // correspond to the same input if code changes between tests)
+        const prevResult = testResult;
+        const prevInputDescs: Record<string, string> = {};
+        const prevOutputDescs: Record<string, string> = {};
+        if (prevResult?.node?.data?.inputs) {
+          prevResult.node.data.inputs.forEach((inp: NodeIO) => {
+            // ioDescriptions (user edits) takes priority over testResult.description
+            const desc = ioDescriptions[inp.id] ?? inp.description ?? '';
+            if (inp.name && desc) prevInputDescs[inp.name] = desc;
+          });
+        }
+        if (prevResult?.node?.data?.outputs) {
+          prevResult.node.data.outputs.forEach((out: NodeIO) => {
+            const desc = ioDescriptions[out.id] ?? out.description ?? '';
+            if (out.name && desc) prevOutputDescs[out.name] = desc;
+          });
+        }
+        
+        // Match new inputs/outputs to preserved descriptions by name
+        const newIoDescs: Record<string, string> = {};
+        normalizedResult.node.data.inputs.forEach((inp: NodeIO) => {
+          newIoDescs[inp.id] = prevInputDescs[inp.name] || inp.description || '';
+        });
+        normalizedResult.node.data.outputs.forEach((out: NodeIO) => {
+          newIoDescs[out.id] = prevOutputDescs[out.name] || out.description || '';
+        });
+        setIoDescriptions(newIoDescs);
         
         setTestResult(normalizedResult)
         // toast.success('Node code tested successfully!')
@@ -312,13 +389,15 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
           const formattedInputs = testResult.node.data.inputs.map((input: any) => ({
             id: input.id || `input_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
             name: input.name || 'input',
-            type: input.type || 'any'
+            type: input.type || 'any',
+            description: ioDescriptions[input.id] ?? input.description ?? ''
           }));
           
           const formattedOutputs = testResult.node.data.outputs.map((output: any) => ({
             id: output.id || `output_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
             name: output.name || 'output',
-            type: output.type || 'any'
+            type: output.type || 'any',
+            description: ioDescriptions[output.id] ?? output.description ?? ''
           }));
           
           updatePayload.inputs = formattedInputs;
@@ -379,13 +458,15 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         const formattedInputs = testResult.node.data.inputs.map((input: any) => ({
           id: input.id || `input_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           name: input.name || 'input',
-          type: input.type || 'any'
+          type: input.type || 'any',
+          description: ioDescriptions[input.id] ?? input.description ?? ''
         }));
         
         const formattedOutputs = testResult.node.data.outputs.map((output: any) => ({
           id: output.id || `output_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           name: output.name || 'output',
-          type: output.type || 'any'
+          type: output.type || 'any',
+          description: ioDescriptions[output.id] ?? output.description ?? ''
         }));
         
         // Create a plain JavaScript object (not a class instance) to ensure it serializes properly
@@ -724,8 +805,15 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                                           className="w-2.5 h-2.5 rounded-full shrink-0 border border-background"
                                           style={{ background: info.handleColor }}
                                         />
-                                        <span className="text-xs font-mono font-medium truncate flex-1">{input.name}</span>
-                                        <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${info.badgeClass} border-0`}>
+                                        <span className="text-xs font-mono font-medium shrink-0">{input.name}</span>
+                                        <textarea
+                                          className="flex-1 min-w-0 text-[10px] text-muted-foreground placeholder:text-muted-foreground/60 bg-transparent resize-none outline-none focus:outline-none px-0 py-0 leading-tight"
+                                          placeholder={`Description of ${input.name}`}
+                                          rows={1}
+                                          value={ioDescriptions[input.id] ?? input.description ?? ''}
+                                          onChange={(e) => setIoDescriptions(prev => ({ ...prev, [input.id]: e.target.value }))}
+                                        />
+                                        <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${info.badgeClass} border-0 shrink-0`}>
                                           {info.label}
                                         </Badge>
                                       </div>
@@ -749,8 +837,15 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
                                           className="w-2.5 h-2.5 rounded-full shrink-0 border border-background"
                                           style={{ background: info.handleColor }}
                                         />
-                                        <span className="text-xs font-mono font-medium truncate flex-1">{output.name}</span>
-                                        <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${info.badgeClass} border-0`}>
+                                        <span className="text-xs font-mono font-medium shrink-0">{output.name}</span>
+                                        <textarea
+                                          className="flex-1 min-w-0 text-[10px] text-muted-foreground placeholder:text-muted-foreground/60 bg-transparent resize-none outline-none focus:outline-none px-0 py-0 leading-tight"
+                                          placeholder={`Description of ${output.name}`}
+                                          rows={1}
+                                          value={ioDescriptions[output.id] ?? output.description ?? ''}
+                                          onChange={(e) => setIoDescriptions(prev => ({ ...prev, [output.id]: e.target.value }))}
+                                        />
+                                        <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${info.badgeClass} border-0 shrink-0`}>
                                           {info.label}
                                         </Badge>
                                       </div>

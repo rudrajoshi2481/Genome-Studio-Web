@@ -138,13 +138,6 @@ export const AddWorkspaceFolderDialog: React.FC<AddWorkspaceFolderDialogProps> =
                 Optional friendly name for the folder
               </p>
             </div>
-
-            <div className="bg-muted/50 p-3 rounded-md text-xs space-y-1">
-              <p className="font-medium">Examples:</p>
-              <p className="font-mono text-muted-foreground">/home/user/projects</p>
-              <p className="font-mono text-muted-foreground">/var/www/html</p>
-              <p className="font-mono text-muted-foreground">/opt/data</p>
-            </div>
           </div>
 
           <DialogFooter>

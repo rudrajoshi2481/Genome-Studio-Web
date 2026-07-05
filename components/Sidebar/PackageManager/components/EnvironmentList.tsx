@@ -66,6 +66,16 @@ const EnvironmentList: React.FC<EnvironmentListProps> = ({
         return (
           <div
             key={env.name}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                type: 'dataType',
+                dataType: 'string',
+                label: env.name,
+                value: env.name,
+              }));
+              e.dataTransfer.effectAllowed = 'move';
+            }}
             className={cn(
               'flex items-center px-2 py-1.5 rounded-md cursor-pointer text-xs transition-colors',
               selectedEnvironment === env.name

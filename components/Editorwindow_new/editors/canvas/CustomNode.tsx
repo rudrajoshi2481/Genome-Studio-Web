@@ -1006,10 +1006,10 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                 </div>
                 {/* Input label */}
                 <div 
-                  className="text-xs font-medium text-foreground ml-2 select-text flex items-center gap-1"
+                  className="text-xs font-medium text-foreground ml-2 select-text flex items-center gap-1.5 flex-1 min-w-0"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
-                  {input.name}
+                  <span className="shrink-0">{input.name}</span>
                   <HandleTypeBadge
                     nodeId={id}
                     handleKind="input"
@@ -1028,6 +1028,11 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                       );
                     }}
                   />
+                  {input.description && (
+                    <span className="text-[10px] text-muted-foreground truncate flex-1 min-w-0" title={input.description}>
+                      {input.description}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -1041,10 +1046,10 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
               <div key={`port-${output.id || idx}`} className="relative h-8 flex items-center justify-end px-3">
                 {/* Output label */}
                 <div 
-                  className="text-xs font-medium text-foreground mr-2 text-right select-text flex items-center gap-1"
+                  className="text-xs font-medium text-foreground mr-2 text-right select-text flex items-center gap-1.5 flex-1 min-w-0"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
-                  {output.name}
+                  <span className="shrink-0">{output.name}</span>
                   <HandleTypeBadge
                     nodeId={id}
                     handleKind="output"
@@ -1063,6 +1068,11 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                       );
                     }}
                   />
+                  {output.description && (
+                    <span className="text-[10px] text-muted-foreground truncate flex-1 min-w-0" title={output.description}>
+                      {output.description}
+                    </span>
+                  )}
                 </div>
                 {/* Output handle */}
                 <div 

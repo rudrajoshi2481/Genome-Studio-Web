@@ -8,6 +8,7 @@ export interface CustomNodeIO {
   id: string;
   name: string;
   type: string;
+  description?: string;
 }
 
 export interface CustomNodeData {

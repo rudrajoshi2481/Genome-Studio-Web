@@ -75,7 +75,7 @@ function NodeCard({
     <ContextMenu key={nodeId}>
       <ContextMenuTrigger>
         <div
-          className={`relative flex items-center gap-2 px-3 py-2.5 border rounded-lg hover:bg-accent/50 group cursor-grab transition-all ${langStyle.borderColor}`}
+          className={`relative flex items-center gap-2 px-3 py-2.5 border rounded-lg hover:bg-accent/50 group cursor-grab transition-all overflow-hidden ${langStyle.borderColor}`}
           style={{
             backgroundImage: `repeating-linear-gradient(135deg, transparent, transparent 6px, ${langStyle.stripeColor} 6px, ${langStyle.stripeColor} 12px)`,
           }}
@@ -86,9 +86,9 @@ function NodeCard({
           }}
         >
           <Code2 className={`h-4 w-4 shrink-0 ${langStyle.iconColor}`} />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-medium break-words flex-1 min-w-0">{node.title}</span>
+              <span className="text-xs font-medium truncate flex-1 min-w-0" title={node.title}>{node.title}</span>
               {nodeTags && Array.isArray(nodeTags) && nodeTags.length > 0 && (
                 <Badge variant="secondary" className="text-[10px] h-4 px-1 shrink-0">
                   {nodeTags[0]}

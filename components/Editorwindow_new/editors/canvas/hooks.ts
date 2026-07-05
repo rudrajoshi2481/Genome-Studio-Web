@@ -156,13 +156,15 @@ export const useCanvasHandlers = (
         )) || 'string';
         
         // Create a data type node
+        // Use custom value from drag data if provided (e.g., environment name from package manager)
+        const defaultValue = nodeData.value !== undefined ? nodeData.value : getDefaultValueForType(dataType);
         newNode = {
           id: uniqueId,
           type: 'dataType',
           position,
           data: {
             dataType: dataType,
-            value: getDefaultValueForType(dataType),
+            value: defaultValue,
             label: nodeData.label || nodeData.function_name || dataType
           }
         };
