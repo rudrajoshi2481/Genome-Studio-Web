@@ -27,7 +27,7 @@ function UserMessage({ message, isLast, onEdit, onDelete }: UserMessageProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   const getAvatarUrl = (avatarPath: string | undefined) => {
-    if (!avatarPath) return '';
+    if (!avatarPath) return '/profile_photo.jpg';
     if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
       return avatarPath;
     }
@@ -105,7 +105,7 @@ function UserMessage({ message, isLast, onEdit, onDelete }: UserMessageProps) {
         </span>
         <span className="text-[10px] font-medium text-foreground">{displayName}</span>
         <Avatar className="h-4 w-4">
-          {user?.avatar && <AvatarImage src={getAvatarUrl(user.avatar)} alt={displayName} />}
+          <AvatarImage src={getAvatarUrl(user?.avatar)} alt={displayName} />
           <AvatarFallback className="bg-muted text-muted-foreground">
             <User className="h-2.5 w-2.5" />
           </AvatarFallback>

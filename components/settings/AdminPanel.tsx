@@ -32,7 +32,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Shield, ShieldOff, Users, RefreshCw, Crown, User as UserIcon } from 'lucide-react';
+import { Shield, ShieldOff, ShieldCheck, Users, RefreshCw, User as UserIcon, Trash2, UserPlus, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const config = getServerConfig();
 
@@ -56,6 +68,19 @@ export default function AdminPanel() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [actionType, setActionType] = useState<'promote' | 'demote'>('promote');
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    username: '',
+    email: '',
+    password: '',
+    full_name: '',
+    is_admin: false,
+  });
+  const [createError, setCreateError] = useState('');
 
   // Check if current user is admin
   const isAdmin = currentUser?.is_admin === true;
@@ -167,8 +192,118 @@ export default function AdminPanel() {
     setSelectedUser(null);
   };
 
+  // Toggle user selection for bulk delete
+  const toggleUserSelection = (userId: number) => {
+    setSelectedUserIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
+  // Toggle select all (excluding self)
+  const toggleSelectAll = () => {
+    const selectableUsers = users.filter(u => u.id !== currentUser?.id);
+    if (selectedUserIds.size === selectableUsers.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(selectableUsers.map(u => u.id)));
+    }
+  };
+
+  // Create new user (admin only)
+  const handleCreateUser = async () => {
+    setCreateError('');
+    if (createForm.password.length < 8) {
+      setCreateError('Password must be at least 8 characters');
+      return;
+    }
+    setIsCreating(true);
+    try {
+      const cookies = document.cookie.split(';');
+      const tokenCookie = cookies.find(cookie =>
+        cookie.trim().startsWith(`${config.auth.tokenStorageKey}=`)
+      );
+      if (!tokenCookie) return;
+      const token = tokenCookie.split('=')[1];
+
+      const response = await fetch(`http://${host}:${port}/api/v1/users/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          username: createForm.username,
+          email: createForm.email,
+          password: createForm.password,
+          full_name: createForm.full_name || null,
+          is_admin: createForm.is_admin,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create user');
+      }
+
+      const newUser = await response.json();
+      console.log('✅ [ADMIN-PANEL] User created:', newUser);
+      setUsers(prev => [...prev, newUser]);
+      setCreateForm({ username: '', email: '', password: '', full_name: '', is_admin: false });
+      setShowCreateDialog(false);
+    } catch (error: unknown) {
+      setCreateError(error instanceof Error ? error.message : 'Failed to create user');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Bulk delete users
+  const handleBulkDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const cookies = document.cookie.split(';');
+      const tokenCookie = cookies.find(cookie =>
+        cookie.trim().startsWith(`${config.auth.tokenStorageKey}=`)
+      );
+      if (!tokenCookie) return;
+      const token = tokenCookie.split('=')[1];
+
+      const response = await fetch(`http://${host}:${port}/api/v1/users/bulk-delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_ids: Array.from(selectedUserIds) }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to delete users');
+      }
+
+      const data = await response.json();
+      console.log('✅ [ADMIN-PANEL] Bulk delete result:', data);
+
+      // Remove deleted users from state
+      setUsers(prev => prev.filter(u => !selectedUserIds.has(u.id)));
+      setSelectedUserIds(new Set());
+      setShowBulkDeleteDialog(false);
+    } catch (error: unknown) {
+      console.error('❌ [ADMIN-PANEL] Bulk delete error:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const getAvatarUrl = (avatarPath: string | undefined) => {
-    if (!avatarPath) return '';
+    if (!avatarPath) return '/profile_photo.jpg';
     if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
       return avatarPath;
     }
@@ -223,15 +358,36 @@ export default function AdminPanel() {
                 Manage user roles and permissions
               </CardDescription>
             </div>
-            <Button
-              onClick={fetchUsers}
-              disabled={isLoading}
-              variant="outline"
-              size="sm"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              {selectedUserIds.size > 0 && (
+                <Button
+                  onClick={() => setShowBulkDeleteDialog(true)}
+                  disabled={isDeleting}
+                  variant="destructive"
+                  size="sm"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete ({selectedUserIds.size})
+                </Button>
+              )}
+              <Button
+                onClick={() => setShowCreateDialog(true)}
+                variant="default"
+                size="sm"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+              <Button
+                onClick={fetchUsers}
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
@@ -251,6 +407,12 @@ export default function AdminPanel() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={users.length > 1 && selectedUserIds.size === users.filter(u => u.id !== currentUser?.id).length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
                     <TableHead>User</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
@@ -260,7 +422,15 @@ export default function AdminPanel() {
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.id} className={selectedUserIds.has(user.id) ? 'bg-muted/50' : ''}>
+                      <TableCell>
+                        {user.id !== currentUser?.id && (
+                          <Checkbox
+                            checked={selectedUserIds.has(user.id)}
+                            onCheckedChange={() => toggleUserSelection(user.id)}
+                          />
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
@@ -283,7 +453,7 @@ export default function AdminPanel() {
                       <TableCell>
                         {user.is_admin ? (
                           <Badge variant="default" className="gap-1">
-                            <Crown className="h-3 w-3" />
+                            <ShieldCheck className="h-3 w-3" />
                             Admin
                           </Badge>
                         ) : (
@@ -349,7 +519,7 @@ export default function AdminPanel() {
         </CardContent>
       </Card>
 
-      {/* Confirmation Dialog */}
+      {/* Role Change Confirmation Dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -378,6 +548,139 @@ export default function AdminPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedUserIds.size} User{selectedUserIds.size > 1 ? 's' : ''}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="mb-2">
+                Are you sure you want to delete <strong>{selectedUserIds.size}</strong> user{selectedUserIds.size > 1 ? 's' : ''}?
+                This action <strong>cannot be undone</strong>.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Users to be deleted: {users.filter(u => selectedUserIds.has(u.id)).map(u => u.username).join(', ')}
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : `Delete ${selectedUserIds.size} User${selectedUserIds.size > 1 ? 's' : ''}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={(open) => { setShowCreateDialog(open); if (!open) setCreateError(''); }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Create New User
+            </DialogTitle>
+            <DialogDescription>
+              Add a new user account. They can log in immediately with these credentials.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            {createError && (
+              <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+                {createError}
+              </div>
+            )}
+            <div className="grid gap-2">
+              <Label htmlFor="create-username">Username <span className="text-red-500">*</span></Label>
+              <Input
+                id="create-username"
+                placeholder="Enter username"
+                value={createForm.username}
+                onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
+                disabled={isCreating}
+                minLength={3}
+                maxLength={50}
+              />
+              <p className="text-xs text-muted-foreground">3-50 characters, alphanumeric only</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="create-email">Email <span className="text-red-500">*</span></Label>
+              <Input
+                id="create-email"
+                type="email"
+                placeholder="user@example.com"
+                value={createForm.email}
+                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                disabled={isCreating}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="create-fullname">Full Name <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input
+                id="create-fullname"
+                placeholder="User's full name"
+                value={createForm.full_name}
+                onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
+                disabled={isCreating}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="create-password">Password <span className="text-red-500">*</span></Label>
+              <Input
+                id="create-password"
+                type="password"
+                placeholder="Minimum 8 characters"
+                value={createForm.password}
+                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                disabled={isCreating}
+                minLength={8}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div>
+                <Label htmlFor="create-admin" className="cursor-pointer">Admin privileges</Label>
+                <p className="text-xs text-muted-foreground">Grant this user admin access</p>
+              </div>
+              <Switch
+                id="create-admin"
+                checked={createForm.is_admin}
+                onCheckedChange={(checked) => setCreateForm({ ...createForm, is_admin: checked })}
+                disabled={isCreating}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isCreating}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateUser}
+              disabled={isCreating || !createForm.username.trim() || !createForm.email.trim() || !createForm.password.trim()}
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Create User
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -146,7 +146,7 @@ export default function Settings() {
   };
 
   const getAvatarUrl = (avatarPath: string | undefined) => {
-    if (!avatarPath) return '';
+    if (!avatarPath) return '/profile_photo.jpg';
     if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
       return avatarPath;
     }

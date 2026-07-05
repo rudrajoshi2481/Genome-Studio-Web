@@ -58,7 +58,7 @@ function Toolbar({ onActiveItemChange, sidebarOpen, onToggleSidebar }: ToolbarPr
 
   // Get the full avatar URL
   const getAvatarUrl = (avatarPath: string | undefined) => {
-    if (!avatarPath) return '';
+    if (!avatarPath) return '/profile_photo.jpg';
     if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
       return avatarPath;
     }
