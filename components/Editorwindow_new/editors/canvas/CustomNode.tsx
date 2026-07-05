@@ -43,7 +43,7 @@ export type NodeExecutionStatus = 'idle' | 'queued' | 'running' | 'completed' | 
 
 // Define unified output type
 export interface UnifiedOutput {
-  type: 'text' | 'rich' | 'error';
+  type: 'text' | 'rich' | 'error' | 'higlass';
   content: unknown;
   order: number;
   var_name?: string;
@@ -351,9 +351,10 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
               if (n.id !== id) return n;
               const currentOutputs = (n.data.unified_outputs as Array<Record<string, unknown>>) || [];
               const order = msg.output.order ?? currentOutputs.length;
+              const isHiglass = msg.output.output_type === 'higlass' && msg.output.viewconf;
               const newOutput: Record<string, unknown> = {
-                type: msg.output.html ? 'rich' : 'text',
-                content: msg.output.html || msg.output.text || '',
+                type: isHiglass ? 'higlass' : (msg.output.html ? 'rich' : 'text'),
+                content: isHiglass ? { viewconf: msg.output.viewconf, html: msg.output.html } : (msg.output.html || msg.output.text || ''),
                 order,
               };
               let dataUpdate: Record<string, unknown> = {
@@ -1168,9 +1169,10 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           const displayCount = unifiedOutputs.filter(output => {
             if (output.type === 'text') return true;
             if (output.type === 'error') return true;
+            if (output.type === 'higlass') return true;
             if (output.type === 'rich') {
               if (output.var_name && internalVars.includes(output.var_name)) return false;
-              if (output.content?.text && output.content.text.includes('module') && output.content.text.includes('from')) return false;
+              if ((output.content as any)?.text && (output.content as any).text.includes('module') && (output.content as any).text.includes('from')) return false;
               return true;
             }
             return false;

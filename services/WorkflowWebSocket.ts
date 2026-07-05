@@ -30,6 +30,8 @@ export interface OutputStreamMessage {
     html?: string;
     text?: string;
     order?: number;
+    output_type?: string;
+    viewconf?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
   };
   timestamp: string;

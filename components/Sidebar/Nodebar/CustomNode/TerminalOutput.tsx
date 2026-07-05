@@ -2,9 +2,10 @@
 
 import React from 'react';
 import { ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
+import { HiGlassViewer } from '@/components/Editorwindow_new/editors/canvas/HiGlassViewer';
 
 interface UnifiedOutput {
-  type: 'text' | 'rich' | 'error';
+  type: 'text' | 'rich' | 'error' | 'higlass';
   content: string | any;
   var_name?: string;
   traceback?: string;
@@ -49,8 +50,8 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
         className="px-3 py-2.5 font-mono text-[12px] leading-relaxed select-text text-foreground"
         style={{
           overflowY: 'auto',
-          overflowX: 'auto',
-          maxHeight: '400px',
+          overflowX: 'visible',
+          maxHeight: '500px',
           minHeight: '120px',
           scrollbarWidth: 'thin',
         }}
@@ -91,6 +92,16 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
                     </pre>
                   </details>
                 )}
+              </div>
+            );
+          }
+
+          if (output.type === 'higlass') {
+            const viewconf = output.content?.viewconf;
+            if (!viewconf) return null;
+            return (
+              <div key={index} className="mt-1.5">
+                <HiGlassViewer viewconf={viewconf} />
               </div>
             );
           }

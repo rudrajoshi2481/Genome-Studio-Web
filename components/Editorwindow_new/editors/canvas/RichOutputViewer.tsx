@@ -5,12 +5,14 @@
 
 import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { HiGlassViewer } from './HiGlassViewer';
 
 interface RichOutput {
   html: string;
   text: string;
   type?: string;
   mime_type?: string;
+  viewconf?: Record<string, unknown>;
 }
 
 interface RichOutputViewerProps {
@@ -53,6 +55,13 @@ export const RichOutputViewer: React.FC<RichOutputViewerProps> = ({ outputs, cla
     <div className={`rich-output-viewer ${className || ''}`}>
       <div className="space-y-1">
         {filteredOutputs.map(([varName, output]) => {
+          if (output.type === 'higlass' && output.viewconf) {
+            return (
+              <div key={varName} className="rich-output-item">
+                <HiGlassViewer viewconf={output.viewconf} />
+              </div>
+            );
+          }
           return (
             <div key={varName} className="rich-output-item">
               {/* Render HTML output inline without blocks */}
