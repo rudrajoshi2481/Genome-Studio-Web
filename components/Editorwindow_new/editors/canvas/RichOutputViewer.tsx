@@ -57,8 +57,8 @@ export const RichOutputViewer: React.FC<RichOutputViewerProps> = ({ outputs, cla
         {filteredOutputs.map(([varName, output]) => {
           if (output.type === 'higlass' && output.viewconf) {
             return (
-              <div key={varName} className="rich-output-item">
-                <HiGlassViewer viewconf={output.viewconf} />
+              <div key={varName} className="rich-output-item w-full">
+                <HiGlassViewer viewconf={output.viewconf} height={500} className="w-full" />
               </div>
             );
           }

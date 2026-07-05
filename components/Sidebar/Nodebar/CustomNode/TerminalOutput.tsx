@@ -32,6 +32,8 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
     order: 0
   })) || [];
 
+  const hasHiglass = displayOutputs.some(o => o.type === 'higlass');
+
   return (
     <div className="w-full rounded-md border border-border bg-muted/30 overflow-hidden">
       {/* Terminal header bar */}
@@ -51,7 +53,7 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
         style={{
           overflowY: 'auto',
           overflowX: 'visible',
-          maxHeight: '500px',
+          maxHeight: hasHiglass ? '600px' : '500px',
           minHeight: '120px',
           scrollbarWidth: 'thin',
         }}
@@ -100,8 +102,8 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
             const viewconf = output.content?.viewconf;
             if (!viewconf) return null;
             return (
-              <div key={index} className="mt-1.5">
-                <HiGlassViewer viewconf={viewconf} />
+              <div key={index} className="mt-1.5 w-full">
+                <HiGlassViewer viewconf={viewconf} height={500} className="w-full" />
               </div>
             );
           }
