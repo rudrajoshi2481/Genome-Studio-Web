@@ -315,7 +315,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         setTestResult(normalizedResult)
         // toast.success('Node code tested successfully!')
       } else {
-        setTestError(data.message || 'Error analyzing node code')
+        setTestError(data.message || data.detail || 'Error analyzing node code')
         // toast.error(data.message || 'Error analyzing node code')
       }
     } catch (error) {
