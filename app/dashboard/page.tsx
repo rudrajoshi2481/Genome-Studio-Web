@@ -22,12 +22,12 @@ import ServerPanel from '@/components/Sidebar/ServerPanel/ServerPanel'
 
 function Page() {
   const [mounted, setMounted] = useState(false)
-  const [traybarOpen, setTraybarOpen] = useState(true)
+  const [traybarOpen, setTraybarOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeItem, setActiveItem] = useState<string>('File Explorer (New)')
 
   useEffect(() => {
-    setTraybarOpen(localStorage.getItem('dashboard_traybarOpen') !== 'false')
+    setTraybarOpen(localStorage.getItem('dashboard_traybarOpen') === 'true')
     setSidebarOpen(localStorage.getItem('dashboard_sidebarOpen') !== 'false')
     setMounted(true)
   }, [])

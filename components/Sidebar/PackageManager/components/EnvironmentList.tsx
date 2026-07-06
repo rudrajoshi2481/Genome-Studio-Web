@@ -1,5 +1,5 @@
-import React from 'react'
-import { Loader2, CheckCircle2, Box, Layers, Terminal, Apple, Package, Code } from 'lucide-react'
+import React, { useState } from 'react'
+import { Loader2, CheckCircle2, Box, Layers, Terminal, Apple, Package, Code, Puzzle, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 
@@ -15,6 +15,8 @@ interface EnvironmentListProps {
   selectedEnvironment: string | null
   onEnvironmentSelect: (envName: string) => void
   isLoading: boolean
+  extensionInstalledEnvs?: Record<string, { submissionTitle: string; condaEnvs: string[] }>
+  onDeleteEnvironment?: (envName: string) => void
 }
 
 const typeBadgeConfig: Record<string, { label: string; className: string }> = {
@@ -37,8 +39,11 @@ const EnvironmentList: React.FC<EnvironmentListProps> = ({
   environments,
   selectedEnvironment,
   onEnvironmentSelect,
-  isLoading
+  isLoading,
+  extensionInstalledEnvs = {},
+  onDeleteEnvironment,
 }) => {
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   if (isLoading && environments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
@@ -77,10 +82,11 @@ const EnvironmentList: React.FC<EnvironmentListProps> = ({
               e.dataTransfer.effectAllowed = 'move';
             }}
             className={cn(
-              'flex items-center px-2 py-1.5 rounded-md cursor-pointer text-xs transition-colors',
+              'group flex items-center px-2 py-1.5 rounded-md cursor-pointer text-xs transition-colors',
               selectedEnvironment === env.name
                 ? 'bg-primary/10 text-primary'
-                : 'hover:bg-muted/50 text-foreground'
+                : 'hover:bg-muted/50 text-foreground',
+              extensionInstalledEnvs[env.name] && 'border border-purple-400/50 dark:border-purple-600/40 bg-purple-50/50 dark:bg-purple-950/20'
             )}
             onClick={() => onEnvironmentSelect(env.name)}
           >
@@ -91,12 +97,60 @@ const EnvironmentList: React.FC<EnvironmentListProps> = ({
                 {env.is_active && (
                   <CheckCircle2 className="h-2.5 w-2.5 text-green-600 flex-shrink-0" />
                 )}
+                {extensionInstalledEnvs[env.name] && (
+                  <span title={`Installed via Extension Manager: ${extensionInstalledEnvs[env.name].submissionTitle}`}>
+                    <Puzzle className="h-2.5 w-2.5 text-purple-500 flex-shrink-0" />
+                  </span>
+                )}
               </div>
             </div>
+            {extensionInstalledEnvs[env.name] && (
+              <Badge variant="outline" className="text-[8px] h-3 px-1 ml-1 flex-shrink-0 font-mono text-purple-600 border-purple-300 dark:text-purple-400 dark:border-purple-800">
+                ext
+              </Badge>
+            )}
             {typeBadge && (
               <Badge variant="outline" className={cn('text-[9px] h-3.5 px-1 ml-1 flex-shrink-0 font-mono', typeBadge.className)}>
                 {typeBadge.label}
               </Badge>
+            )}
+            {onDeleteEnvironment && env.name !== 'base' && env.type !== 'linux' && env.type !== 'r' && (
+              confirmDelete === env.name ? (
+                <div className="flex items-center gap-0.5 ml-1 flex-shrink-0">
+                  <button
+                    className="h-4 w-4 flex items-center justify-center rounded hover:bg-red-500/20 text-red-500 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDeleteEnvironment(env.name)
+                      setConfirmDelete(null)
+                    }}
+                    title="Confirm delete"
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="h-4 w-4 flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setConfirmDelete(null)
+                    }}
+                    title="Cancel"
+                  >
+                    <span className="text-[10px]">×</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="h-4 w-4 flex items-center justify-center rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-500 transition-colors ml-1 flex-shrink-0 opacity-0 group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setConfirmDelete(env.name)
+                  }}
+                  title="Delete environment"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              )
             )}
           </div>
         )

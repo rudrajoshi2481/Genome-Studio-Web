@@ -7,8 +7,9 @@
  * Values can be overridden by environment variables.
  */
 
-export const host = (typeof window !== 'undefined' ? window.location.hostname : null) || process.env.NEXT_PUBLIC_API_HOST || '127.0.0.1';
-export const port = (typeof window !== 'undefined' ? window.location.port : null) || process.env.NEXT_PUBLIC_API_PORT || '8000';
+const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
+export const host = (isElectron ? window.location.hostname : null) || process.env.NEXT_PUBLIC_API_HOST || '127.0.0.1';
+export const port = (isElectron ? window.location.port : null) || process.env.NEXT_PUBLIC_API_PORT || '8000';
 
 
 
@@ -75,9 +76,9 @@ export function getServerConfig(): ServerConfig {
  */
 export function getApiBaseUrl(): string {
   const { protocol, port, baseUrl } = defaultConfig.api;
-  // Use window.location when in browser so the frontend connects to the
-  // same port the backend is actually running on (dynamic port in Electron mode)
-  if (typeof window !== 'undefined') {
+  // Use window.location only in Electron mode, where the backend serves the
+  // frontend on the same dynamic port. In dev/browser mode, use env-configured values.
+  if (typeof window !== 'undefined' && window.electronAPI?.isElectron) {
     const resolvedHost = window.location.hostname;
     const resolvedPort = window.location.port || port;
     return `${protocol}://${resolvedHost}:${resolvedPort}${baseUrl}`;
@@ -90,7 +91,7 @@ export function getApiBaseUrl(): string {
  */
 export function getWebsocketUrl(endpoint: string = ''): string {
   const { protocol, port, path } = defaultConfig.websocket;
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && window.electronAPI?.isElectron) {
     const resolvedHost = window.location.hostname;
     const resolvedPort = window.location.port || port;
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

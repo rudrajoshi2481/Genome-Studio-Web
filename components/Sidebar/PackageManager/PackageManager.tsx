@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, PackageSearch as PackageSearchIcon, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { RefreshCw, PackageSearch as PackageSearchIcon, Loader2, CheckCircle2, AlertCircle, Puzzle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -9,9 +9,12 @@ import { ScrollArea as DialogScrollArea } from '@/components/ui/scroll-area'
 import EnvironmentList from './components/EnvironmentList'
 import PackageSearch from './components/PackageSearch'
 import CreateEnvironmentDialog from './components/CreateEnvironmentDialog'
+import { HoverBorderGradient } from '@/components/ui/hover-border-gradient'
 
 import { usePackageManager } from './hooks/usePackageManager'
 import GlobalPackageSearch from './components/GlobalPackageSearch'
+import { host, port, getApiBaseUrl } from '@/config/server'
+import * as authService from '@/lib/services/auth-service'
 
 interface Environment {
   name: string
@@ -55,6 +58,7 @@ function PackageManager() {
   const [installLogs, setInstallLogs] = useState<{ timestamp: string; message: string; type: 'info' | 'success' | 'error' }[]>([])
   const [installStatus, setInstallStatus] = useState<'idle' | 'installing' | 'success' | 'error'>('idle')
   const [showInstallDialog, setShowInstallDialog] = useState(false)
+  const [extensionInstalledEnvs, setExtensionInstalledEnvs] = useState<Record<string, { submissionTitle: string; condaEnvs: string[] }>>({})
   const searchAbortRef = useRef<AbortController | null>(null)
 
   const stopSearch = () => {
@@ -88,13 +92,50 @@ function PackageManager() {
     installBatch,
     uninstallPackage,
     createEnvironment,
-    createVenv
+    createVenv,
+    deleteEnvironment
   } = usePackageManager()
 
   // Load environments on component mount
   useEffect(() => {
     loadEnvironments()
+    loadExtensionInstalledEnvs()
   }, [])
+
+  // Listen for extension install events
+  useEffect(() => {
+    const handler = () => loadExtensionInstalledEnvs()
+    window.addEventListener('extension-installed', handler)
+    return () => window.removeEventListener('extension-installed', handler)
+  }, [])
+
+  const loadExtensionInstalledEnvs = async () => {
+    try {
+      const token = authService.getToken()
+      if (!token) {
+        console.warn('[PackageManager] No auth token, skipping extension envs load')
+        return
+      }
+      const resp = await fetch(`${getApiBaseUrl()}/genomic-hub/installed/list`, {
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      })
+      if (!resp.ok) {
+        console.warn('[PackageManager] Failed to load extension installed envs:', resp.status)
+        return
+      }
+      const data = await resp.json()
+      const map: Record<string, { submissionTitle: string; condaEnvs: string[] }> = {}
+      for (const item of data.installed || []) {
+        for (const envName of item.condaEnvs || []) {
+          map[envName] = { submissionTitle: item.submissionTitle, condaEnvs: item.condaEnvs }
+        }
+      }
+      console.log('[PackageManager] Loaded extension installed envs:', map)
+      setExtensionInstalledEnvs(map)
+    } catch (e) {
+      console.error('[PackageManager] Failed to load extension installed envs:', e)
+    }
+  }
 
   const loadEnvironments = async () => {
     try {
@@ -280,6 +321,21 @@ function PackageManager() {
     }
   }
 
+  const handleDeleteEnvironment = async (envName: string) => {
+    try {
+      setError(null)
+      await deleteEnvironment(envName)
+      if (selectedEnvironment === envName) {
+        setSelectedEnvironment(null)
+        setPackages([])
+      }
+      await loadEnvironments()
+    } catch (err) {
+      setError(`Failed to delete environment: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      console.error('Error deleting environment:', err)
+    }
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -356,6 +412,8 @@ function PackageManager() {
                     selectedEnvironment={selectedEnvironment}
                     onEnvironmentSelect={handleEnvironmentSelect}
                     isLoading={isLoadingEnvs}
+                    extensionInstalledEnvs={extensionInstalledEnvs}
+                    onDeleteEnvironment={handleDeleteEnvironment}
                   />
                 </ScrollArea>
               </div>

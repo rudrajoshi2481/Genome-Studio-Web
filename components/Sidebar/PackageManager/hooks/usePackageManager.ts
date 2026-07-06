@@ -180,6 +180,12 @@ export const usePackageManager = () => {
     })
   }
 
+  const deleteEnvironment = async (envName: string): Promise<void> => {
+    await makeAuthenticatedRequest(`/api/v1/package-manager/environments/${encodeURIComponent(envName)}`, {
+      method: 'DELETE',
+    })
+  }
+
   return {
     fetchEnvironments,
     fetchPackagesInEnvironment,
@@ -189,5 +195,6 @@ export const usePackageManager = () => {
     uninstallPackage,
     createEnvironment,
     createVenv,
+    deleteEnvironment,
   }
 }

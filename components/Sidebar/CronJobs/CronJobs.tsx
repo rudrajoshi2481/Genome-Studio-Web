@@ -565,14 +565,14 @@ function CronJobs() {
 
         {/* Create Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle className="text-base">Create Cron Job</DialogTitle>
               <DialogDescription className="text-xs">
                 Schedule a command to run automatically at specified intervals.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-2">
+            <div className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0">
               <div className="space-y-1.5">
                 <Label className="text-xs">Name</Label>
                 <Input
@@ -642,8 +642,8 @@ function CronJobs() {
 
         {/* Detail / Edit Dialog */}
         <Dialog open={!!detailJob} onOpenChange={(open: boolean) => { if (!open) { setDetailJob(null); setIsEditing(false) } }}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-base">{isEditing ? 'Edit Cron Job' : detailJob?.name}</DialogTitle>
@@ -691,7 +691,7 @@ function CronJobs() {
 
             {isEditing ? (
               /* ---- Edit Mode ---- */
-              <div className="space-y-4 py-2">
+              <div className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Name</Label>
                   <Input
@@ -743,7 +743,7 @@ function CronJobs() {
               </div>
             ) : (
               /* ---- View Mode ---- */
-              <Tabs defaultValue="overview" className="w-full">
+              <Tabs defaultValue="overview" className="w-full overflow-y-auto flex-1 min-h-0">
                 <TabsList className="w-full">
                   <TabsTrigger value="overview" className="flex-1 text-xs">Overview</TabsTrigger>
                   <TabsTrigger value="logs" className="flex-1 text-xs">
@@ -818,7 +818,7 @@ function CronJobs() {
               </Tabs>
             )}
 
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0">
               {isEditing ? (
                 <>
                   <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>

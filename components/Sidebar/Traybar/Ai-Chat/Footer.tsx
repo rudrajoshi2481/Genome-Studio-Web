@@ -131,7 +131,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
 
   // Use store values as source of truth. Initialize with default for SSR consistency;
   // actual value from localStorage/store is applied in useEffect after hydration.
-  const [selectedModel, setSelectedModelState] = useState<string>('qwen3.5:latest')
+  const [selectedModel, setSelectedModelState] = useState<string>('')
   const [pinnedModels, setPinnedModelsState] = useState<string[]>([])
 
   const setSelectedModel = useCallback((model: string) => {
@@ -153,7 +153,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
   useEffect(() => {
     // Prefer store value, fall back to localStorage for migration
     const model = storeSelectedModel || (() => {
-      try { return localStorage.getItem(SELECTED_MODEL_KEY) || 'qwen3.5:latest' } catch { return 'qwen3.5:latest' }
+      try { return localStorage.getItem(SELECTED_MODEL_KEY) || '' } catch { return '' }
     })()
     setSelectedModelState(model)
 
@@ -201,7 +201,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
 
     if (!nextModel) {
       const hasDefault = ollamaModels.some(m => m.name === 'qwen3.5:latest')
-      nextModel = hasDefault ? 'qwen3.5:latest' : (allModels[0]?.name || 'qwen3.5:latest')
+      nextModel = hasDefault ? 'qwen3.5:latest' : (allModels[0]?.name || '')
     }
 
     const modelToSet = nextModel as string
@@ -538,7 +538,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                   className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
                   title="Select model"
                 >
-                  <span className="whitespace-nowrap truncate max-w-[120px]">{formatModelName(selectedModel)}</span>
+                  <span className="whitespace-nowrap truncate max-w-[120px]">{selectedModel ? formatModelName(selectedModel) : 'No model'}</span>
                 </Button>
               </ModelSelectorTrigger>
               <ModelSelectorContent title="Select Model">
@@ -771,23 +771,34 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                       <div className="space-y-1">
                         <p className="text-sm font-medium">No models available</p>
                         <p className="text-xs text-muted-foreground leading-relaxed max-w-[280px]">
-                          Start Ollama with{" "}
-                          <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">
-                            ollama serve
-                          </code>{" "}
-                          or configure Z.ai API key in backend .env.
+                          Install Ollama to use local LLMs, or configure Z.ai API key in backend .env.
                         </p>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 text-xs gap-1.5"
-                        onClick={() => fetchOllamaModels()}
-                      >
-                        <RefreshCw size={13} /> Retry connection
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href="https://ollama.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="h-8 text-xs gap-1.5"
+                          >
+                            Download Ollama
+                          </Button>
+                        </a>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs gap-1.5"
+                          onClick={() => fetchOllamaModels()}
+                        >
+                          <RefreshCw size={13} /> Retry
+                        </Button>
+                      </div>
                     </div>
-                  )}
+                  )
                 </ModelSelectorList>
               </ModelSelectorContent>
             </ModelSelector>
