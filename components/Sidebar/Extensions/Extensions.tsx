@@ -107,7 +107,7 @@ function Extensions() {
       setSubmissions(data.submissions || [])
     } catch (err) {
       console.error('Failed to fetch submissions:', err)
-      toast.error('Failed to load flows from Genomic Hub')
+      toast.error('Failed to load flows from Genome Hub')
     } finally {
       setIsLoading(false)
     }
@@ -589,7 +589,7 @@ function Extensions() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <a
-                            href="https://genome-studio.rudhrajoshi.me/genomic-hub"
+                            href="https://genome-studio.rudhrajoshi.me/genome-hub"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center rounded-md h-6 w-6 hover:bg-accent transition-colors flex-shrink-0"
