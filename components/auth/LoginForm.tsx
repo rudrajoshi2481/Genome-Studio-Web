@@ -347,6 +347,32 @@ export default function LoginForm() {
             </>
           )}
         </p>
+
+        <div className="mt-4 pt-4 border-t">
+          <button
+            type="button"
+            onClick={async () => {
+              if (confirm('This will permanently delete ALL data (users, workflows, files, settings) and quit the app. Are you sure?')) {
+                try {
+                  await fetch(`${window.location.origin}/api/v1/reset`, { method: 'POST' });
+                } catch (e) {
+                  console.error('Reset failed:', e);
+                }
+                localStorage.clear();
+                document.cookie = 'genome_studio_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
+                // Quit the Electron app
+                if (window.electronAPI?.quitApp) {
+                  window.electronAPI.quitApp();
+                } else {
+                  window.location.reload();
+                }
+              }
+            }}
+            className="text-xs text-muted-foreground underline-offset-4 hover:underline hover:text-destructive transition-colors"
+          >
+            Start from scratch
+          </button>
+        </div>
       </CardContent>
     </Card>
   );

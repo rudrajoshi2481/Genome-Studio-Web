@@ -7,8 +7,8 @@
  * Values can be overridden by environment variables.
  */
 
-export const host = process.env.NEXT_PUBLIC_API_HOST || '127.0.0.1';
-export const port = process.env.NEXT_PUBLIC_API_PORT || '8000';
+export const host = (typeof window !== 'undefined' ? window.location.hostname : null) || process.env.NEXT_PUBLIC_API_HOST || '127.0.0.1';
+export const port = (typeof window !== 'undefined' ? window.location.port : null) || process.env.NEXT_PUBLIC_API_PORT || '8000';
 
 
 
@@ -75,9 +75,14 @@ export function getServerConfig(): ServerConfig {
  */
 export function getApiBaseUrl(): string {
   const { protocol, port, baseUrl } = defaultConfig.api;
-  // Use window.location.hostname when in browser so remote clients resolve correctly
-  const resolvedHost = typeof window !== 'undefined' ? window.location.hostname : defaultConfig.api.host;
-  return `${protocol}://${resolvedHost}:${port}${baseUrl}`;
+  // Use window.location when in browser so the frontend connects to the
+  // same port the backend is actually running on (dynamic port in Electron mode)
+  if (typeof window !== 'undefined') {
+    const resolvedHost = window.location.hostname;
+    const resolvedPort = window.location.port || port;
+    return `${protocol}://${resolvedHost}:${resolvedPort}${baseUrl}`;
+  }
+  return `${protocol}://${defaultConfig.api.host}:${port}${baseUrl}`;
 }
 
 /**
@@ -85,8 +90,13 @@ export function getApiBaseUrl(): string {
  */
 export function getWebsocketUrl(endpoint: string = ''): string {
   const { protocol, port, path } = defaultConfig.websocket;
-  const resolvedHost = typeof window !== 'undefined' ? window.location.hostname : defaultConfig.websocket.host;
-  return `${protocol}://${resolvedHost}:${port}${path}${endpoint}`;
+  if (typeof window !== 'undefined') {
+    const resolvedHost = window.location.hostname;
+    const resolvedPort = window.location.port || port;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${wsProtocol}://${resolvedHost}:${resolvedPort}${path}${endpoint}`;
+  }
+  return `${protocol}://${defaultConfig.websocket.host}:${port}${path}${endpoint}`;
 }
 
 /**

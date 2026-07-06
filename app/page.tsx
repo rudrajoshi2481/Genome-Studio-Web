@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 function page() {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     router.replace('/login')
+    setMounted(true)
   }, [router])
 
   return (

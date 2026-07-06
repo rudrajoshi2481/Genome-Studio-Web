@@ -97,7 +97,13 @@ export function logout(): void {
   // Clear token expiry from local storage
   localStorage.removeItem(config.auth.tokenExpiryKey);
   
-  // Redirect to login page
+  // In Electron desktop mode, quit the app on sign out
+  if (typeof window !== 'undefined' && window.electronAPI?.quitApp) {
+    window.electronAPI.quitApp();
+    return;
+  }
+  
+  // In browser/dev mode, redirect to login page
   window.location.href = '/login';
 }
 
