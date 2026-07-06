@@ -116,7 +116,7 @@ export default function LoginForm() {
       </CardHeader>
       
       <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); clearError(); setRegisterError(''); }} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">
               <LogIn className="size-4" />
@@ -146,7 +146,7 @@ export default function LoginForm() {
                     type="text"
                     placeholder="Enter your username"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => { setUsername(e.target.value); if (error) clearError(); }}
                     required
                     className="pl-9"
                   />
@@ -164,7 +164,7 @@ export default function LoginForm() {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => { setPassword(e.target.value); if (error) clearError(); }}
                     required
                     className="pl-9 pr-9"
                   />

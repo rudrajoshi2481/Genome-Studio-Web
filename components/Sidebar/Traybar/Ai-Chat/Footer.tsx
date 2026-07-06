@@ -798,7 +798,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                         </Button>
                       </div>
                     </div>
-                  )
+                  )}
                 </ModelSelectorList>
               </ModelSelectorContent>
             </ModelSelector>
