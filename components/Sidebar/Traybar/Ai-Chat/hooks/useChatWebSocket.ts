@@ -888,7 +888,7 @@ export const useChatWebSocket = () => {
           });
           break;
         case 'compaction':
-        case 'reactive_compact':
+        case 'emergency_compact':
           if (message.context_window) {
             useChatStore.getState().setContextWindow(message.context_window);
           }
@@ -913,7 +913,7 @@ export const useChatWebSocket = () => {
           sessionAddMessage({
             type: 'system',
             role: 'system',
-            content: `Budget limit reached (${message.pct}% used, ${message.continuation_count} continuations)`
+            content: `Budget limit reached (${message.pct}% used, ${message.iterations} iterations)`
           });
           break;
         case 'budget_continue':
@@ -939,11 +939,11 @@ export const useChatWebSocket = () => {
             content: message.content || ''
           });
           break;
-        case 'query_chain':
-        case 'job_classified':
-        case 'auto_dream':
+        case 'turn_tracking':
+        case 'task_profiled':
+        case 'background_reflection':
         case 'max_output_tokens_recovery':
-        case 'stop_hook_blocking':
+        case 'evaluator_blocking':
           break;
         case 'command_stopped': {
           const cmdToolMsg = sessionGetMessages().find(

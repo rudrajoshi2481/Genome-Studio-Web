@@ -533,3 +533,50 @@ export const recompileAllNodes = async (token: string): Promise<RecompileResult>
     throw error;
   }
 };
+
+/**
+ * Batch validate, convert, and upload nodes to the database.
+ * Each item should have `code` (source code) and `language` (python/r/bash).
+ * @param token JWT authentication token
+ * @param nodes Array of { code, language, tags?, is_public? }
+ * @returns Batch result with counts and per-item results
+ */
+export const batchConvertUpload = async (
+  token: string,
+  nodes: { code: string; language: string; tags?: string[]; is_public?: boolean }[]
+): Promise<{
+  total: number;
+  validated: number;
+  converted: number;
+  uploaded: number;
+  failed: number;
+  results: { index: number; title: string | null; status: string; error: string | null; node_id: string | null; db_id: number | null }[];
+}> => {
+  try {
+    if (!token) {
+      throw new Error('Authentication token is required');
+    }
+
+    const fullUrl = `${API_URL}/workflow-manager/execute/function/batch-convert-upload`;
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json',
+      },
+      body: JSON.stringify({ nodes }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Batch convert-upload failed: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error in batchConvertUpload:', error);
+    throw error;
+  }
+};

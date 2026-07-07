@@ -341,7 +341,71 @@ function Extensions() {
         addLog(sub.id, `[Install] Could not check environments: ${e}`)
       }
 
-      // 5. Persist install record to database
+      // 5. Batch convert JSON node files and upload to database
+      const jsonFiles = allFiles.filter(f => f.name.endsWith('.json'))
+      if (jsonFiles.length > 0) {
+        addLog(sub.id, `[Install] Found ${jsonFiles.length} JSON node file(s) — batch converting...`)
+        try {
+          const batchNodes: { code: string; language: string; tags?: string[]; title?: string; description?: string; function_name?: string; inputs?: any[]; outputs?: any[] }[] = []
+          for (const jf of jsonFiles) {
+            // Re-download the JSON content (we already have it in `text` but that was overwritten in the loop)
+            const dlResp = await fetch(`${API_BASE_URL}/api/v1/genomic-hub/download`, {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ submissionId: sub.id, storagePath: jf.storagePath }),
+            })
+            if (!dlResp.ok) {
+              addLog(sub.id, `[Install] Warning: Could not re-fetch ${jf.name} for conversion`)
+              continue
+            }
+            const dlBlob = await dlResp.blob()
+            const jsonText = await dlBlob.text()
+            const parsed = JSON.parse(jsonText)
+            // The JSON can be an array of nodes or a single node object
+            const items = Array.isArray(parsed) ? parsed : [parsed]
+            for (const item of items) {
+              batchNodes.push({
+                code: item.source_code || item.code || '',
+                language: item.language || 'python',
+                tags: item.tags || [],
+                title: item.title || undefined,
+                description: item.description || undefined,
+                function_name: item.function_name || undefined,
+                inputs: item.inputs || undefined,
+                outputs: item.outputs || undefined,
+              })
+            }
+          }
+          if (batchNodes.length > 0) {
+            addLog(sub.id, `[Install] Sending ${batchNodes.length} node(s) for batch validate+convert+upload...`)
+            const batchResp = await fetch(`${API_BASE_URL}/api/v1/workflow-manager/execute/function/batch-convert-upload`, {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ nodes: batchNodes }),
+            })
+            if (batchResp.ok) {
+              const batchData = await batchResp.json()
+              addLog(sub.id, `[Install] Batch result: uploaded=${batchData.uploaded}/${batchData.total}  failed=${batchData.failed}`)
+              if (batchData.failed > 0) {
+                for (const r of batchData.results) {
+                  if (r.status !== 'success') {
+                    addLog(sub.id, `[Install] Node #${r.index} — ${r.status}: ${r.error || 'unknown'}`)
+                  }
+                }
+              }
+            } else {
+              const errText = await batchResp.text()
+              addLog(sub.id, `[Install] Warning: Batch convert-upload failed: ${batchResp.status} ${errText}`)
+            }
+          }
+        } catch (e) {
+          addLog(sub.id, `[Install] Warning: Could not batch convert JSON files: ${e}`)
+        }
+      } else {
+        addLog(sub.id, `[Install] No JSON node files found, skipping batch convert`)
+      }
+
+      // 6. Persist install record to database
       addLog(sub.id, `[Install] Saving install record to database...`)
       try {
         const currentLogs = installLogs[sub.id] || []
@@ -632,12 +696,12 @@ function Extensions() {
                               Logs
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col p-4 gap-3">
+                          <DialogContent className="min-w-[60vw] max-h-[80vh] overflow-hidden flex flex-col p-4 gap-3">
                             <DialogHeader className="flex-shrink-0">
                               <DialogTitle className="text-sm">Install Logs — {sub.title}</DialogTitle>
                             </DialogHeader>
-                            <div className="flex-1 min-h-0 overflow-y-auto rounded-md border bg-zinc-950 p-3">
-                              <pre className="text-[11px] font-mono text-zinc-300 whitespace-pre-wrap break-all leading-relaxed">
+                            <div className="flex-1 min-h-0 overflow-y-auto rounded-md border bg-muted p-3">
+                              <pre className="text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-all leading-relaxed">
                                 {installLogs[sub.id].join('\n')}
                               </pre>
                             </div>
