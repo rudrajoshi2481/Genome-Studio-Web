@@ -653,7 +653,7 @@ function Extensions() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <a
-                            href="https://genome-studio.rudhrajoshi.me/genome-hub"
+                            href="https://bioinformatics-studio.rudhrajoshi.me/genome-hub"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center rounded-md h-6 w-6 hover:bg-accent transition-colors flex-shrink-0"

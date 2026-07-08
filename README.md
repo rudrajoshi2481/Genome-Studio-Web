@@ -1,4 +1,4 @@
-# Genome Studio Web
+# Bioinformatics Studio Web
 
 ## Dashboard
 

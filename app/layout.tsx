@@ -33,8 +33,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Genome Studio",
-  description: "Genome Studio",
+  title: "Bioinformatics Studio",
+  description: "Bioinformatics Studio",
   icons: {
     icon: [
       { url: '/light_GS.svg', media: '(prefers-color-scheme: light)' },

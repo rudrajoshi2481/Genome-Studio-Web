@@ -38,8 +38,8 @@ export async function login(username: string, password: string): Promise<AuthRes
     formData.append('username', username);
     formData.append('password', password);
     formData.append('scope', '');
-    formData.append('client_id', 'genome_studio_web');
-    formData.append('client_secret', 'genome_studio_secret');
+    formData.append('client_id', 'bioinformatics_studio_web');
+    formData.append('client_secret', 'bioinformatics_studio_secret');
     
     // Make API request
     console.log('Attempting login to:', endpoints.auth.login);

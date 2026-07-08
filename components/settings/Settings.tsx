@@ -25,7 +25,6 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Settings as SettingsIcon, X, Upload, Trash2, User, Mail, Shield, LogOut, Camera, Calendar, Loader2, Check, IdCard, Clock, AlertTriangle } from 'lucide-react';
 import AdminPanel from './AdminPanel';
-import { Switch } from '@/components/ui/switch';
 
 interface AccountFormData {
   full_name: string;
@@ -37,7 +36,6 @@ interface AccountFormData {
 export default function Settings() {
   const { user, isAuthenticated, isLoading, logout } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
-  const [telemetryEnabled, setTelemetryEnabled] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -48,10 +46,6 @@ export default function Settings() {
     bio: '',
     avatar: '',
   });
-
-  useEffect(() => {
-    setTelemetryEnabled(localStorage.getItem('telemetry_enabled') === 'true');
-  }, []);
 
   useEffect(() => {
     if (user) {
@@ -560,9 +554,9 @@ export default function Settings() {
                         if (!window.confirm('This will clear ALL cached data except login token. The page will reload. Continue?')) return;
                         const PRESERVE_KEYS = new Set([
                           'auth_token',
-                          'genome_studio_token',
-                          'genome_studio_refresh_token',
-                          'genome_studio_token_expiry',
+                          'bioinformatics_studio_token',
+                          'bioinformatics_studio_refresh_token',
+                          'bioinformatics_studio_token_expiry',
                         ]);
                         const preserved: Record<string, string> = {};
                         PRESERVE_KEYS.forEach(key => {
@@ -580,18 +574,6 @@ export default function Settings() {
                       <Trash2 className="h-3.5 w-3.5" />
                       Clear Cache
                     </Button>
-                  </div>
-
-                  {/* Telemetry Toggle */}
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                    <p className="text-sm text-muted-foreground">Telemetry helps improve Genome Studio</p>
-                    <Switch
-                      checked={telemetryEnabled}
-                      onCheckedChange={(checked) => {
-                        setTelemetryEnabled(checked);
-                        localStorage.setItem('telemetry_enabled', String(checked));
-                      }}
-                    />
                   </div>
                 </div>
               </ScrollArea>

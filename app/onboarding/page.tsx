@@ -39,18 +39,18 @@ export default function OnboardingPage() {
     // Clear all localStorage keys
     localStorage.clear();
     // Clear auth cookie
-    document.cookie = "genome_studio_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict";
+    document.cookie = "bioinformatics_studio_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict";
     // Mark as onboarded using cookie (persists across port changes, unlike localStorage)
-    document.cookie = "genome_studio_onboarded=true; path=/; max-age=31536000; SameSite=Strict";
+    document.cookie = "bioinformatics_studio_onboarded=true; path=/; max-age=31536000; SameSite=Strict";
     router.replace("/login");
   };
 
   const handleRestore = () => {
     // Keep existing data, just mark as onboarded using cookie
-    document.cookie = "genome_studio_onboarded=true; path=/; max-age=31536000; SameSite=Strict";
+    document.cookie = "bioinformatics_studio_onboarded=true; path=/; max-age=31536000; SameSite=Strict";
     // Check cookies for token (cookies are domain-scoped, persist across ports)
     const cookies = document.cookie.split(";");
-    const tokenCookie = cookies.find(c => c.trim().startsWith("genome_studio_token="));
+    const tokenCookie = cookies.find(c => c.trim().startsWith("bioinformatics_studio_token="));
     if (tokenCookie) {
       router.replace("/dashboard");
     } else {
@@ -86,7 +86,7 @@ export default function OnboardingPage() {
         <div className="mb-3 inline-flex items-center justify-center rounded-full bg-primary/10 p-3">
           <Sparkles className="h-8 w-8 text-primary" />
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Welcome to Genome Studio</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome to Bioinformatics Studio</h1>
         <p className="mt-2 text-muted-foreground">
           Your visual workflow orchestration IDE for bioinformatics
         </p>

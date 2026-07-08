@@ -33,7 +33,7 @@ export function middleware(request: NextRequest) {
   const isStaticAsset = /\.(jpg|jpeg|png|gif|svg|css|js|woff|woff2|ttf|eot)$/i.test(pathname);
   
   // Get the token from cookies
-  const token = request.cookies.get('genome_studio_token')?.value;
+  const token = request.cookies.get('bioinformatics_studio_token')?.value;
   
   // Debug logging
   console.log(`[Auth] ${pathname} - Public: ${isPublicPath}, Static: ${isStaticAsset}, API: ${isApiRoute}, Token: ${!!token}`);

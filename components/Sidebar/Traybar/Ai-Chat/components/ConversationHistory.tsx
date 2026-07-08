@@ -93,7 +93,7 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
       case 'analysis':
         return 'Genomic Data Analyst';
       default:
-        return 'Genome Studio AI';
+        return 'Bioinformatics Studio AI';
     }
   };
 

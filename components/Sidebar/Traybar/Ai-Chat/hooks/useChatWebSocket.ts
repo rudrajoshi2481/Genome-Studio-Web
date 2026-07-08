@@ -105,7 +105,7 @@ export const useChatWebSocket = () => {
         case 'system':
           useChatStore.getState().setConnectionStatus(true);
           // Skip adding connection confirmation messages to the chat
-          if (message.content && message.content !== 'Connected to Genome Studio AI') {
+          if (message.content && message.content !== 'Connected to Bioinformatics Studio AI') {
             sessionAddMessage({
               type: 'system',
               role: 'system',

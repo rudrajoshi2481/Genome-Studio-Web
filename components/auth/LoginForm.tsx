@@ -109,7 +109,7 @@ export default function LoginForm() {
     <Card className="w-full max-w-[420px] shadow-lg">
       <CardHeader className="text-center">
         <div className="mx-auto mb-2">
-          <Image src="/black_genome_studio.svg" alt="Genome Studio" width={120} height={60} priority />
+          <Image src="/black_bioinformatics_studio.svg" alt="Bioinformatics Studio" width={120} height={60} priority />
         </div>
         
         <CardDescription className="text-muted-foreground">Sign in or create a new account</CardDescription>
@@ -359,7 +359,7 @@ export default function LoginForm() {
                   console.error('Reset failed:', e);
                 }
                 localStorage.clear();
-                document.cookie = 'genome_studio_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
+                document.cookie = 'bioinformatics_studio_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
                 // Quit the Electron app
                 if (window.electronAPI?.quitApp) {
                   window.electronAPI.quitApp();

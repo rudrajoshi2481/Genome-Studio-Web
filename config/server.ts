@@ -58,9 +58,9 @@ const defaultConfig: ServerConfig = {
     path: process.env.NEXT_PUBLIC_WS_PATH || '/ws',
   },
   auth: {
-    tokenStorageKey: 'genome_studio_token',
-    refreshTokenStorageKey: 'genome_studio_refresh_token',
-    tokenExpiryKey: 'genome_studio_token_expiry',
+    tokenStorageKey: 'bioinformatics_studio_token',
+    refreshTokenStorageKey: 'bioinformatics_studio_refresh_token',
+    tokenExpiryKey: 'bioinformatics_studio_token_expiry',
   },
 };
 

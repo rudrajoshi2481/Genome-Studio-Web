@@ -87,9 +87,9 @@ export function SessionTab({ s }: { s: ChatSettings }) {
                 if (!window.confirm('This will clear ALL cached data except login token. The page will reload. Continue?')) return;
                 const PRESERVE_KEYS = new Set([
                   'auth_token',
-                  'genome_studio_token',
-                  'genome_studio_refresh_token',
-                  'genome_studio_token_expiry',
+                  'bioinformatics_studio_token',
+                  'bioinformatics_studio_refresh_token',
+                  'bioinformatics_studio_token_expiry',
                 ]);
                 const preserved: Record<string, string> = {};
                 PRESERVE_KEYS.forEach(key => {

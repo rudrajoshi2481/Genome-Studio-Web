@@ -114,13 +114,13 @@ export function createDefaultFlow(): PipelineFile {
   return {
     id: `pipeline_${Math.random().toString(36).substr(2, 9)}`,
     name: 'New Pipeline',
-    description: 'A new pipeline created in Genome Studio',
+    description: 'A new pipeline created in Bioinformatics Studio',
     nodes: [],
     edges: [],
     created: timestamp,
     modified: timestamp,
     version: '1.0.0',
-    author: 'Genome Studio User',
+    author: 'Bioinformatics Studio User',
     config: {
       auto_layout: true,
       execution_mode: 'sequential',

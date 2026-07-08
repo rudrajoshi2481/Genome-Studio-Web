@@ -819,7 +819,7 @@ export const useChatStore = create<ChatState>()(
   }),
 }),
     {
-      name: 'genome-studio-chat-settings',
+      name: 'bioinformatics-studio-chat-settings',
       partialize: (state) => ({
         enabledDatabases: state.enabledDatabases,
         keepIntermediateFiles: state.keepIntermediateFiles,

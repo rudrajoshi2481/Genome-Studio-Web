@@ -25,7 +25,7 @@ export function ThemeAwareLogo({
   }, [])
 
   const isDark = mounted && resolvedTheme === 'dark'
-  const logoSrc = isDark ? '/white_genome_studio.svg' : '/black_genome_studio.svg'
+  const logoSrc = isDark ? '/white_bioinformatics_studio.svg' : '/black_bioinformatics_studio.svg'
 
   if (!mounted) {
     return (
@@ -40,7 +40,7 @@ export function ThemeAwareLogo({
   return (
     <Image
       src={logoSrc}
-      alt="Genome Studio"
+      alt="Bioinformatics Studio"
       width={width}
       height={height}
       className={className}

@@ -88,7 +88,7 @@ export const useNodeStore = create<NodeState>()(
       }),
     }),
     {
-      name: 'genome-studio-node-storage', // unique name for localStorage
+      name: 'bioinformatics-studio-node-storage', // unique name for localStorage
     }
   )
 )

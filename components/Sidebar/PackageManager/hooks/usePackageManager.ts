@@ -44,7 +44,7 @@ export const usePackageManager = () => {
     
     // Get token from cookies using the correct storage key
     const cookies = document.cookie.split(';')
-    const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('genome_studio_token='))
+    const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('bioinformatics_studio_token='))
     
     if (!tokenCookie) {
       return null

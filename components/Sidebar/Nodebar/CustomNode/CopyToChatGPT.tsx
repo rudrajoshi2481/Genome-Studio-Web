@@ -33,7 +33,7 @@ export function CopyToChatGPT({
   
   const handleCopyToChatGPT = () => {
     // Create the prompt that will be sent to ChatGPT
-    const prompt = `I need help fixing and optimizing this ${language} code for use in Genome Studio (a visual workflow editor using React Flow).
+    const prompt = `I need help fixing and optimizing this ${language} code for use in Bioinformatics Studio (a visual workflow editor using React Flow).
 
 **Function Name:** ${nodeName}
 ${description ? `**Description:** ${description}` : ''}
@@ -43,7 +43,7 @@ ${description ? `**Description:** ${description}` : ''}
 ${code}
 \`\`\`
 
-**IMPORTANT - Genome Studio Code Format Requirements:**
+**IMPORTANT - Bioinformatics Studio Code Format Requirements:**
 
 The code MUST follow this specific format:
 
@@ -71,7 +71,7 @@ output_variable = function_name(param1: str, param2: int)
 
 **Critical Rules:**
 1. **@node() decorator** - The main function MUST have @node() decorator (this marks it as the entry point)
-   - **DO NOT import node or anything from genome_studio** - The decorator is built-in, no import needed
+   - **DO NOT import node or anything from bioinformatics_studio** - The decorator is built-in, no import needed
 2. **Function parameters** - These become INPUT handles in the React Flow graph (e.g., param1, param2)
 3. **Output variable** - Assign function result to a variable (e.g., output_variable = function_name(...))
    - This variable becomes the OUTPUT handle in React Flow
@@ -89,7 +89,7 @@ output_variable = function_name(param1: str, param2: int)
 4. Review for bugs, optimizations, and best practices
 5. Proper error handling if needed
 
-Provide the corrected code in the Genome Studio format with title and description.`
+Provide the corrected code in the Bioinformatics Studio format with title and description.`
 
     // Encode the prompt for URL
     const encodedPrompt = encodeURIComponent(prompt)
@@ -143,7 +143,7 @@ export function CopyToChatGPTIcon({
 }: CopyToChatGPTProps) {
   
   const handleCopyToChatGPT = () => {
-    const prompt = `I need help fixing and optimizing this ${language} code for use in Genome Studio (a visual workflow editor using React Flow).
+    const prompt = `I need help fixing and optimizing this ${language} code for use in Bioinformatics Studio (a visual workflow editor using React Flow).
 
 **Function Name:** ${nodeName}
 ${description ? `**Description:** ${description}` : ''}
@@ -153,7 +153,7 @@ ${description ? `**Description:** ${description}` : ''}
 ${code}
 \`\`\`
 
-**IMPORTANT - Genome Studio Code Format Requirements:**
+**IMPORTANT - Bioinformatics Studio Code Format Requirements:**
 
 The code MUST follow this specific format:
 
@@ -181,7 +181,7 @@ output_variable = function_name(param1: str, param2: int)
 
 **Critical Rules:**
 1. **@node() decorator** - The main function MUST have @node() decorator (this marks it as the entry point)
-   - **DO NOT import node or anything from genome_studio** - The decorator is built-in, no import needed
+   - **DO NOT import node or anything from bioinformatics_studio** - The decorator is built-in, no import needed
 2. **Function parameters** - These become INPUT handles in the React Flow graph (e.g., param1, param2)
 3. **Output variable** - Assign function result to a variable (e.g., output_variable = function_name(...))
    - This variable becomes the OUTPUT handle in React Flow
@@ -199,7 +199,7 @@ output_variable = function_name(param1: str, param2: int)
 4. Review for bugs, optimizations, and best practices
 5. Proper error handling if needed
 
-Provide the corrected code in the Genome Studio format with title and description.`
+Provide the corrected code in the Bioinformatics Studio format with title and description.`
 
     const encodedPrompt = encodeURIComponent(prompt)
     const chatGPTUrl = `https://chat.openai.com/?q=${encodedPrompt}`
