@@ -111,7 +111,7 @@ export default function LoginForm() {
         <div className="mx-auto mb-2">
           <Image src="/black_bioinformatics_studio.svg" alt="Bioinformatics Studio" width={120} height={60} priority />
         </div>
-        
+        <CardTitle className="text-2xl font-bold">Bioinformatics Studio</CardTitle>
         <CardDescription className="text-muted-foreground">Sign in or create a new account</CardDescription>
       </CardHeader>
       
