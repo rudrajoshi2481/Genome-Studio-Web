@@ -50,6 +50,24 @@ interface FlowSubmission {
 
 const API_BASE_URL = `http://${host}:${port}`
 
+const FIREBASE_STORAGE_BASE = "https://firebasestorage.googleapis.com/v0/b/genome-studio.firebasestorage.app/o"
+const CF_INCREMENT_DL = "https://incrementflowdownloadcount-4mch7ghcbq-uc.a.run.app"
+
+const getFirebaseDownloadUrl = (storagePath: string): string => {
+  const encodedPath = storagePath.replace(/\//g, '%2F')
+  return `${FIREBASE_STORAGE_BASE}/${encodedPath}?alt=media`
+}
+
+const incrementDownloadCount = async (submissionId: string) => {
+  try {
+    await fetch(CF_INCREMENT_DL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { submissionId } }),
+    })
+  } catch {}
+}
+
 const getAuthHeaders = (): Record<string, string> => {
   const token = authService.getToken()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -99,12 +117,15 @@ function Extensions() {
   const loadSubmissions = async () => {
     setIsLoading(true)
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/genomic-hub`, {
-        headers: getAuthHeaders(),
+      const resp = await fetch("https://getgenomichubdata-4mch7ghcbq-uc.a.run.app", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: {} }),
       })
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const data = await resp.json()
-      setSubmissions(data.submissions || [])
+      const result = data.result || data
+      setSubmissions(result.submissions || [])
     } catch (err) {
       console.error('Failed to fetch submissions:', err)
       toast.error('Failed to load flows from Genome Hub')
@@ -200,17 +221,21 @@ function Extensions() {
 
       for (const file of allFiles) {
         addLog(sub.id, `[Install] Downloading ${file.name}...`)
-        const resp = await fetch(`${API_BASE_URL}/api/v1/genomic-hub/download`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            submissionId: sub.id,
-            storagePath: file.storagePath,
-          }),
-        })
+        let resp: Response
+        try {
+          resp = await fetch(`${apiBaseUrl}/genomic-hub/download`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ submissionId: sub.id, storagePath: file.storagePath }),
+          })
+        } catch (fetchErr) {
+          addLog(sub.id, `[Install] ERROR: Network error downloading ${file.name}: ${fetchErr}`)
+          throw new Error(`Failed to download ${file.name}: ${fetchErr}`)
+        }
         if (!resp.ok) {
-          addLog(sub.id, `[Install] ERROR: Failed to download ${file.name}`)
-          throw new Error(`Failed to download ${file.name}`)
+          const errBody = await resp.text().catch(() => 'no body')
+          addLog(sub.id, `[Install] ERROR: Failed to download ${file.name} (HTTP ${resp.status}): ${errBody.slice(0, 200)}`)
+          throw new Error(`Failed to download ${file.name} (HTTP ${resp.status})`)
         }
         const blob = await resp.blob()
         const text = await blob.text()
@@ -349,11 +374,7 @@ function Extensions() {
           const batchNodes: { code: string; language: string; tags?: string[]; title?: string; description?: string; function_name?: string; inputs?: any[]; outputs?: any[] }[] = []
           for (const jf of jsonFiles) {
             // Re-download the JSON content (we already have it in `text` but that was overwritten in the loop)
-            const dlResp = await fetch(`${API_BASE_URL}/api/v1/genomic-hub/download`, {
-              method: 'POST',
-              headers: getAuthHeaders(),
-              body: JSON.stringify({ submissionId: sub.id, storagePath: jf.storagePath }),
-            })
+            const dlResp = await fetch(getFirebaseDownloadUrl(jf.storagePath))
             if (!dlResp.ok) {
               addLog(sub.id, `[Install] Warning: Could not re-fetch ${jf.name} for conversion`)
               continue
@@ -451,16 +472,10 @@ function Extensions() {
     if (downloadingFiles.has(fileKey)) return
     setDownloadingFiles(prev => new Set(prev).add(fileKey))
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/genomic-hub/download`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          submissionId,
-          storagePath: file.storagePath,
-        }),
-      })
+      const resp = await fetch(getFirebaseDownloadUrl(file.storagePath))
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const blob = await resp.blob()
+      incrementDownloadCount(submissionId)
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = blobUrl
