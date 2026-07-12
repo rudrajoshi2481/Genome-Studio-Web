@@ -112,6 +112,14 @@ export const useCanvasHandlers = (
     // toast.success('Node deleted');
   }, [setNodes, setEdges, tabId, setDirty, updateTab]);
 
+  // Handle edge double-click to remove the edge
+  const onEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.stopPropagation();
+    setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+    setDirty(tabId, true);
+    updateTab(tabId, { isDirty: true });
+  }, [setEdges, tabId, setDirty, updateTab]);
+
   // Handle drag over event (needed for drop functionality)
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -236,6 +244,7 @@ export const useCanvasHandlers = (
     handleNodeDelete,
     onDragOver,
     onDrop,
+    onEdgeDoubleClick,
     handleKeyDown
   };
 };

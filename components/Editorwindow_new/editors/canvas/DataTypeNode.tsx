@@ -353,7 +353,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
   const handleSaveToNodebar = async () => {
     try {
       if (!token) {
-        // toast.error('Please log in to save nodes');
+        toast.error('Please log in to save nodes');
         return;
       }
 
@@ -408,10 +408,12 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
       const savedNode = await createCustomNode(token, nodeToSave);
       
       console.log('Data type node saved successfully:', savedNode);
-      // toast.success(`Saved "${label}" to Nodebar!`);
+      toast.success(`Saved "${label}" to Nodebar!`);
+      // Dispatch event so Nodebar refreshes its list
+      window.dispatchEvent(new Event('extension-installed'));
     } catch (error) {
       console.error('Error saving data type node to nodebar:', error);
-      // toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

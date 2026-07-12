@@ -691,6 +691,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
     handleNodeDelete,
     onDragOver,
     onDrop: onDropHandler,
+    onEdgeDoubleClick,
     handleKeyDown
   } = useCanvasHandlers(
     tabId,
@@ -931,6 +932,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
           onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          onEdgeDoubleClick={onEdgeDoubleClick}
           nodeTypes={nodeTypes}
           deleteKeyCode={null}
           {...(savedViewport ? { defaultViewport: savedViewport, fitView: false } : { fitView: true })}

@@ -214,6 +214,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         resetNode();
       }
       setSaveSuccess(false);
+      setSaveError(null);
       setTestResult(null);
       setTestError(null);
       setIoDescriptions({});
@@ -334,7 +335,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
     // In edit mode, we might not need to test the node again if we're just updating metadata
     if (!isEditMode && !testResult) {
       console.log('No test result available, cannot save')
-      // toast.error('Please test the node before saving')
+      toast.error('Please test the node before saving')
       setTestError('Please test the node before saving')
       return
     }
@@ -350,7 +351,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       
       if (!token) {
         console.error('Authentication token not found')
-        // toast.error('Authentication token not found. Please log in again.')
+        toast.error('Authentication token not found. Please log in again.')
         setSaveError('Authentication token not found. Please log in again.')
         setIsSaving(false)
         return
@@ -418,9 +419,8 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             throw new Error('Node ID is missing for update operation');
           }
           
-          // toast.success('Custom node updated successfully!');
-          
           setSaveSuccess(true);
+          toast.success('Custom node updated successfully!');
           
           // Call the onSaveSuccess callback if provided
           if (onSaveSuccess) {
@@ -437,7 +437,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         } catch (error) {
           console.error('Error updating node:', error);
           const errorMessage = error instanceof Error ? error.message : 'Failed to update custom node';
-          // toast.error(errorMessage);
+          toast.error(errorMessage);
           setSaveError(errorMessage);
         }
       } else {
@@ -447,7 +447,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         // Validate test result structure
         if (!testResult || !testResult.node || !testResult.node.id || !testResult.node.data) {
           console.error('Test result is missing required fields')
-          // toast.error('Invalid node data structure. Please test the node again.')
+          toast.error('Invalid node data structure. Please test the node again.')
           setSaveError('Invalid node data structure. Please test the node again.')
           setIsSaving(false)
           return
@@ -496,7 +496,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         // Validate required fields before sending
         if (!savePayload.data.function_name) {
           console.error('Missing function_name in node data')
-          // toast.error('Invalid node data: missing function name')
+          toast.error('Invalid node data: missing function name')
           setSaveError('Invalid node data: missing function name')
           setIsSaving(false)
           return
@@ -526,10 +526,8 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             const data = JSON.parse(responseText)
             console.log('Node saved successfully:', data)
             
-            // Show success toast
-            // toast.success('Custom node saved successfully!')
-            
             setSaveSuccess(true)
+            toast.success('Custom node saved successfully!')
             
             // Call the onSaveSuccess callback if provided
             if (onSaveSuccess) {
@@ -543,7 +541,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             }, 2000)
           } catch (parseError) {
             console.error('Error parsing success response:', parseError)
-            // toast.error('Server returned success but response format was invalid')
+            toast.error('Server returned success but response format was invalid')
             setSaveError('Server returned success but response format was invalid')
           }
         } else {
@@ -551,19 +549,19 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
             const errorData = JSON.parse(responseText)
             console.error('Error saving node:', response.status, errorData)
             const errorMessage = `Failed to save node: ${errorData.detail || 'Unknown error'}`
-            // toast.error(errorMessage)
+            toast.error(errorMessage)
             setSaveError(errorMessage)
           } catch (parseError) {
             console.error('Error parsing error response:', parseError)
             const errorMessage = `Server error (${response.status}): ${responseText.substring(0, 100)}`
-            // toast.error(errorMessage)
+            toast.error(errorMessage)
             setSaveError(errorMessage)
           }
         }
       }
     } catch (error) {
       console.error('Error saving node:', error)
-      // toast.error('Failed to connect to the API. Make sure the server is running.')
+      toast.error('Failed to connect to the API. Make sure the server is running.')
       setSaveError('Failed to connect to the API. Make sure the server is running.')
     } finally {
       setIsSaving(false)
@@ -905,7 +903,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
               <Button 
                 size="sm"
                 onClick={handleSaveNode} 
-                disabled={isSaving || !!saveError || !nodeName}
+                disabled={isSaving || !nodeName}
                 variant={saveSuccess ? "secondary" : "default"}
               >
                 {isSaving ? (

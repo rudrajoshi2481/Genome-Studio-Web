@@ -200,6 +200,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   const [isExecuting, setIsExecuting] = useState(false);
   const [unifiedOutputs, setUnifiedOutputs] = useState<UnifiedOutput[]>([]);
   const [isLocked, setIsLocked] = useState(false); // Lock state: false = draggable, true = locked (no drag)
+  const [isSavingToNodebar, setIsSavingToNodebar] = useState(false);
   const executionIdRef = useRef<string | null>(null); // Track execution_id for stop functionality
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     // Check localStorage first (instant persistence like viewport), then node data
@@ -541,11 +542,14 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   };
 
   const handleSaveToNodebar = async () => {
+    if (isSavingToNodebar) return;
     try {
       if (!token) {
-        // toast.error('Please log in to save nodes');
+        toast.error('Please log in to save nodes');
         return;
       }
+
+      setIsSavingToNodebar(true);
 
       // Prepare node data for saving
       const nodeToSave = {
@@ -564,10 +568,14 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       const savedNode = await createCustomNode(token, nodeToSave as Partial<import('@/lib/services/custom-node-service').CustomNodeData>);
       
       console.log('Node saved successfully:', savedNode);
-      // toast.success(`Saved "${nodeData.title}" to Nodebar!`);
+      toast.success(`Saved "${nodeData.title}" to Nodebar!`);
+      // Dispatch event so Nodebar refreshes its list
+      window.dispatchEvent(new Event('extension-installed'));
     } catch (error) {
       console.error('Error saving node to nodebar:', error);
-      // toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to save node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSavingToNodebar(false);
     }
   };
 

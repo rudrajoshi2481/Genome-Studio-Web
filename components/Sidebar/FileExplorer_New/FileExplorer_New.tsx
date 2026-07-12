@@ -643,6 +643,17 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                   handleFileOpen(result.path);
                 }
               }}
+              draggable={!result.is_dir}
+              onDragStart={(e) => {
+                const dragData = {
+                  type: 'dataType',
+                  dataType: 'string',
+                  label: result.name,
+                  value: result.path,
+                };
+                e.dataTransfer.setData('application/reactflow', JSON.stringify(dragData));
+                e.dataTransfer.effectAllowed = 'move';
+              }}
             >
               <FileIconComponent 
                 fileName={result.name} 

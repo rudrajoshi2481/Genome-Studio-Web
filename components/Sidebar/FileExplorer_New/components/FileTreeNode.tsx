@@ -141,6 +141,19 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
     onContextAction(action, contextNode);
   }, [onContextAction]);
 
+  // Handle drag start for files — creates a string DataTypeNode with the file path
+  const handleDragStart = useCallback((event: React.DragEvent) => {
+    if (node.is_dir) return;
+    const dragData = {
+      type: 'dataType',
+      dataType: 'string',
+      label: node.name,
+      value: node.path,
+    };
+    event.dataTransfer.setData('application/reactflow', JSON.stringify(dragData));
+    event.dataTransfer.effectAllowed = 'move';
+  }, [node.is_dir, node.name, node.path]);
+
   // Handle keyboard navigation
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
     switch (event.key) {
@@ -182,6 +195,8 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
           onKeyDown={handleKeyDown}
+          onDragStart={handleDragStart}
+          draggable={!node.is_dir}
           tabIndex={0}
           role="treeitem"
           aria-expanded={node.is_dir ? isExpanded : undefined}
