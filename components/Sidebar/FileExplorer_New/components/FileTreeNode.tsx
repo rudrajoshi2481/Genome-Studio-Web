@@ -147,7 +147,7 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = memo(({
     const dragData = {
       type: 'dataType',
       dataType: 'string',
-      label: node.name,
+      label: node.name.replace(/\./g, '_'),
       value: node.path,
     };
     event.dataTransfer.setData('application/reactflow', JSON.stringify(dragData));

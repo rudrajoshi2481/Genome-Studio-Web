@@ -648,7 +648,7 @@ export const FileExplorer_New: React.FC<FileExplorerNewProps> = ({
                 const dragData = {
                   type: 'dataType',
                   dataType: 'string',
-                  label: result.name,
+                  label: result.name.replace(/\./g, '_'),
                   value: result.path,
                 };
                 e.dataTransfer.setData('application/reactflow', JSON.stringify(dragData));
