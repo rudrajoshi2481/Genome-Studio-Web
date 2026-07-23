@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Rudhra Joshi and Yong Chen.
+// Licensed under CC BY-NC 4.0. Developed with partial support from the
+// National Science Foundation under CAREER Award DBI-2239350.
+
 import type { Metadata } from "next";
 import { Poppins, Young_Serif, Source_Sans_3, JetBrains_Mono } from "next/font/google";
 import "./globals.css";

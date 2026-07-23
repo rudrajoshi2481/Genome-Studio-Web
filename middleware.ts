@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Rudhra Joshi and Yong Chen.
+// Licensed under CC BY-NC 4.0. Developed with partial support from the
+// National Science Foundation under CAREER Award DBI-2239350.
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { endpoints } from './lib/utils/api-config';
