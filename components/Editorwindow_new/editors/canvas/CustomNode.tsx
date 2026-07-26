@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, useUpdateNodeInternals, useReactFlow, Node } from 'reactflow';
 import { cn } from "@/lib/utils" // Import cn from shadcn utils if available, or define it
 import { workflowManagerAPI } from '@/services/WorkflowManagerAPI';
@@ -202,6 +202,8 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
   const [isLocked, setIsLocked] = useState(false); // Lock state: false = draggable, true = locked (no drag)
   const [isSavingToNodebar, setIsSavingToNodebar] = useState(false);
   const executionIdRef = useRef<string | null>(null); // Track execution_id for stop functionality
+  const wsBatchRef = useRef<{ logs: Array<Record<string, unknown>>; outputs: Array<Record<string, unknown>>; htmls: Record<string, unknown> }>({ logs: [], outputs: [], htmls: {} });
+  const wsBatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     // Check localStorage first (instant persistence like viewport), then node data
     if (typeof window !== 'undefined' && nodeData.filePath) {
@@ -277,6 +279,37 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     }
   }, [id, nodeData.inputs?.length, nodeData.outputs?.length, updateNodeInternals]);
 
+  // Flush batched WebSocket updates in a single setNodes call (throttled to ~100ms)
+  const flushWsBatch = useCallback(() => {
+    if (wsBatchTimerRef.current) return;
+    wsBatchTimerRef.current = setTimeout(() => {
+      wsBatchTimerRef.current = null;
+      const batch = wsBatchRef.current;
+      if (batch.logs.length === 0 && batch.outputs.length === 0) return;
+      const logsToAdd = batch.logs;
+      const outputsToAdd = batch.outputs.map((o, i) => ({ ...o, order: (o.order as number) >= 0 ? o.order : i }));
+      const htmlsToAdd = batch.htmls;
+      wsBatchRef.current = { logs: [], outputs: [], htmls: {} };
+      setNodes((nds: Node[]) =>
+        nds.map((n: Node) => {
+          if (n.id !== id) return n;
+          const currentLogs = (n.data.logs as Array<Record<string, unknown>>) || [];
+          const currentOutputs = (n.data.unified_outputs as Array<Record<string, unknown>>) || [];
+          const currentHtml = (n.data.output_html as Record<string, unknown>) || {};
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              logs: [...currentLogs, ...logsToAdd],
+              unified_outputs: [...currentOutputs, ...outputsToAdd],
+              output_html: { ...currentHtml, ...htmlsToAdd },
+            },
+          };
+        })
+      );
+    }, 100);
+  }, [id, setNodes]);
+
   // Handle single node execution with WebSocket streaming
   const handleRunNode = async () => {
     if (!nodeData.filePath) {
@@ -309,7 +342,8 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
 
       const requestPayload = {
         file_path: nodeData.filePath,
-        node_id: id
+        node_id: id,
+        conda_env: workflowManagerAPI.selectedCondaEnv || undefined,
       };
 
       // Start execution — backend returns execution_id immediately
@@ -327,50 +361,24 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         },
         onLog: (msg: LogStreamMessage) => {
           if (msg.node_id !== id) return;
-          // Append log to this node's data in real-time
-          setNodes((nds: Node[]) =>
-            nds.map((n: Node) => {
-              if (n.id !== id) return n;
-              const currentLogs = (n.data.logs as Array<Record<string, unknown>>) || [];
-              const currentOutputs = (n.data.unified_outputs as Array<Record<string, unknown>>) || [];
-              return {
-                ...n,
-                data: {
-                  ...n.data,
-                  logs: [...currentLogs, msg.log],
-                  unified_outputs: [...currentOutputs, { type: 'text', content: msg.log.message, order: currentOutputs.length }],
-                },
-              };
-            })
-          );
+          wsBatchRef.current.logs.push(msg.log);
+          wsBatchRef.current.outputs.push({ type: 'text', content: msg.log.message, order: -1 });
+          flushWsBatch();
         },
         onOutput: (msg: OutputStreamMessage) => {
           if (msg.node_id !== id) return;
-          // Append rich output to this node's data in real-time
-          setNodes((nds: Node[]) =>
-            nds.map((n: Node) => {
-              if (n.id !== id) return n;
-              const currentOutputs = (n.data.unified_outputs as Array<Record<string, unknown>>) || [];
-              const order = msg.output.order ?? currentOutputs.length;
-              const isHiglass = msg.output.output_type === 'higlass' && msg.output.viewconf;
-              const newOutput: Record<string, unknown> = {
-                type: isHiglass ? 'higlass' : (msg.output.html ? 'rich' : 'text'),
-                content: isHiglass ? { viewconf: msg.output.viewconf, html: msg.output.html } : (msg.output.html || msg.output.text || ''),
-                order,
-              };
-              let dataUpdate: Record<string, unknown> = {
-                unified_outputs: [...currentOutputs, newOutput],
-              };
-              if (msg.output.html) {
-                const currentHtml = (n.data.output_html as Record<string, unknown>) || {};
-                dataUpdate.output_html = { ...currentHtml, [`output_${order}`]: msg.output.html };
-              }
-              return {
-                ...n,
-                data: { ...n.data, ...dataUpdate },
-              };
-            })
-          );
+          const isHiglass = msg.output.output_type === 'higlass' && msg.output.viewconf;
+          const newOutput: Record<string, unknown> = {
+            type: isHiglass ? 'higlass' : (msg.output.html ? 'rich' : 'text'),
+            content: isHiglass ? { viewconf: msg.output.viewconf, html: msg.output.html } : (msg.output.html || msg.output.text || ''),
+            order: msg.output.order ?? -1,
+          };
+          wsBatchRef.current.outputs.push(newOutput);
+          if (msg.output.html) {
+            const order = msg.output.order ?? 0;
+            wsBatchRef.current.htmls[`output_${order}`] = msg.output.html;
+          }
+          flushWsBatch();
         },
         onStatus: (msg: StatusUpdateMessage) => {
           // Handle terminal statuses (completed/failed/cancelled) with node_id
@@ -378,6 +386,13 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
             if (hasFinished) return;
             hasFinished = true;
             setIsExecuting(false);
+
+            // Cancel any pending batch flush — final status replaces all streamed data
+            if (wsBatchTimerRef.current) {
+              clearTimeout(wsBatchTimerRef.current);
+              wsBatchTimerRef.current = null;
+            }
+            wsBatchRef.current = { logs: [], outputs: [], htmls: {} };
 
             // Update node with final status and complete result data from the backend
             // Replace streamed logs/outputs with the complete set from the final message
@@ -642,22 +657,26 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
     return Math.max(minimumHeight, baseHeight + inputsHeight + outputsHeight + dividerHeight);
   }, [nodeData.inputs?.length, nodeData.outputs?.length, nodeData.description, unifiedOutputs.length, outputsOpen, isCollapsed]);
 
+  const nodeStyle = useMemo(() => ({ 
+    width: nodeData.width || dimensions.width,
+    minHeight: minHeight,
+    position: 'relative' as const
+  }), [nodeData.width, dimensions.width, minHeight]);
+
+  const nodeClassName = useMemo(() => cn(
+    "shadow-md rounded-md overflow-visible",
+    selected && "ring-2 ring-primary",
+    "bg-background",
+    isLocked && "noDrag"
+  ), [selected, isLocked]);
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
           ref={nodeRef}
-          className={cn(
-            "shadow-md rounded-md overflow-visible",
-            selected && "ring-2 ring-primary",
-            "bg-background",
-            isLocked && "noDrag"  // Add noDrag when locked
-          )}
-          style={{ 
-            width: nodeData.width || dimensions.width,
-            minHeight: minHeight,
-            position: 'relative'
-          }}
+          className={nodeClassName}
+          style={nodeStyle}
           onDoubleClick={(e) => {
             e.stopPropagation();
             setIsLocked(!isLocked);

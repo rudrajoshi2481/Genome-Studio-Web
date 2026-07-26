@@ -5,17 +5,27 @@
 
 import { host, port } from '@/config/server';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import authService from '@/lib/services/auth-service';
+
+export interface CondaEnv {
+  name: string;
+  path: string;
+  python: string;
+  available: boolean;
+}
 
 export interface WorkflowExecutionRequest {
   file_path: string;
   execution_mode?: 'sequential' | 'parallel' | 'dependency_based';
   stop_on_error?: boolean;
   timeout_seconds?: number;
+  conda_env?: string;
 }
 
 export interface SingleNodeExecutionRequest {
   file_path: string;
   node_id: string;
+  conda_env?: string;
 }
 
 export interface WorkflowExecutionResponse {
@@ -79,6 +89,7 @@ export interface NodeExecutionResult {
 class WorkflowManagerAPI {
   private baseUrl: string;
   private wsUrl: string;
+  selectedCondaEnv: string | null = null;
 
   constructor() {
     this.baseUrl = `http://${host}:${port}/api/v1/workflow-manager-new`;
@@ -87,7 +98,10 @@ class WorkflowManagerAPI {
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {
-    const token = useAuthStore.getState().token;
+    let token = useAuthStore.getState().token;
+    if (!token) {
+      token = authService.getToken();
+    }
     console.log('🔑 WorkflowManagerAPI: Auth token check:', token ? 'Token found' : 'No token found');
     console.log('🔑 WorkflowManagerAPI: Token length:', token ? token.length : 0);
     console.log('🔑 WorkflowManagerAPI: Auth state:', {
@@ -236,6 +250,21 @@ class WorkflowManagerAPI {
     return response.json();
   }
 
+
+  /**
+   * Get available conda environments
+   */
+  async getCondaEnvs(): Promise<{ envs: CondaEnv[] }> {
+    const response = await fetch(`${this.baseUrl}/conda-envs`, {
+      headers: await this.getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get conda envs: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 
   /**
    * Create WebSocket connection for real-time updates

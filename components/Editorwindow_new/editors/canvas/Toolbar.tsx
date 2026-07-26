@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, Save, Play, Square, RotateCcw, CheckCircle, AlertCircle, RefreshCw, Network, GitBranch, Loader2, Settings } from 'lucide-react';
+import { Download, Save, Play, Square, RotateCcw, CheckCircle, AlertCircle, RefreshCw, Network, GitBranch, Loader2, Settings, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Node, Edge, useReactFlow } from 'reactflow';
 import {
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { serializeFlowData, convertToFlowNodes, convertToFlowEdges } from './utils/file-parser';
-import { workflowManagerAPI, WorkflowExecutionStatus } from '@/services/WorkflowManagerAPI';
+import { workflowManagerAPI, WorkflowExecutionStatus, CondaEnv } from '@/services/WorkflowManagerAPI';
 import { workflowWebSocket, LogStreamMessage, OutputStreamMessage, StatusUpdateMessage, ProgressUpdateMessage } from '@/services/WorkflowWebSocket';
 import { useTabStore } from '@/components/FileTabs/useTabStore';
 
@@ -91,6 +92,9 @@ function Toolbar({
   const { updateTab } = useTabStore();
   const [executionStatus, setExecutionStatus] = useState<WorkflowExecutionStatus | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [condaEnvs, setCondaEnvs] = useState<CondaEnv[]>([]);
+  const [selectedCondaEnv, setSelectedCondaEnv] = useState<string>('default');
+  const [envsLoading, setEnvsLoading] = useState(false);
   const [localMinimap, setLocalMinimap] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('canvas_show_minimap');
@@ -105,6 +109,22 @@ function Toolbar({
       localStorage.setItem('canvas_show_minimap', String(localMinimap));
     }
   }, [localMinimap]);
+
+  // Fetch conda environments on mount
+  useEffect(() => {
+    const fetchEnvs = async () => {
+      setEnvsLoading(true);
+      try {
+        const result = await workflowManagerAPI.getCondaEnvs();
+        setCondaEnvs(result.envs);
+      } catch (error) {
+        console.error('Failed to fetch conda envs:', error);
+      } finally {
+        setEnvsLoading(false);
+      }
+    };
+    fetchEnvs();
+  }, []);
 
   const updateExecutingState = (executing: boolean) => {
     setIsExecuting(executing);
@@ -201,7 +221,8 @@ function Toolbar({
         file_path: filePath,
         execution_mode: 'dependency_based' as const,
         stop_on_error: true,
-        timeout_seconds: 86400
+        timeout_seconds: 86400,
+        conda_env: selectedCondaEnv !== 'default' ? selectedCondaEnv : undefined,
       };
 
       // Clear all node execution state in the UI for a fresh full run
@@ -513,6 +534,37 @@ function Toolbar({
         </div>
 
         <Separator orientation="vertical" className="h-5" />
+
+        {/* Conda Environment Selector */}
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
+            <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+            <Select
+              value={selectedCondaEnv}
+              onValueChange={(val) => {
+                setSelectedCondaEnv(val);
+                workflowManagerAPI.selectedCondaEnv = val !== 'default' ? val : null;
+              }}
+              disabled={isExecuting || envsLoading}
+            >
+              <SelectTrigger className="h-6 w-[130px] text-xs">
+                <SelectValue placeholder="Python env" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default" className="text-xs">
+                  Default (bundled)
+                </SelectItem>
+                {condaEnvs
+                  .filter(env => env.available)
+                  .map(env => (
+                    <SelectItem key={env.name} value={env.name} className="text-xs">
+                      {env.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {/* Flow Info (Right) */}
         <div className="flex items-center gap-1.5">

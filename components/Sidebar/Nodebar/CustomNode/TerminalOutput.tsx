@@ -64,17 +64,23 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
 
         {displayOutputs.map((output, index) => {
           if (output.type === 'text') {
+            const textContent = typeof output.content === 'string' 
+              ? output.content 
+              : (output.content?.text || output.content?.html || JSON.stringify(output.content));
             return (
               <div
                 key={index}
                 className="text-foreground/90 whitespace-pre-wrap break-words"
               >
-                <span className="text-muted-foreground select-none">›</span>{' '}{output.content}
+                <span className="text-muted-foreground select-none">›</span>{' '}{textContent}
               </div>
             );
           }
 
           if (output.type === 'error') {
+            const errorContent = typeof output.content === 'string' 
+              ? output.content 
+              : (output.content?.text || output.content?.html || JSON.stringify(output.content));
             return (
               <div key={index} className="mt-1.5 rounded-md bg-destructive/5 border border-destructive/20 overflow-hidden">
                 <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-destructive/10 border-b border-destructive/20">
@@ -82,7 +88,7 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
                   <span className="text-destructive font-semibold text-[11px]">Error</span>
                 </div>
                 <pre className="px-2.5 py-2 text-destructive whitespace-pre-wrap break-words text-[11px]">
-                  {output.content}
+                  {errorContent}
                 </pre>
                 {output.traceback && (
                   <details className="border-t border-destructive/20">
