@@ -75,6 +75,7 @@ const CanvasContent: React.FC<CanvasContentProps> = (props) => {
  
   return (
     <ReactFlow
+      id={`rf-legacy-${tabId}`}
       nodes={nodes}
       edges={edges}
       onNodesChange={onNodesChange}

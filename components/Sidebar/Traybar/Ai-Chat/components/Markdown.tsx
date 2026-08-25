@@ -7,6 +7,7 @@ import remarkMath from "remark-math";
 import remarkBreaks from "remark-breaks";
 import rehypeKatex from "rehype-katex";
 import { CodeBlock } from "./CodeBlock";
+import { Mermaid } from "./Mermaid";
 import { cn } from "@/lib/utils";
 import { LinkIcon } from "lucide-react";
 import {
@@ -49,9 +50,9 @@ const components: Partial<Components> = {
       </TableCell>
     );
   },
-  code: ({ children }) => {
+  code: ({ children, className, ...props }) => {
     return (
-      <code className="text-[13px] text-primary px-1.5 py-0.5 mx-0.5 font-mono">
+      <code className="text-[13px] text-primary px-1.5 py-0.5 mx-0.5 font-mono" {...(props as any)}>
         {children}
       </code>
     );
@@ -73,6 +74,20 @@ const components: Partial<Components> = {
     );
   },
   pre: ({ children }) => {
+    // Check if this is a mermaid code block by inspecting the child <code> element
+    const child = Array.isArray(children) ? children[0] : children;
+    const childProps = (child as any)?.props;
+    const childClassName = childProps?.className || "";
+    const langMatch = /language-(\w+)/.exec(childClassName);
+    if (langMatch && langMatch[1] === "mermaid") {
+      // Extract the raw chart text from the code element's children
+      const chart = String(childProps?.children ?? "").replace(/\n$/, "");
+      return (
+        <div className="my-1">
+          <Mermaid chart={chart} />
+        </div>
+      );
+    }
     return (
       <div className="my-1">
         <CodeBlock>{children}</CodeBlock>

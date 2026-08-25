@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, TimerReset, Puzzle, Server } from 'lucide-react'
+import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, TimerReset, Puzzle, Server, Boxes } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { host, port } from '@/config/server'
@@ -34,6 +34,8 @@ import ServerPanel from './ServerPanel/ServerPanel'
 type ToolbarItem = {
   name: string
   icon: LucideIcon
+  /** When true, a horizontal separator is rendered after this item */
+  separatorAfter?: boolean
 } & (
   | { type: 'sidebar', component: () => React.ReactNode }
   | { type: 'page', link: string }
@@ -121,7 +123,14 @@ function Toolbar({ onActiveItemChange, sidebarOpen, onToggleSidebar }: ToolbarPr
       name: "Extensions",
       icon: Puzzle,
       type: "sidebar",
-      component: () => <Extensions />
+      component: () => <Extensions />,
+      separatorAfter: true
+    },
+    {
+      name: "Extensions Hub",
+      icon: Boxes,
+      type: "page",
+      link: "/extensions-hub"
     },
     {
       name: "Server",
@@ -158,7 +167,7 @@ function Toolbar({ onActiveItemChange, sidebarOpen, onToggleSidebar }: ToolbarPr
    */
   const handleItemClick = (item: ToolbarItem) => {
     if (item.type === 'page') {
-      router.push(item.link)
+      window.open(item.link, '_blank', 'noopener,noreferrer')
       return
     }
 
@@ -240,7 +249,8 @@ function Toolbar({ onActiveItemChange, sidebarOpen, onToggleSidebar }: ToolbarPr
         const isActive = activeItem === item.name
         const isPinned = pinnedItems.has(item.name)
         return (
-          <ContextMenu key={item.name}>
+          <React.Fragment key={item.name}>
+          <ContextMenu>
             <ContextMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -287,6 +297,10 @@ function Toolbar({ onActiveItemChange, sidebarOpen, onToggleSidebar }: ToolbarPr
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
+          {item.separatorAfter && (
+            <div className="w-6 my-1 border-t border-border" aria-hidden="true" />
+          )}
+          </React.Fragment>
         )
       })}
      </div>

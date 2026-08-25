@@ -16,6 +16,7 @@ export interface SlashCommand {
 const DEFAULT_COMMANDS: SlashCommand[] = [];
 
 let _cachedCommands: SlashCommand[] | null = null;
+let _commandsFetchPromise: Promise<SlashCommand[]> | null = null;
 
 async function fetchBackendCommands(): Promise<SlashCommand[]> {
   try {
@@ -33,19 +34,30 @@ async function fetchBackendCommands(): Promise<SlashCommand[]> {
   }
 }
 
+/** Invalidate the cached command list so the next fetch hits the backend. */
+export function invalidateSlashCommandCache() {
+  _cachedCommands = null;
+  _commandsFetchPromise = null;
+}
+
 async function getAllCommands(): Promise<SlashCommand[]> {
   if (_cachedCommands) return _cachedCommands;
-  const backend = await fetchBackendCommands();
-  const merged = [...DEFAULT_COMMANDS];
-  const seen = new Set(merged.map(c => c.name));
-  for (const cmd of backend) {
-    if (!seen.has(cmd.name)) {
-      merged.push(cmd);
-      seen.add(cmd.name);
+  if (_commandsFetchPromise) return _commandsFetchPromise;
+  _commandsFetchPromise = (async () => {
+    const backend = await fetchBackendCommands();
+    const merged = [...DEFAULT_COMMANDS];
+    const seen = new Set(merged.map(c => c.name));
+    for (const cmd of backend) {
+      if (!seen.has(cmd.name)) {
+        merged.push(cmd);
+        seen.add(cmd.name);
+      }
     }
-  }
-  _cachedCommands = merged;
-  return merged;
+    _cachedCommands = merged;
+    _commandsFetchPromise = null;
+    return merged;
+  })();
+  return _commandsFetchPromise;
 }
 
 interface SlashCommandSuggestionProps {
@@ -72,6 +84,9 @@ export function SlashCommandSuggestion({
   const [allCommands, setAllCommands] = useState<SlashCommand[]>(DEFAULT_COMMANDS);
 
   useEffect(() => {
+    // The component mounts fresh each time the menu opens, so invalidate the
+    // module-level cache to pick up backend command changes without a reload.
+    invalidateSlashCommandCache();
     getAllCommands().then(setAllCommands);
   }, []);
 

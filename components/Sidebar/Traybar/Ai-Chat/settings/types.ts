@@ -14,6 +14,9 @@ export interface AgentInfo {
 export interface SkillInfo {
   name: string
   description?: string
+  body?: string
+  path?: string
+  writable?: boolean
 }
 
 export interface CommandInfo {

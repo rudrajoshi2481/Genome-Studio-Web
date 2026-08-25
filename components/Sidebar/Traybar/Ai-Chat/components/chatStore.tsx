@@ -14,7 +14,7 @@ export interface UploadedFile {
 }
 
 export interface ChatMentionItem {
-  type: 'tool' | 'agent' | 'workflow' | 'database' | 'command' | 'file'
+  type: 'tool' | 'agent' | 'workflow' | 'database' | 'command' | 'file' | 'skill'
   name: string
   id?: string
   description?: string
@@ -60,7 +60,7 @@ export type ReasoningStep =
 
 export interface Message {
   id: string
-  type: 'human' | 'ai' | 'tool' | 'tool_code' | 'system' | 'thinking' | 'stream' | 'reasoning' | 'plan' | 'task' | 'confirmation' | 'separator'
+  type: 'human' | 'ai' | 'tool' | 'tool_code' | 'system' | 'thinking' | 'stream' | 'reasoning' | 'plan' | 'task' | 'confirmation' | 'separator' | 'error' | 'retry'
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp?: string
@@ -76,6 +76,15 @@ export interface Message {
     error?: string
     [key: string]: any
   }
+  // Error message metadata (type === 'error')
+  errorKind?: 'rate_limit' | 'timeout' | 'context_length' | 'auth' | 'connection' | 'generic'
+  errorTitle?: string
+  errorDetail?: string
+  canRetry?: boolean
+  // Retry message metadata (type === 'retry')
+  retryAttempt?: number
+  retryMaxAttempts?: number
+  retryDelay?: number
   reasoning?: {
     content: string
     isStreaming?: boolean

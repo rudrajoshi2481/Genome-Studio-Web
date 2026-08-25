@@ -1,8 +1,16 @@
-import React from "react"
+import React, { useState } from "react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Bot, Zap, Terminal, BookOpen, type LucideIcon } from "lucide-react"
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
+  Bot, Zap, Terminal, BookOpen, Plus, Pencil, Trash2, Copy, type LucideIcon,
+} from "lucide-react"
 import type { ChatSettings } from "./useChatSettings"
+import type { SkillInfo } from "./types"
+import { SkillEditorDialog } from "./SkillEditorDialog"
 
 function EmptyState({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
   return (
@@ -14,6 +22,36 @@ function EmptyState({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
 }
 
 export function AgentsTab({ s }: { s: ChatSettings }) {
+  const [skillDialogOpen, setSkillDialogOpen] = useState(false)
+  const [editingSkill, setEditingSkill] = useState<SkillInfo | null>(null)
+
+  const openCreateSkill = () => {
+    setEditingSkill(null)
+    s.setSkillError(null)
+    setSkillDialogOpen(true)
+  }
+
+  const openEditSkill = (skill: SkillInfo) => {
+    setEditingSkill(skill)
+    s.setSkillError(null)
+    setSkillDialogOpen(true)
+  }
+
+  const handleDeleteSkill = async (skill: SkillInfo) => {
+    if (!confirm(`Delete skill "${skill.name}"? This cannot be undone.`)) return
+    await s.handleDeleteSkill(skill.name)
+  }
+
+  const handleDuplicateSkill = async (skill: SkillInfo) => {
+    // Copy the skill content into a new user-level skill with "-copy" suffix
+    const newName = `${skill.name}-copy`
+    await s.handleSaveSkill({
+      name: newName,
+      description: skill.description || "",
+      body: skill.body || "",
+    })
+  }
+
   return (
     <div className="space-y-5">
       {/* ─── Agents ─── */}
@@ -55,7 +93,7 @@ export function AgentsTab({ s }: { s: ChatSettings }) {
         </CardContent>
       </Card>
 
-      {/* ─── Skills ─── */}
+      {/* ─── Skills (CRUD) ─── */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -65,34 +103,103 @@ export function AgentsTab({ s }: { s: ChatSettings }) {
                 Skills
               </CardTitle>
               <CardDescription className="text-xs">
-                Specialized capabilities the agent can invoke.
+                Specialized capabilities injected into the agent prompt. Mention with @ in chat.
               </CardDescription>
             </div>
-            <Badge variant="secondary" className="text-[10px] shrink-0">{s.skills.length}</Badge>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="secondary" className="text-[10px]">{s.skills.length}</Badge>
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={openCreateSkill}>
+                <Plus className="h-3.5 w-3.5" />
+                New Skill
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           {s.skills.length === 0 ? (
-            <EmptyState icon={Zap} text="No skills loaded." />
+            <div className="flex flex-col items-center justify-center py-8 gap-3 text-muted-foreground">
+              <Zap className="h-6 w-6 opacity-40" />
+              <p className="text-xs">No skills loaded. Create one to give the agent specialized know-how.</p>
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={openCreateSkill}>
+                <Plus className="h-3.5 w-3.5" />
+                Create skill
+              </Button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {s.skills.map((sk) => (
-                <div key={sk.name} className="p-3 rounded-lg border hover:bg-muted/20 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
-                      <Zap className="h-3.5 w-3.5" />
+              {s.skills.map((sk) => {
+                return (
+                  <div key={sk.name} className="group/skill p-3 rounded-lg border hover:bg-muted/20 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                        <Zap className="h-3.5 w-3.5" />
+                      </div>
+                      <p className="font-medium text-sm truncate flex-1 min-w-0">{sk.name}</p>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover/skill:opacity-100 transition-opacity shrink-0">
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="size-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
+                                onClick={() => handleDuplicateSkill(sk)}
+                                aria-label={`Duplicate ${sk.name}`}
+                                type="button"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">Duplicate</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="size-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
+                                onClick={() => openEditSkill(sk)}
+                                aria-label={`Edit ${sk.name}`}
+                                type="button"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">Edit</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="size-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted"
+                                onClick={() => handleDeleteSkill(sk)}
+                                aria-label={`Delete ${sk.name}`}
+                                type="button"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">Delete</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </div>
-                    <p className="font-medium text-sm truncate">{sk.name}</p>
+                    {sk.description && (
+                      <p className="text-[11px] text-muted-foreground mt-2 line-clamp-2">{sk.description}</p>
+                    )}
                   </div>
-                  {sk.description && (
-                    <p className="text-[11px] text-muted-foreground mt-2 line-clamp-2">{sk.description}</p>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <SkillEditorDialog
+        open={skillDialogOpen}
+        onOpenChange={setSkillDialogOpen}
+        s={s}
+        skill={editingSkill}
+      />
 
       {/* ─── Slash Commands ─── */}
       <Card>

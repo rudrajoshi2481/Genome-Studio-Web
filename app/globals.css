@@ -278,4 +278,7 @@
 .mention {
   display: inline-flex;
   align-items: center;
+  vertical-align: baseline;
+  margin: 0 1px;
+  user-select: none;
 }

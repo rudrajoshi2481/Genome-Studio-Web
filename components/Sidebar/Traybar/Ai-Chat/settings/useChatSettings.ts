@@ -66,6 +66,10 @@ export function useChatSettings(open: boolean) {
   const [permSaving, setPermSaving] = useState(false)
   const [permError, setPermError] = useState<string | null>(null)
 
+  // Skill CRUD state
+  const [skillSaving, setSkillSaving] = useState(false)
+  const [skillError, setSkillError] = useState<string | null>(null)
+
   const fetchAll = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -109,9 +113,13 @@ export function useChatSettings(open: boolean) {
         setPermAllowedTools(permRes.value.allowed || [])
         setPermDeniedTools(permRes.value.denied || [])
         const serverMode = permRes.value.mode || 'default'
-        if (serverMode === 'bypass' && permissionMode !== 'bypass') {
+        // Read imperatively so this callback stays stable — depending on
+        // permissionMode would recreate fetchAll on every mode change and
+        // retrigger the effect below, causing a fetch/setState loop.
+        const currentMode = useChatStore.getState().permissionMode
+        if (serverMode === 'bypass' && currentMode !== 'bypass') {
           setPermissionMode('bypass')
-        } else if (serverMode === 'default' && permissionMode !== 'default' && permissionMode !== 'bypass') {
+        } else if (serverMode === 'default' && currentMode !== 'default' && currentMode !== 'bypass') {
           setPermissionMode('default')
         }
       }
@@ -120,7 +128,7 @@ export function useChatSettings(open: boolean) {
     } finally {
       setLoading(false)
     }
-  }, [permissionMode, setPermissionMode])
+  }, [setPermissionMode])
 
   const handleSaveUrl = useCallback(async () => {
     setUrlSaving(true)
@@ -334,6 +342,56 @@ export function useChatSettings(open: boolean) {
     }
   }, [resetPermissionMode])
 
+  const handleSaveSkill = useCallback(async (skill: { name: string; description: string; body: string }, originalName?: string) => {
+    setSkillSaving(true)
+    setSkillError(null)
+    try {
+      const isUpdate = !!originalName
+      const url = isUpdate
+        ? `${getApiBaseUrl()}/ai-chat/skills/${encodeURIComponent(originalName!)}`
+        : `${getApiBaseUrl()}/ai-chat/skills`
+      const resp = await fetch(url, {
+        method: isUpdate ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(skill),
+      })
+      const data = await resp.json()
+      if (!resp.ok) {
+        setSkillError(data.detail || "Failed to save skill")
+        return null
+      }
+      await fetchAll()
+      return data
+    } catch (err) {
+      setSkillError("Failed to save skill")
+      return null
+    } finally {
+      setSkillSaving(false)
+    }
+  }, [fetchAll])
+
+  const handleDeleteSkill = useCallback(async (name: string) => {
+    setSkillSaving(true)
+    setSkillError(null)
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/ai-chat/skills/${encodeURIComponent(name)}`, {
+        method: "DELETE",
+      })
+      const data = await resp.json()
+      if (!resp.ok) {
+        setSkillError(data.detail || "Failed to delete skill")
+        return false
+      }
+      await fetchAll()
+      return true
+    } catch (err) {
+      setSkillError("Failed to delete skill")
+      return false
+    } finally {
+      setSkillSaving(false)
+    }
+  }, [fetchAll])
+
   useEffect(() => {
     if (open) fetchAll()
   }, [open, fetchAll])
@@ -359,6 +417,8 @@ export function useChatSettings(open: boolean) {
     handleSetPermissionMode, handleResetPermissions,
     // session
     keepIntermediateFiles, setKeepIntermediateFiles,
+    // skills CRUD
+    skillSaving, skillError, setSkillError, handleSaveSkill, handleDeleteSkill,
   }
 }
 

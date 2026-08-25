@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useLayoutEffect, useState, type JSX } from "react";
+import React, { useEffect, useState, type JSX } from "react";
 import { bundledLanguages, codeToHast, type BundledLanguage } from "shiki/bundle/web";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { toJsxRuntime } from "hast-util-to-jsx-runtime";
@@ -80,30 +80,36 @@ export function CodeBlock({ children }: { children: any }) {
   const code = children?.props?.children ?? "";
   const { theme } = useTheme();
   const language = children?.props?.className?.split("-")?.[1] || "bash";
-  const [loading, setLoading] = useState(true);
-  const [component, setComponent] = useState<JSX.Element | null>(
-    <PurePre className="animate-pulse" code={code} lang={language}>
-      {children}
-    </PurePre>,
-  );
+  const themeName = theme === "dark" ? "dark-plus" : "github-light";
+  // Highlighted result keyed by the input it was produced for, so stale
+  // results are ignored at render time without calling setState in an effect.
+  const [highlighted, setHighlighted] = useState<{
+    code: string;
+    language: string;
+    theme: string;
+    el: JSX.Element;
+  } | null>(null);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    Highlight(code, language, theme === "dark" ? "dark-plus" : "github-light")
+    Highlight(code, language, themeName)
       .then((result) => {
         if (!cancelled) {
-          setComponent(result);
-          setLoading(false);
+          setHighlighted({ code, language, theme: themeName, el: result });
         }
       })
-      .catch(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [theme, language, code]);
+  }, [themeName, language, code]);
+
+  const isCurrent =
+    highlighted !== null &&
+    highlighted.code === code &&
+    highlighted.language === language &&
+    highlighted.theme === themeName;
+  const loading = !isCurrent;
 
   return (
     <div
@@ -112,7 +118,13 @@ export function CodeBlock({ children }: { children: any }) {
         "text-xs flex shadow-sm flex-col relative my-2 overflow-hidden",
       )}
     >
-      {component}
+      {isCurrent ? (
+        highlighted.el
+      ) : (
+        <PurePre code={code} lang={language}>
+          {children}
+        </PurePre>
+      )}
     </div>
   );
 }

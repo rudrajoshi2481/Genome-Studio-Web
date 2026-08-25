@@ -296,18 +296,24 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
       editorRef.current?.chain().focus().clearContent().run()
     }
 
-    switch (cmdName) {
-      case '/new':
+    // Normalize: accept both "/new" and "new" forms
+    const normalized = cmdName.replace(/^\/+/, '')
+
+    switch (normalized) {
+      case 'new':
+        // Cache the outgoing session so its messages aren't lost when we
+        // switch to the fresh tab (matches handleNewConversation behavior).
+        cacheCurrentSession()
         clearMentions()
         clearUploadedFiles()
-        cacheCurrentSession()
-        const tempId = `temp-${Date.now()}`
-        openSession(tempId, 'New Chat')
-        setCurrentConversation(null)
-        clearMessages()
+        {
+          const tempId = `temp-${Date.now()}`
+          openSession(tempId, 'New Chat')
+          setCurrentConversation(null)
+          clearMessages()
+        }
         clearInput()
         break
-      case '/clear':
       case 'clear':
         if (onSendCommand) {
           onSendCommand('clear', [], selectedModel)
@@ -315,16 +321,13 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
         clearMessages()
         clearInput()
         break
-      case '/compact':
       case 'compact':
-      case '/compaction':
       case 'compaction':
         if (onSendCommand) {
           onSendCommand('compact', [], selectedModel)
         }
         clearInput()
         break
-      case '/help':
       case 'help':
         if (onSendCommand) {
           onSendCommand('help', [], selectedModel)
@@ -333,7 +336,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
         break
       default:
         if (onSendCommand) {
-          onSendCommand(cmdName.replace(/^\/+/, ''), [], selectedModel)
+          onSendCommand(normalized, [], selectedModel)
         }
         clearInput()
         break
@@ -342,16 +345,61 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
 
   const handleSubmit = () => {
     const text = inputValue.trim()
-    const commandMention = mentions.find(m => m.type === 'command')
-    if (commandMention) {
-      executeSlashCommand(commandMention.name)
+    const commandMentions = mentions.filter(m => m.type === 'command')
+    if (commandMentions.length > 0) {
+      // Command badge(s) present in the editor. Execute them.
+      const builtin = ['new', 'clear', 'compact', 'compaction', 'help']
+      // Strip all command badge labels from the text to get extra args.
+      let extraText = text
+      for (const cm of commandMentions) {
+        const cmdName = cm.name.startsWith('/') ? cm.name : `/${cm.name}`
+        extraText = extraText.replace(`command("${cmdName}")`, '')
+      }
+      extraText = extraText.trim()
+      const extraArgs = extraText ? extraText.split(/\s+/) : []
+
+      // Execute each command badge. Built-ins execute locally; custom
+      // commands are sent to the backend (only the last one carries args).
+      for (let i = 0; i < commandMentions.length; i++) {
+        const cm = commandMentions[i]
+        const cmdName = cm.name.startsWith('/') ? cm.name : `/${cm.name}`
+        const normalized = cmdName.replace(/^\/+/, '')
+        const isLast = i === commandMentions.length - 1
+        if (builtin.includes(normalized)) {
+          executeSlashCommand(cmdName)
+        } else if (onSendCommand) {
+          onSendCommand(normalized, isLast ? extraArgs : [], selectedModel)
+        }
+      }
+      setInputValue('')
+      setMentions([])
+      clearMentions()
+      clearUploadedFiles()
+      editorRef.current?.commands.clearContent()
       return
     }
     if (!text && uploadedFiles.length === 0) return
 
-    if (text.startsWith('/') && !text.includes(' ')) {
-      executeSlashCommand(text)
-      return
+    // Slash command typed as plain text: "/cmd" or "/cmd arg1 arg2".
+    if (text.startsWith('/')) {
+      const parts = text.split(/\s+/)
+      const cmd = parts[0]
+      const args = parts.slice(1)
+      if (cmd.length > 1) {
+        const builtin = ['new', 'clear', 'compact', 'compaction', 'help']
+        const normalizedName = cmd.replace(/^\/+/, '')
+        if (builtin.includes(normalizedName)) {
+          executeSlashCommand(cmd)
+        } else if (onSendCommand) {
+          onSendCommand(normalizedName, args, selectedModel)
+          setInputValue('')
+          setMentions([])
+          clearMentions()
+          clearUploadedFiles()
+          editorRef.current?.commands.clearContent()
+        }
+        return
+      }
     }
 
     if (loading) {
@@ -380,18 +428,52 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
 
   const handleSlashCommandSelect = (cmd: SlashCommand) => {
     setShowSlashMenu(false)
-    justInsertedCommand.current = true
+    // Don't set justInsertedCommand — we're inserting a badge, not executing,
+    // and setting it would suppress the next slash trigger.
 
     const editor = editorRef.current
     if (!editor) return
 
-    editor.chain().focus().clearContent().run()
-    setInputValue('')
-    setMentions([])
-    clearMentions()
-    clearUploadedFiles()
+    // Delete only the typed slash trigger text (e.g. "/ne"), NOT the entire
+    // editor content — otherwise existing badges get wiped when stacking
+    // multiple commands. Walk the doc nodes to find the last "/" character
+    // position before the cursor, then delete from there to the cursor.
+    const cursorPos = editor.state.selection.head
+    let slashDocPos = -1
+    editor.state.doc.nodesBetween(0, cursorPos, (node, pos) => {
+      if (node.isText) {
+        const text = node.text || ''
+        const idx = text.lastIndexOf('/')
+        if (idx !== -1) {
+          // pos is the doc position of this text node; idx is the offset within it
+          slashDocPos = pos + idx
+        }
+      }
+    })
 
-    executeSlashCommand(`/${cmd.name}`)
+    if (slashDocPos !== -1) {
+      editor.chain().focus().deleteRange({ from: slashDocPos, to: cursorPos }).run()
+    }
+
+    const cmdName = cmd.name.startsWith('/') ? cmd.name : `/${cmd.name}`
+    const mentionId = JSON.stringify({
+      type: 'command',
+      name: cmdName,
+      description: cmd.description || '',
+    })
+
+    // Insert the command as a mention badge followed by a space so the
+    // user can type additional text/arguments after it.
+    editor
+      .chain()
+      .focus()
+      .insertContent([
+        { type: 'mention', attrs: { label: `command("${cmdName}")`, id: mentionId } },
+        { type: 'text', text: ' ' },
+      ])
+      .run()
+    // Focus back to the editor so the user can type immediately
+    editor.commands.focus()
   }
 
   const checkForSlashTrigger = (text: string) => {
@@ -400,6 +482,9 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
       setShowSlashMenu(false)
       return
     }
+    // Trigger the slash menu when "/" appears at the start of the input OR
+    // right after a whitespace (e.g. after a command badge + space). This
+    // allows stacking multiple command badges in the same message.
     const lastSlashSegment = text.split(/\s+/).filter(Boolean).pop() || ''
     if (lastSlashSegment.startsWith('/') && lastSlashSegment.length > 0) {
       const rect = containerRef.current?.getBoundingClientRect()
@@ -456,7 +541,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
           top={slashPosition.top}
           left={slashPosition.left}
           width={containerRef.current?.offsetWidth || 400}
-          searchValue={(inputValue.split(/\s+/).filter(Boolean).pop() || '').slice(1)}
+          searchValue={(inputValue.split(/\s+/).filter(Boolean).pop() || '').replace(/^\//, '')}
         />
       )}
 
@@ -504,7 +589,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
             onChange={handleInputChange}
             onChangeMention={(m) => { setMentions(m); setStoreMentions(m); }}
             onEnter={handleSubmit}
-            placeholder="Ask anything... (@ for mentions, / for commands)"
+            placeholder="Ask anything... (@ for skills/agents, / for commands)"
             ref={editorRef}
           />
         </div>

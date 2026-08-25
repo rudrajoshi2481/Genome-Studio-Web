@@ -7,6 +7,67 @@ import { getAllCanvasStates } from '@/components/Editorwindow_new/editors/canvas
 import { getApiBaseUrl } from '@/config/server';
 import * as authService from '@/lib/services/auth-service';
 
+/**
+ * Parse a backend LLM error string into a structured kind + friendly title.
+ * Backend sends content like: "LLM error: Error code: 429 - {'error': {'code': '1302', 'message': 'Rate limit reached for requests'}}"
+ * or "LLM error: LLM stream timed out — no chunk received in 120s (model may be loading)"
+ */
+function parseLlmError(raw: string): {
+  kind: 'rate_limit' | 'timeout' | 'context_length' | 'auth' | 'connection' | 'generic';
+  title: string;
+  detail: string;
+} {
+  const text = (raw || '').trim();
+  const lower = text.toLowerCase();
+
+  // Strip the "LLM error: " / "Error: " prefix from the user-facing detail
+  const detail = text
+    .replace(/^llm error:\s*/i, '')
+    .replace(/^error:\s*/i, '')
+    .trim();
+
+  if (lower.includes('rate limit') || lower.includes('429') || lower.includes('1302')) {
+    return {
+      kind: 'rate_limit',
+      title: 'Rate limit reached',
+      detail: detail || 'The AI provider is throttling requests. Please wait a moment and try again.',
+    };
+  }
+  if (lower.includes('timed out') || lower.includes('timeout') || lower.includes('no chunk received')) {
+    return {
+      kind: 'timeout',
+      title: 'Response timed out',
+      detail: detail || 'The model took too long to respond. It may still be loading — try again in a few seconds.',
+    };
+  }
+  if (lower.includes('context length') || lower.includes('prompt is too long') || lower.includes('too many tokens') || lower.includes('maximum context')) {
+    return {
+      kind: 'context_length',
+      title: 'Conversation too long',
+      detail: detail || 'The conversation exceeded the model\'s context window. Try starting a new chat or removing some context.',
+    };
+  }
+  if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('authentication') || lower.includes('api key')) {
+    return {
+      kind: 'auth',
+      title: 'Authentication error',
+      detail: detail || 'The AI provider rejected the request due to missing or invalid credentials.',
+    };
+  }
+  if (lower.includes('connection') || lower.includes('econnrefused') || lower.includes('network') || lower.includes('websocket')) {
+    return {
+      kind: 'connection',
+      title: 'Connection problem',
+      detail: detail || 'Could not reach the AI service. Check your network and try again.',
+    };
+  }
+  return {
+    kind: 'generic',
+    title: 'Something went wrong',
+    detail: detail || text || 'An unexpected error occurred while contacting the AI model.',
+  };
+}
+
 export interface SendMessageOptions {
   mentions?: ChatMentionItem[];
   attachments?: Array<{ type: 'file'; path?: string; name?: string; lines?: string; url?: string; mediaType?: string }>;
@@ -875,9 +936,12 @@ export const useChatWebSocket = () => {
         }
         case 'retry':
           sessionAddMessage({
-            type: 'system',
+            type: 'retry',
             role: 'system',
-            content: `Retrying (attempt ${message.attempt})... ${message.message || ''}`
+            content: message.message || '',
+            retryAttempt: message.attempt,
+            retryMaxAttempts: message.max_attempts,
+            retryDelay: message.delay,
           });
           break;
         case 'model_fallback':
@@ -990,14 +1054,22 @@ export const useChatWebSocket = () => {
           }
           break;
         }
-        case 'error':
+        case 'error': {
+          const parsed = parseLlmError(message.content || '');
+          // Rate-limit and timeout errors are typically transient and safe to retry
+          const canRetry = parsed.kind === 'rate_limit' || parsed.kind === 'timeout' || parsed.kind === 'connection';
           sessionAddMessage({
-            type: 'system',
+            type: 'error',
             role: 'system',
-            content: `Error: ${message.content}`
+            content: parsed.detail,
+            errorKind: parsed.kind,
+            errorTitle: parsed.title,
+            errorDetail: parsed.detail,
+            canRetry,
           });
           if (isActiveSession) sessionSetLoading(false);
           break;
+        }
         default:
           console.log('Unknown message type:', message.type);
           break;
@@ -1022,9 +1094,13 @@ export const useChatWebSocket = () => {
     if (!wsService.isConnected()) {
       console.error('WebSocket is not connected');
       useChatStore.getState().addMessage({
-        type: 'system',
+        type: 'error',
         role: 'system',
-        content: 'WebSocket is not connected. Attempting to reconnect...'
+        content: 'WebSocket is not connected. Attempting to reconnect...',
+        errorKind: 'connection',
+        errorTitle: 'Not connected',
+        errorDetail: 'WebSocket is not connected. Attempting to reconnect...',
+        canRetry: true,
       });
       // Queue the message so it can be sent once reconnected
       useChatStore.getState().addQueuedMessage({
@@ -1080,9 +1156,25 @@ export const useChatWebSocket = () => {
       const agentMention = options?.mentions?.find(m => m.type === 'agent');
       const agent = options?.agent || agentMention?.name;
 
+      // Extract explicitly @-mentioned skills so the backend injects them
+      // directly into the system prompt (in addition to keyword matching).
+      const skillMentions = options?.mentions?.filter(m => m.type === 'skill').map(m => m.name) || [];
+
       // Extract enabled databases from mentions
       const dbMentions = options?.mentions?.filter(m => m.type === 'database').map(m => m.id || m.name) || [];
-      const enabledDatabases = options?.enabledDatabases || (dbMentions.length > 0 ? dbMentions : undefined);
+      // Prefer the explicit enabledDatabases list. Only fall back to db
+      // mentions when no explicit list was provided. Crucially, an empty
+      // array is a meaningful value ("all databases disabled") and must be
+      // preserved — converting it to undefined makes the backend skip
+      // filtering entirely.
+      let enabledDatabases: string[] | undefined;
+      if (options?.enabledDatabases !== undefined) {
+        enabledDatabases = options.enabledDatabases;
+      } else if (dbMentions.length > 0) {
+        enabledDatabases = dbMentions;
+      } else {
+        enabledDatabases = undefined;
+      }
 
       // Get the active file explorer root path
       const activeRootPath = options?.rootPath || (typeof window !== 'undefined' ? localStorage.getItem('fileExplorer_rootPath') || undefined : undefined);
@@ -1173,6 +1265,7 @@ export const useChatWebSocket = () => {
         stream: true,
         attachments: attachments.length > 0 ? attachments : undefined,
         agent: agent || undefined,
+        skill_mentions: skillMentions.length > 0 ? skillMentions : undefined,
         enabled_databases: enabledDatabases,
         command: options?.command || undefined,
         command_args: options?.commandArgs || undefined,
@@ -1185,13 +1278,15 @@ export const useChatWebSocket = () => {
 
       if (isNew) {
         // Set currentConversationId to the session ID so subsequent messages
-        // from this tab use the same session — also sync to openSessions
+        // from this tab use the same session — also sync to openSessions.
+        // Coerce undefined → null to match the ChatState type.
+        const convIdForState = sessionIdToSend ?? null;
         useChatStore.setState((state) => ({
           isNewChat: false,
-          currentConversationId: sessionIdToSend,
+          currentConversationId: convIdForState,
           openSessions: state.openSessions.map(s =>
             s.id === activeId
-              ? { ...s, isNewChat: false, currentConversationId: sessionIdToSend }
+              ? { ...s, isNewChat: false, currentConversationId: convIdForState }
               : s
           ),
         }));
@@ -1206,10 +1301,15 @@ export const useChatWebSocket = () => {
       useChatStore.getState().setLoading(true);
     } catch (error) {
       console.error('Failed to send message:', error);
+      const parsed = parseLlmError(String((error as Error)?.message || error));
       useChatStore.getState().addMessage({
-        type: 'system',
+        type: 'error',
         role: 'system',
-        content: 'Failed to send message. Please check your connection.'
+        content: parsed.detail,
+        errorKind: parsed.kind,
+        errorTitle: parsed.title,
+        errorDetail: parsed.detail,
+        canRetry: true,
       });
       useChatStore.getState().setLoading(false);
     }
@@ -1257,9 +1357,13 @@ export const useChatWebSocket = () => {
     if (!wsService.isConnected()) {
       console.error('WebSocket is not connected');
       useChatStore.getState().addMessage({
-        type: 'system',
+        type: 'error',
         role: 'system',
-        content: 'WebSocket is not connected. Attempting to reconnect...'
+        content: 'WebSocket is not connected. Attempting to reconnect...',
+        errorKind: 'connection',
+        errorTitle: 'Not connected',
+        errorDetail: 'WebSocket is not connected. Attempting to reconnect...',
+        canRetry: true,
       });
       wsService.connect().catch(() => {});
       return;

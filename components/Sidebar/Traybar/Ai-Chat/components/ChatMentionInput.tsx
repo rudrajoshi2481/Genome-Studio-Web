@@ -18,6 +18,7 @@ import {
   Terminal,
   Database,
   FileIcon,
+  Zap,
 } from "lucide-react";
 
 import MentionInput from "./MentionInput";
@@ -31,7 +32,7 @@ import { getApiBaseUrl } from "@/config/server";
 import { useChatStore } from "./chatStore";
 
 export interface ChatMention {
-  type: "tool" | "agent" | "workflow" | "database" | "command" | "file";
+  type: "tool" | "agent" | "workflow" | "database" | "command" | "file" | "skill";
   name: string;
   id?: string;
   description?: string;
@@ -82,7 +83,7 @@ async function fetchBackendMentions(): Promise<{ agents: ChatMention[]; files: C
     : [];
 
   const skills: ChatMention[] = skillsResp.status === 'fulfilled'
-    ? (skillsResp.value || []).map((s: any) => ({ type: "tool" as const, name: s.name, description: s.description, id: s.name }))
+    ? (skillsResp.value || []).map((s: any) => ({ type: "skill" as const, name: s.name, description: s.description, id: s.name }))
     : [];
 
   const commands: ChatMention[] = cmdResp.status === 'fulfilled'
@@ -124,19 +125,39 @@ const SLASH_COMMANDS: ChatMention[] = [];
 function getMentionIcon(mention: ChatMention): React.ReactNode {
   switch (mention.type) {
     case "agent":
-      return <Bot className="size-3.5 text-primary" />;
+      return <Bot className="size-3 shrink-0" />;
     case "workflow":
-      return <Workflow className="size-3.5 text-primary" />;
+      return <Workflow className="size-3 shrink-0" />;
     case "database":
-      return <Database className="size-3.5 text-primary" />;
+      return <Database className="size-3 shrink-0" />;
     case "command":
-      return <Terminal className="size-3.5 text-primary" />;
+      return <Terminal className="size-3 shrink-0" />;
     case "file":
-      return <FileIcon className="size-3.5 text-primary" />;
+      return <FileIcon className="size-3 shrink-0" />;
+    case "skill":
+      return <Zap className="size-3 shrink-0" />;
     default:
-      return <Wrench className="size-3.5 text-primary" />;
+      return <Wrench className="size-3 shrink-0" />;
   }
 }
+
+/** Per-type badge styles using only shadcn design tokens. */
+const BADGE_TYPE_STYLES: Record<string, string> = {
+  command:
+    "bg-primary/10 text-primary border-primary/30",
+  skill:
+    "bg-secondary text-secondary-foreground border-border",
+  agent:
+    "bg-accent text-accent-foreground border-border",
+  database:
+    "bg-muted text-foreground border-border",
+  tool:
+    "bg-secondary text-secondary-foreground border-border",
+  workflow:
+    "bg-accent text-accent-foreground border-border",
+  file:
+    "bg-muted text-muted-foreground border-border",
+};
 
 type MentionItemType = {
   id: string;
@@ -212,36 +233,46 @@ export function ChatMentionInputMentionItem({
       command: "Command",
       tool: "Tool",
       file: "File",
+      skill: "Skill",
     };
     return labels[item.type] || "Mention";
   }, [item.type]);
 
+  const icon = getMentionIcon(item);
+  const typeStyle = BADGE_TYPE_STYLES[item.type] || BADGE_TYPE_STYLES.tool;
+
   const label = useMemo(() => {
     return (
       <Badge
-        variant="secondary"
+        variant="outline"
         className={cn(
-          "inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-medium rounded-none cursor-default",
+          "inline-flex items-center gap-1 px-1.5 py-0 h-5 text-[11px] font-medium rounded-md border cursor-default select-none",
+          "transition-colors hover:opacity-80",
+          typeStyle,
           className,
         )}
       >
-        <span className="truncate max-w-[100px]">{item.name}</span>
+        {icon}
+        <span className="truncate max-w-[120px] leading-none">{item.name}</span>
       </Badge>
     );
-  }, [item, className]);
+  }, [item, className, icon, typeStyle]);
 
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>{label}</TooltipTrigger>
-        <TooltipContent side="top" className="p-2 max-w-[220px] text-xs">
-          <div className="flex flex-col gap-0.5">
+        <TooltipContent side="top" className="p-2.5 max-w-[240px] text-xs">
+          <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1.5 font-medium">
+              {icon}
               <span>{item.name}</span>
-              <span className="text-muted-foreground text-[10px]">· {typeLabel}</span>
+              <span className="text-muted-foreground text-[10px] font-normal">
+                {typeLabel}
+              </span>
             </div>
             {item.description && (
-              <p className="text-muted-foreground text-[10px] leading-relaxed">
+              <p className="text-muted-foreground text-[10px] leading-relaxed line-clamp-3">
                 {item.description}
               </p>
             )}
@@ -282,7 +313,7 @@ export function ChatMentionInputSuggestion({
   }, []);
 
   const toolMentions = useMemo(() => {
-    const merged = [...DEFAULT_TOOLS, ...backendMentions.tools, ...backendMentions.skills];
+    const merged = [...DEFAULT_TOOLS, ...backendMentions.tools];
     return merged.filter(
       (t) => !searchValue || t.name.toLowerCase().includes(searchValue.toLowerCase()),
     ).map((tool) => {
@@ -297,6 +328,28 @@ export function ChatMentionInputSuggestion({
             id,
           }),
         icon: getMentionIcon(tool),
+        suffix: selectedIds?.includes(id) && (
+          <CheckIcon className="size-3 ml-auto" />
+        ),
+      };
+    });
+  }, [selectedIds, searchValue, backendMentions]);
+
+  const skillMentions = useMemo(() => {
+    return backendMentions.skills.filter(
+      (sk) => !searchValue || sk.name.toLowerCase().includes(searchValue.toLowerCase()) || (sk.description || "").toLowerCase().includes(searchValue.toLowerCase()),
+    ).map((skill) => {
+      const id = JSON.stringify(skill);
+      return {
+        id: skill.id!,
+        type: "skill" as const,
+        label: skill.name,
+        onSelect: () =>
+          onSelectMention({
+            label: `skill("${skill.name}")`,
+            id,
+          }),
+        icon: getMentionIcon(skill),
         suffix: selectedIds?.includes(id) && (
           <CheckIcon className="size-3 ml-auto" />
         ),
@@ -402,8 +455,8 @@ export function ChatMentionInputSuggestion({
   }, [selectedIds, searchValue, backendMentions, enabledDatabases]);
 
   const allMentions = useMemo(() => {
-    return [...databaseMentions, ...agentMentions, ...toolMentions, ...fileMentions, ...workflowMentions];
-  }, [databaseMentions, agentMentions, toolMentions, fileMentions, workflowMentions]);
+    return [...skillMentions, ...databaseMentions, ...agentMentions, ...toolMentions, ...fileMentions, ...workflowMentions];
+  }, [skillMentions, databaseMentions, agentMentions, toolMentions, fileMentions, workflowMentions]);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -421,6 +474,7 @@ export function ChatMentionInputSuggestion({
 
   const groupedMentions = useMemo(() => {
     const groups = {
+      skill: { title: "Skills", items: [] as MentionItemType[] },
       database: { title: "Databases", items: [] as MentionItemType[] },
       agent: { title: "Agents", items: [] as MentionItemType[] },
       tool: { title: "Tools", items: [] as MentionItemType[] },
@@ -452,7 +506,7 @@ export function ChatMentionInputSuggestion({
     <Popover open={true} onOpenChange={(f: boolean) => { !f && onClose(); }}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
-        className={cn("p-0", className)}
+        className={cn("p-0 w-[420px] max-w-[500px] shadow-lg border rounded-lg", className)}
         align="start"
         side="top"
         style={{
@@ -501,18 +555,34 @@ export function ChatMentionInputSuggestion({
 
           <div className="overflow-hidden max-h-[280px] overflow-y-auto">
             {allMentions.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground p-6">
+              <div className="flex-1 flex flex-col items-center justify-center text-xs text-muted-foreground p-8 gap-1.5">
+                <SearchIcon className="size-4 opacity-40" />
                 <div className="text-center">
-                  <div className="mb-1">
-                    {searchValue ? "No results found" : "Type @ to see available mentions"}
-                  </div>
+                  {searchValue ? `No results for "${searchValue}"` : "Type @ to see available mentions"}
                 </div>
               </div>
             ) : (
               <>
-                {groupedMentions.database.items.length > 0 && (
+                {groupedMentions.skill.items.length > 0 && (
                   <div className="p-1.5">
-                    <div className="text-[10px] font-medium text-muted-foreground px-2 py-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
+                      {groupedMentions.skill.title}
+                    </div>
+                    <div className="space-y-0.5">
+                      {groupedMentions.skill.items.map((item) => (
+                        <MentionItemRow
+                          key={item.id}
+                          item={item}
+                          isSelected={allMentions[selectedIndex]?.id === item.id}
+                          ref={(el) => { itemRefs.current[item.id] = el; }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {groupedMentions.database.items.length > 0 && (
+                  <div className="p-1.5 border-t">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
                       {groupedMentions.database.title}
                     </div>
                     <div className="space-y-0.5">
@@ -529,7 +599,7 @@ export function ChatMentionInputSuggestion({
                 )}
                 {groupedMentions.agent.items.length > 0 && (
                   <div className="p-1.5 border-t">
-                    <div className="text-[10px] font-medium text-muted-foreground px-2 py-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
                       {groupedMentions.agent.title}
                     </div>
                     <div className="space-y-0.5">
@@ -546,7 +616,7 @@ export function ChatMentionInputSuggestion({
                 )}
                 {groupedMentions.tool.items.length > 0 && (
                   <div className="p-1.5 border-t">
-                    <div className="text-[10px] font-medium text-muted-foreground px-2 py-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
                       {groupedMentions.tool.title}
                     </div>
                     <div className="space-y-0.5">
@@ -563,7 +633,7 @@ export function ChatMentionInputSuggestion({
                 )}
                 {groupedMentions.file.items.length > 0 && (
                   <div className="p-1.5 border-t">
-                    <div className="text-[10px] font-medium text-muted-foreground px-2 py-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
                       {groupedMentions.file.title}
                     </div>
                     <div className="space-y-0.5">
@@ -580,7 +650,7 @@ export function ChatMentionInputSuggestion({
                 )}
                 {groupedMentions.workflow.items.length > 0 && (
                   <div className="p-1.5 border-t">
-                    <div className="text-[10px] font-medium text-muted-foreground px-2 py-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
                       {groupedMentions.workflow.title}
                     </div>
                     <div className="space-y-0.5">
@@ -608,17 +678,31 @@ const MentionItemRow = React.forwardRef<
   HTMLButtonElement,
   { item: MentionItemType; isSelected: boolean }
 >(({ item, isSelected }, ref) => {
+  // Extract the ChatMention from the item id to get the type for coloring
+  let mention: ChatMention | null = null;
+  try { mention = JSON.parse(item.id) as ChatMention; } catch { /* ignore */ }
+
   return (
     <button
       ref={ref}
       className={cn(
-        "flex items-center gap-2 w-full rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground cursor-pointer",
+        "flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs outline-none cursor-pointer transition-colors",
+        "hover:bg-accent hover:text-accent-foreground",
         isSelected && "bg-accent text-accent-foreground",
       )}
       onClick={() => item.onSelect()}
     >
-      {item.icon}
-      <span className="truncate min-w-0">{item.label}</span>
+      <span className="shrink-0 text-muted-foreground">
+        {item.icon}
+      </span>
+      <div className="flex flex-col min-w-0 flex-1">
+        <span className="truncate leading-tight">{item.label}</span>
+        {mention?.description && (
+          <span className="truncate text-[10px] text-muted-foreground leading-tight">
+            {mention.description}
+          </span>
+        )}
+      </div>
       {item.suffix}
     </button>
   );

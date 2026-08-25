@@ -925,6 +925,7 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
       
       <div className={`flex-1 relative bg-transparent ${isTabDirty ? 'ring-2 ring-yellow-400 ring-inset' : ''}`}>
         <ReactFlow
+          id={`rf-${tabId}`}
           nodes={nodesWithDeleteHandler}
           edges={edges}
           onNodesChange={handleNodesChange}

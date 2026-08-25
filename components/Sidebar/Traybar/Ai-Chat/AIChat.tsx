@@ -15,6 +15,8 @@ import ConfirmationMessage from './components/ConfirmationMessage';
 import ToolMessage from './components/ToolMessage';
 import ToolCodeMessage from './components/ToolCodeMessage';
 import ChatGreeting from './components/ChatGreeting';
+import ErrorMessage from './components/ErrorMessage';
+import RetryMessage from './components/RetryMessage';
 import {
   Conversation,
   ConversationContent,
@@ -121,9 +123,12 @@ function AIChat({ onClose }: { onClose?: () => void }) {
 
   useEffect(() => {
     fetchConversations(false);
-    // Open a default "New Chat" tab on first load if no sessions are open
+    // The zustand persist onRehydrateStorage already ensures at least one
+    // session exists (creating a fresh "New Chat" if needed). Only open a
+    // default tab here when rehydration left zero sessions — guards against
+    // the rare case where rehydration hasn't run yet.
     const state = useChatStore.getState();
-    if (state.openSessions.length === 0) {
+    if (state.openSessions.length === 0 && state.activeSessionId === null) {
       const tempId = `temp-${Date.now()}`;
       state.openSession(tempId, 'New Chat');
       state.setCurrentConversation(null);
@@ -168,6 +173,25 @@ function AIChat({ onClose }: { onClose?: () => void }) {
     // Open a new tab for this conversation — openSession resets all session-specific state
     const sessionId = conv.id;
     openSession(sessionId, conv.title || 'Chat');
+    // CRITICAL: openSession treats any ID starting with "temp-" as a new
+    // temporary session (setting currentConversationId=null, isNewChat=true).
+    // But conversations from history may have temp-prefixed IDs (the backend
+    // session store uses them as permanent conversation IDs). Override these
+    // flags so the backend knows this is an existing conversation and loads
+    // the previous messages into the agent's context.
+    useChatStore.setState({
+      currentConversationId: sessionId,
+      isNewChat: false,
+    });
+    // Also update the session in openSessions so switching back to it later
+    // preserves the correct state.
+    useChatStore.setState((state) => ({
+      openSessions: state.openSessions.map(s =>
+        s.id === sessionId
+          ? { ...s, currentConversationId: sessionId, isNewChat: false }
+          : s
+      ),
+    }));
     setShowConvList(false);
     try {
       const url = `${getApiBaseUrl()}/ai-chat/conversations/${sessionId}/messages`;
@@ -258,7 +282,10 @@ function AIChat({ onClose }: { onClose?: () => void }) {
     sendMessage(content, model, {
       mentions: mentions.length > 0 ? mentions : undefined,
       attachments: attachments.length > 0 ? attachments : undefined,
-      enabledDatabases: enabledDatabases.length > 0 ? enabledDatabases : undefined,
+      // Always send the array (even when empty) so the backend applies
+      // database filtering. Sending `undefined` makes the backend treat it
+      // as "no filtering" and the AI can still query disabled databases.
+      enabledDatabases,
       keepIntermediateFiles,
     });
   };
@@ -298,7 +325,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   };
 
   const renderMessage = (message: any, index: number) => {
-    const groupedTypes = ['tool', 'tool_code', 'reasoning', 'plan', 'task', 'confirmation', 'thinking'];
+    const groupedTypes = ['tool', 'tool_code', 'reasoning', 'plan', 'task', 'confirmation', 'thinking', 'error', 'retry'];
     const isGrouped = index > 0 && groupedTypes.includes(message.type);
     const wrapperClass = isGrouped ? '-mt-1' : '';
     const isLast = index === messages.length - 1;
@@ -347,6 +374,10 @@ function AIChat({ onClose }: { onClose?: () => void }) {
             {message.content}
           </div>
         );
+      case 'error':
+        return <ErrorMessage key={message.id} message={message} onRetry={handleRegenerate} />;
+      case 'retry':
+        return <RetryMessage key={message.id} message={message} />;
       case 'separator':
         return (
           <div key={message.id} className="flex items-center gap-2 py-2 px-1 select-none">
@@ -369,9 +400,9 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex h-full w-full flex-col bg-background">
       <Appbar onNewChat={handleNewConversation} onToggleHistory={() => {
+        // Toggling history open should NOT discard the current chat.
+        // Just refresh the conversation list and reveal the panel.
         if (!showConvList) {
-          // Open a new chat session and show history in it
-          handleNewConversation();
           fetchConversations(false);
         }
         setShowConvList(!showConvList);
@@ -428,8 +459,9 @@ function AIChat({ onClose }: { onClose?: () => void }) {
               if (session) {
                 state.closeSession(id);
               }
-              // If the deleted conversation was active, start a new chat
-              if (currentConversationId === id) {
+              // If the deleted conversation was the active one, start a new chat.
+              // Read fresh state — the closure's currentConversationId may be stale.
+              if (state.currentConversationId === id) {
                 handleNewConversation();
               }
             }}

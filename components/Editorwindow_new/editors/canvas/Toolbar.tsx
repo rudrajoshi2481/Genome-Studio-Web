@@ -547,7 +547,7 @@ function Toolbar({
               }}
               disabled={isExecuting || envsLoading}
             >
-              <SelectTrigger className="h-6 w-[130px] text-xs">
+              <SelectTrigger size="sm" className="!h-6 w-[130px] py-0 px-2 text-xs">
                 <SelectValue placeholder="Python env" />
               </SelectTrigger>
               <SelectContent>
