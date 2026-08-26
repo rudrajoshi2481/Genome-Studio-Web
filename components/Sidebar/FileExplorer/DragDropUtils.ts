@@ -3,7 +3,7 @@ import { FileExplorerConfig } from './config';
 
 // Import auth store to get the authentication token
 import { useAuthStore } from '../../../lib/stores/auth-store';
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 
 // Helper function to get the API base URL
 const getApiBaseUrl = () => {
@@ -14,7 +14,7 @@ const getApiBaseUrl = () => {
   }
   
   // Use localhost:8000 for backend API calls
-  const apiBaseUrl = `http://${host}:${port}`;
+  const apiBaseUrl = `http://${getHost()}:${getPort()}`;
   console.log('Using fixed API URL:', apiBaseUrl);
   return apiBaseUrl;
 };

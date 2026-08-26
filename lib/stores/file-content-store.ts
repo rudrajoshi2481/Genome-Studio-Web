@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import * as authService from '../services/auth-service'
 import { toast } from "sonner"
-import { host, port } from '@/config/server'
+import { getHost, getPort } from '@/config/server'
 
 interface FileMetadata {
   size?: number;
@@ -69,7 +69,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
 
       // Fetch the file content from the API
       const token = authService.getToken()
-      const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/file-content?path=${encodeURIComponent(path)}&root_path=${encodeURIComponent(rootPath)}`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/file-explorer/file-content?path=${encodeURIComponent(path)}&root_path=${encodeURIComponent(rootPath)}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -126,7 +126,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       }));
       
       const token = authService.getToken()
-      const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/update-file-content?root_path=${encodeURIComponent(rootPath)}`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/file-explorer/update-file-content?root_path=${encodeURIComponent(rootPath)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -208,7 +208,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       // If we don't have a socket or it's closed, create a new one
       if (!socket || socket.readyState === WebSocket.CLOSED) {
         const token = authService.getToken()
-        const newSocket = new WebSocket(`ws://${host}:${port}/api/v1/file-explorer/watch?token=${token}&directory=${encodeURIComponent(directory)}`)
+        const newSocket = new WebSocket(`ws://${getHost()}:${getPort()}/api/v1/file-explorer/watch?token=${token}&directory=${encodeURIComponent(directory)}`)
         
         newSocket.onmessage = (event) => {
           try {
@@ -526,7 +526,7 @@ export const useFileContentStore = create<FileContentState>((set, get) => ({
       const rootPath = lastSlashIndex >= 0 ? filePath.substring(0, lastSlashIndex) : ''
       
       const response = await fetch(
-        `http://${host}:${port}/api/v1/file-explorer/file-content?path=${encodeURIComponent(filePath)}&root_path=${encodeURIComponent(rootPath)}`,
+        `http://${getHost()}:${getPort()}/api/v1/file-explorer/file-content?path=${encodeURIComponent(filePath)}&root_path=${encodeURIComponent(rootPath)}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

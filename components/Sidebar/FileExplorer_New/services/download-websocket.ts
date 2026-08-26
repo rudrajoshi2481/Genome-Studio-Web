@@ -3,7 +3,7 @@
  */
 
 import * as authService from '@/lib/services/auth-service';
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 
 interface DownloadProgress {
   type: 'start' | 'progress' | 'complete' | 'data' | 'done' | 'error';
@@ -40,7 +40,7 @@ export class DownloadWebSocket {
 
     // Connect directly to backend, bypassing Next.js proxy
     // This avoids proxy timeout issues
-    const wsUrl = `ws://${host}:${port}/api/v1/file-explorer-new/ws/download?token=${token}`;
+    const wsUrl = `ws://${getHost()}:${getPort()}/api/v1/file-explorer-new/ws/download?token=${token}`;
 
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(wsUrl);

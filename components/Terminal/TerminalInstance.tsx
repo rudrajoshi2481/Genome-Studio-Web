@@ -6,7 +6,7 @@ import { useTerminalStore } from './store/terminal-store'
 import TerminalSessionManager from './services/TerminalSessionManager';
 // import CompactSystemStats from './SystemStats/CompactSystemStats';
 import 'xterm/css/xterm.css'
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 
 interface TerminalInstanceProps {
   tabId: string;
@@ -120,7 +120,7 @@ function TerminalInstance({ tabId }: TerminalInstanceProps) {
           if (!workspaceCwd && typeof window !== 'undefined') {
             workspaceCwd = localStorage.getItem('fileExplorer_rootPath') || undefined;
           }
-          const connected = await sessionManager.connectWebSocket(tabId, token, host, port, terminalType, false, workspaceCwd);
+          const connected = await sessionManager.connectWebSocket(tabId, token, getHost(), getPort(), terminalType, false, workspaceCwd);
           if (isMounted) {
             setConnected(connected);
             if (!connected) {

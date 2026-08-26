@@ -3,7 +3,7 @@
  * Handles communication with the new workflow manager backend
  */
 
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import authService from '@/lib/services/auth-service';
 
@@ -92,9 +92,9 @@ class WorkflowManagerAPI {
   selectedCondaEnv: string | null = null;
 
   constructor() {
-    this.baseUrl = `http://${host}:${port}/api/v1/workflow-manager-new`;
+    this.baseUrl = `http://${getHost()}:${getPort()}/api/v1/workflow-manager-new`;
     const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    this.wsUrl = `${wsProtocol}//${host}:${port}/api/v1/workflow-manager-new`;
+    this.wsUrl = `${wsProtocol}//${getHost()}:${getPort()}/api/v1/workflow-manager-new`;
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {

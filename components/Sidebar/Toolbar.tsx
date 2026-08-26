@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, TimerReset, Puzzle, Server, Boxes } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
-import { host, port } from '@/config/server'
+import { getHost, getPort } from '@/config/server'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -64,7 +64,7 @@ function Toolbar({ onActiveItemChange, sidebarOpen, onToggleSidebar }: ToolbarPr
     if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
       return avatarPath;
     }
-    return `http://${host}:${port}${avatarPath}`;
+    return `http://${getHost()}:${getPort()}${avatarPath}`;
   };
 
   // Get user initials for avatar fallback
@@ -167,7 +167,15 @@ function Toolbar({ onActiveItemChange, sidebarOpen, onToggleSidebar }: ToolbarPr
    */
   const handleItemClick = (item: ToolbarItem) => {
     if (item.type === 'page') {
-      window.open(item.link, '_blank', 'noopener,noreferrer')
+      // Open in a new Electron window using the preload-exposed IPC.
+      // This is more reliable than window.open() and ensures the new window
+      // shares the same session / storage (localStorage, cookies) as the main
+      // window, so the user stays authenticated.
+      if (typeof window !== 'undefined' && window.electronAPI?.openWindow) {
+        window.electronAPI.openWindow(item.link)
+      } else {
+        window.open(item.link, '_blank')
+      }
       return
     }
 

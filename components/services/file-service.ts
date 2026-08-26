@@ -1,8 +1,10 @@
-import { getServerConfig } from '@/config/server';
+import { getApiBaseUrl } from '@/config/server';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
-// Base API URL
-const API_BASE_URL = `${getServerConfig().api.protocol}://${getServerConfig().api.host}:${getServerConfig().api.port}/api/v1`;
+// Base API URL — evaluated at call time for correct dynamic port in Electron mode
+function getApiBase(): string {
+  return getApiBaseUrl();
+}
 
 /**
  * Service for file operations
@@ -27,7 +29,7 @@ export const FileService = {
       throw new Error('Authentication token not found');
     }
 
-    const url = new URL(`${API_BASE_URL}/file-explorer/file-content`);
+    const url = new URL(`${getApiBase()}/file-explorer/file-content`);
     url.searchParams.append('path', filePath);
     url.searchParams.append('root_path', rootPath);
 

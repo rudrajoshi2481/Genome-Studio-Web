@@ -2,7 +2,7 @@ import { useFileExplorerStore } from './utils/store'
 import { FileNode } from './utils/FileExplorerClass'
 import { useTabStore } from '@/components/FileTabs/useTabStore'
 import * as authService from '@/lib/services/auth-service'
-import { host, port } from '@/config/server'
+import { getHost, getPort } from '@/config/server'
 import { getExpandedPaths, restoreExpandedPaths } from './FileHelpers'
 
 // Submit delete to backend
@@ -23,7 +23,7 @@ export const deleteFile = async (
       root_path: rootPath
     }).toString()
     
-    const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/delete-file?${queryParams}`, {
+    const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/file-explorer/delete-file?${queryParams}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`

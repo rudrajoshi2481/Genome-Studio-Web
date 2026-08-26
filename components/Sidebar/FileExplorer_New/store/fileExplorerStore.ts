@@ -8,7 +8,7 @@ import { create } from 'zustand';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import * as authService from '@/lib/services/auth-service';
 import { fileExplorerApi } from '../services/api';
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 import { useTabStore } from '@/components/FileTabs/useTabStore';
 
 // Import helper functions for upload conflict handling
@@ -825,7 +825,7 @@ export const useFileExplorerStore = create<FileExplorerStore>()((set: any, get: 
     
     const { rootPath } = get();
     const token = getToken();
-    const wsUrl = `ws://${host}:${port}/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`;
+    const wsUrl = `ws://${getHost()}:${getPort()}/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`;
     let treeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
     
     try {

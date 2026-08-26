@@ -62,9 +62,11 @@ export async function login(username: string, password: string): Promise<AuthRes
       };
     }
     
-    // Store token in cookies
+    // Store token in cookies (for fetch requests) and localStorage (for
+    // sharing across Electron windows / new BrowserWindows).
     document.cookie = `${config.auth.tokenStorageKey}=${data.access_token}; path=/; max-age=${data.expires_in}; SameSite=Strict`;
-    
+    localStorage.setItem(config.auth.tokenStorageKey, data.access_token);
+
     // Store expiry time
     const expiryTime = Date.now() + (data.expires_in * 1000);
     localStorage.setItem(config.auth.tokenExpiryKey, expiryTime.toString());
@@ -91,9 +93,10 @@ export async function login(username: string, password: string): Promise<AuthRes
  * Logout the current user
  */
 export function logout(): void {
-  // Clear token from cookies
+  // Clear token from cookies and localStorage
   document.cookie = `${config.auth.tokenStorageKey}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict`;
-  
+  localStorage.removeItem(config.auth.tokenStorageKey);
+
   // Clear token expiry from local storage
   localStorage.removeItem(config.auth.tokenExpiryKey);
   
@@ -179,21 +182,20 @@ export function isAuthenticated(): boolean {
   if (typeof window === 'undefined') {
     return false;
   }
-  
-  // Check if token exists in cookies
-  const cookies = document.cookie.split(';');
-  const tokenCookie = cookies.find(cookie => cookie.trim().startsWith(`${config.auth.tokenStorageKey}=`));
-  
-  if (!tokenCookie) {
+
+  // Check if token exists in cookies or localStorage
+  const token = getToken();
+
+  if (!token) {
     return false;
   }
-  
+
   // Check if token is expired
   const expiryTimeStr = localStorage.getItem(config.auth.tokenExpiryKey);
   if (!expiryTimeStr) {
     return false;
   }
-  
+
   const expiryTime = parseInt(expiryTimeStr, 10);
   return Date.now() < expiryTime;
 }
@@ -207,16 +209,30 @@ export function getToken(): string | null {
   if (typeof window === 'undefined') {
     return null;
   }
-  
-  // Check if token exists in cookies
+
+  // Check if token exists in cookies (used by fetch requests)
   const cookies = document.cookie.split(';');
   const tokenCookie = cookies.find(cookie => cookie.trim().startsWith(`${config.auth.tokenStorageKey}=`));
-  
-  if (!tokenCookie) {
-    return null;
+
+  if (tokenCookie) {
+    const token = tokenCookie.split('=')[1];
+    // Keep localStorage backup in sync
+    localStorage.setItem(config.auth.tokenStorageKey, token);
+    return token;
   }
-  
-  return tokenCookie.split('=')[1];
+
+  // Fallback to localStorage — this is needed for new Electron windows
+  // opened from the main window, where the SameSite=Strict cookie may not
+  // be immediately available on initial navigation.
+  const persistedToken = localStorage.getItem(config.auth.tokenStorageKey);
+  if (persistedToken) {
+    // Restore the cookie so subsequent fetch requests work
+    const maxAge = 7 * 24 * 60 * 60 // 7 days
+    document.cookie = `${config.auth.tokenStorageKey}=${persistedToken}; path=/; max-age=${maxAge}; SameSite=Strict`;
+    return persistedToken;
+  }
+
+  return null;
 }
 
 const authService = {

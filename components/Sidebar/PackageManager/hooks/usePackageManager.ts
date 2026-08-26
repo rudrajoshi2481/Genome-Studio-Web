@@ -31,10 +31,9 @@ interface SearchResponse {
   count: number
 }
 
-import { host } from '@/config/server'
-import { port } from '@/config/server'
+import { getHost, getPort } from '@/config/server'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || `http://${host}:${port}`
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || `http://${getHost()}:${getPort()}`
 
 export const usePackageManager = () => {
   const getAuthToken = () => {

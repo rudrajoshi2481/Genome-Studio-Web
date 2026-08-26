@@ -156,43 +156,60 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
         user: state.user,
         tokenExpiry: state.tokenExpiry,
-        // Don't persist token in localStorage for security
-        // The actual token is stored in cookies by the auth service
+        // Also persist token so new Electron windows (same origin) inherit
+        // the auth state without requiring a separate login.
+        token: state.token,
       }),
       onRehydrateStorage: () => (state) => {
         console.log('🔄 [AUTH-STORE] Rehydration started');
-        
+
         // After hydration, verify the token is still valid
         if (state && isBrowser) {
           console.log('🔄 [AUTH-STORE] State exists, checking authentication');
           console.log('🔄 [AUTH-STORE] Current state:', {
             isAuthenticated: state.isAuthenticated,
             hasUser: !!state.user,
-            username: state.user?.username
+            username: state.user?.username,
+            hasPersistedToken: !!state.token
           });
-          
-          const isValid = authService.isAuthenticated();
-          const token = authService.getToken();
-          
+
+          // Try cookie first, then fall back to persisted token from localStorage
+          let token = authService.getToken();
+          if (!token && state.token) {
+            token = state.token;
+            console.log('🔄 [AUTH-STORE] Cookie token missing, using persisted token from localStorage');
+            // Restore the cookie from the persisted token so API calls work
+            const maxAge = 7 * 24 * 60 * 60 // 7 days
+            document.cookie = `${config.auth.tokenStorageKey}=${token}; path=/; max-age=${maxAge}; SameSite=Strict`
+          }
+
+          // Check expiry from localStorage
+          const expiryTimeStr = localStorage.getItem(config.auth.tokenExpiryKey)
+          const isValid = token && expiryTimeStr ? Date.now() < parseInt(expiryTimeStr, 10) : false
+
           console.log('🔄 [AUTH-STORE] Token validation:', {
             isValid,
             hasToken: !!token,
             tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
           });
-          
+
           if (!isValid && state.isAuthenticated) {
             console.warn('⚠️ [AUTH-STORE] Token expired, clearing auth state');
             // Token expired, clear auth state
-            state.isAuthenticated = false;
-            state.user = null;
-            state.token = null;
-            state.tokenExpiry = null;
+            useAuthStore.setState({
+              isAuthenticated: false,
+              user: null,
+              token: null,
+              tokenExpiry: null
+            });
           } else if (isValid && token) {
             console.log('✅ [AUTH-STORE] Token is valid');
-            // Token exists and is valid
-            state.isAuthenticated = true;
-            state.token = token;
-            
+            // Token exists and is valid — update store state (don't mutate)
+            useAuthStore.setState({
+              isAuthenticated: true,
+              token,
+            });
+
             // Fetch user data if not already present
             if (!state.user) {
               console.log('🔄 [AUTH-STORE] No user data, fetching from API...');
@@ -203,7 +220,7 @@ export const useAuthStore = create<AuthState>()(
                     username: user.username,
                     is_admin: user.is_admin
                   });
-                  useAuthStore.setState({ 
+                  useAuthStore.setState({
                     user,
                     isAuthenticated: true,
                     token,

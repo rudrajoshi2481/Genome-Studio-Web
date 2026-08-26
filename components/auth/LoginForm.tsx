@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 import { Eye, EyeOff, Lock, Mail, User, UserPlus, LogIn, Info } from 'lucide-react';
 import Image from 'next/image';
 
@@ -46,8 +46,9 @@ export default function LoginForm() {
     const success = await login(username, password);
     
     if (success) {
-      router.push(`/dashboard`);
-      console.log(`Redirecting to: /dashboard`);
+      const target = redirect ? `/${redirect}` : '/dashboard';
+      router.push(target);
+      console.log(`Redirecting to: ${target}`);
     }
   };
   
@@ -69,7 +70,7 @@ export default function LoginForm() {
     setRegisterLoading(true);
     
     try {
-      const response = await fetch(`http://${host}:${port}/api/v1/register`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

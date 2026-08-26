@@ -4,7 +4,7 @@
  * Handles log_stream, output_stream, status_update, and progress_update messages.
  */
 
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 export interface LogStreamMessage {
@@ -98,7 +98,7 @@ export class WorkflowWebSocketService {
 
     const token = useAuthStore.getState().token;
     const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${host}:${port}/api/v1/workflow-manager-new/ws/${this.clientId}${token ? `?token=${token}` : ''}`;
+    const wsUrl = `${wsProtocol}//${getHost()}:${getPort()}/api/v1/workflow-manager-new/ws/${this.clientId}${token ? `?token=${token}` : ''}`;
     
     if (process.env.NODE_ENV === 'development') {
       console.debug('WorkflowWebSocket: Connecting to', wsUrl);

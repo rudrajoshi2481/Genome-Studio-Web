@@ -2,7 +2,7 @@
  * WebSocket service for real-time file synchronization with global file watcher
  */
 
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 import { WebSocketMessage } from '../types';
 
 export type WebSocketEventType = 

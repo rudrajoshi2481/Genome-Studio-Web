@@ -1,4 +1,4 @@
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 
 export interface SystemStats {
   server_ip: string;
@@ -32,7 +32,7 @@ export class SystemStatsService {
   private pingInterval: NodeJS.Timeout | null = null;
 
   private constructor() {
-    this.baseUrl = `http://${host}:${port}`;
+    this.baseUrl = `http://${getHost()}:${getPort()}`;
     // WebSocket URL will be constructed when needed (client-side only)
     this.wsUrl = '';
   }
@@ -100,7 +100,7 @@ export class SystemStatsService {
     if (!this.wsUrl) {
       // Use wss:// for HTTPS or ws:// for HTTP
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      this.wsUrl = `${protocol}//${host}:${port}/api/v1/system/ws`;
+      this.wsUrl = `${protocol}//${getHost()}:${getPort()}/api/v1/system/ws`;
     }
     
     return this.wsUrl;

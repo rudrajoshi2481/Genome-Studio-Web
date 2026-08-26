@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, Play, RefreshCcw, TimerReset, Calendar, Save, Pencil, ScrollText, CheckCircle2, XCircle, Loader2, CircleDot, Search, X } from 'lucide-react'
 import { useAuthStore } from '@/lib/stores/auth-store'
-import { getServerConfig } from '@/config/server'
+import { getServerConfig, getApiBaseUrl } from '@/config/server'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,7 +53,8 @@ import {
 import SimpleCodeEditor from '@/components/Sidebar/Nodebar/CustomNode/SimpleCodeEditor'
 
 const config = getServerConfig()
-const API_URL = `${config.api.protocol}://${config.api.host}:${config.api.port}${config.api.baseUrl}`
+// Evaluate at call time for correct dynamic port in Electron mode
+const getApiUrl = () => getApiBaseUrl()
 
 const SCHEDULE_PRESETS = [
   { label: 'Every minute', value: '* * * * *' },
@@ -114,7 +115,7 @@ function CronJobs() {
     const minDelay = new Promise(resolve => setTimeout(resolve, 500))
     try {
       const [res] = await Promise.all([
-        fetch(`${API_URL}/cron-jobs`, {
+        fetch(`${getApiUrl()}/cron-jobs`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         minDelay,
@@ -144,7 +145,7 @@ function CronJobs() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/cron-jobs`, {
+      const res = await fetch(`${getApiUrl()}/cron-jobs`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -173,7 +174,7 @@ function CronJobs() {
   const handleDelete = async (job: CronJob) => {
     if (!token) return
     try {
-      const res = await fetch(`${API_URL}/cron-jobs/${job.id}`, {
+      const res = await fetch(`${getApiUrl()}/cron-jobs/${job.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -191,7 +192,7 @@ function CronJobs() {
   const handleToggle = async (job: CronJob) => {
     if (!token) return
     try {
-      const res = await fetch(`${API_URL}/cron-jobs/${job.id}`, {
+      const res = await fetch(`${getApiUrl()}/cron-jobs/${job.id}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -211,7 +212,7 @@ function CronJobs() {
   const handleRunNow = async (jobId: string) => {
     if (!token) return
     try {
-      const res = await fetch(`${API_URL}/cron-jobs/${jobId}/run`, {
+      const res = await fetch(`${getApiUrl()}/cron-jobs/${jobId}/run`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -230,7 +231,7 @@ function CronJobs() {
     setDetailLogs('')
     setDetailLogsLoading(true)
     try {
-      const res = await fetch(`${API_URL}/cron-jobs/${job.id}/logs`, {
+      const res = await fetch(`${getApiUrl()}/cron-jobs/${job.id}/logs`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to fetch logs')
@@ -265,7 +266,7 @@ function CronJobs() {
     }
     setIsSaving(true)
     try {
-      const res = await fetch(`${API_URL}/cron-jobs/${detailJob.id}`, {
+      const res = await fetch(`${getApiUrl()}/cron-jobs/${detailJob.id}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,

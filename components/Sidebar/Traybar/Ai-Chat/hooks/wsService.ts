@@ -1,4 +1,4 @@
-import { host, port } from '@/config/server';
+import { getHost, getPort } from '@/config/server';
 import { useChatStore } from '../components/chatStore';
 
 interface WebSocketMessage {
@@ -30,7 +30,7 @@ class WebSocketService {
     // Generate unique connection ID
     this.connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    const wsUrl = `ws://${host}:${port}/api/v1/ai-chat/chat/${this.connectionId}`;
+    const wsUrl = `ws://${getHost()}:${getPort()}/api/v1/ai-chat/chat/${this.connectionId}`;
     console.log('🔌 [AI-CHAT-WS] Connecting to:', wsUrl);
     
     return new Promise((resolve, reject) => {

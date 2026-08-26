@@ -1,4 +1,4 @@
-import { host, port } from '@/config/server'
+import { getHost, getPort } from '@/config/server'
 
 export interface AtomicSyncMessage {
   type: 'connected' | 'file_content' | 'file_updated' | 'node_updated' | 'backend_change' | 'file_saved' | 'error' | 'pong'
@@ -54,7 +54,7 @@ export class AtomicFileSyncService {
 
     try {
       const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${host}:${port}/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`
+      const wsUrl = `${wsProtocol}//${getHost()}:${getPort()}/api/v1/file-explorer-new/ws/file-sync?token=${encodeURIComponent(token)}`
       this.websocket = new WebSocket(wsUrl)
 
       return new Promise((resolve) => {

@@ -61,6 +61,7 @@
     "@streamdown/math": "^1.0.2",
     "@streamdown/mermaid": "^1.0.2",
     "@tailwindcss/typography": "^0.5.20",
+    "mermaid": "^11.16.0",
     "@tiptap/extension-mention": "^3.27.1",
     "@tiptap/pm": "^3.27.1",
     "@tiptap/react": "^3.27.1",

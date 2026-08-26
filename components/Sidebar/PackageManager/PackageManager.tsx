@@ -13,7 +13,7 @@ import { HoverBorderGradient } from '@/components/ui/hover-border-gradient'
 
 import { usePackageManager } from './hooks/usePackageManager'
 import GlobalPackageSearch from './components/GlobalPackageSearch'
-import { host, port, getApiBaseUrl } from '@/config/server'
+import { getHost, getPort, getApiBaseUrl } from '@/config/server'
 import * as authService from '@/lib/services/auth-service'
 
 interface Environment {

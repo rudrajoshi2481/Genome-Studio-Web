@@ -8,7 +8,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { toast } from 'sonner'
-import { host, port } from '@/config/server'
+import { getHost, getPort } from '@/config/server'
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -158,7 +158,7 @@ function Settings() {
         return
       }
 
-      const response = await fetch(`http://${host}:${port}/api/v1/me`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/me`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -223,7 +223,7 @@ function Settings() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch(`http://${host}:${port}/api/v1/upload-avatar`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/upload-avatar`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -239,7 +239,7 @@ function Settings() {
       const result = await response.json()
       
       // Update settings with new avatar URL
-      updateSetting('avatar', `http://${host}:${port}${result.avatar_url}`)
+      updateSetting('avatar', `http://${getHost()}:${getPort()}${result.avatar_url}`)
       
       // toast.success('Avatar uploaded successfully')
     } catch (error: unknown) {

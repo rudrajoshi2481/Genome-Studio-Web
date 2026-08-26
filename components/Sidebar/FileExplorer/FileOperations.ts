@@ -2,7 +2,7 @@ import { useFileExplorerStore } from './utils/store'
 import { FileNode } from './utils/FileExplorerClass'
 import { useTabStore } from '@/components/FileTabs/useTabStore'
 import * as authService from '@/lib/services/auth-service'
-import { host, port } from '@/config/server'
+import { getHost, getPort } from '@/config/server'
 import { findNodeByPath, getExpandedPaths, restoreExpandedPaths } from './FileHelpers'
 
 // Get the currently selected folder path for new file/folder creation
@@ -88,7 +88,7 @@ export const renameFile = async (
     // Get the root path from the file explorer store
     const rootPath = useFileExplorerStore.getState().rootPath
     
-    const response = await fetch(`http://${host}:${port}/api/v1/file-explorer/rename-file`, {
+    const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/file-explorer/rename-file`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -155,7 +155,7 @@ export const deleteFile = async (
     const rootPath = useFileExplorerStore.getState().rootPath
     
     // Build the URL with query parameters for DELETE request
-    const url = new URL(`http://${host}:${port}/api/v1/file-explorer/delete-file`);
+    const url = new URL(`http://${getHost()}:${getPort()}/api/v1/file-explorer/delete-file`);
     url.searchParams.append('path', path);
     url.searchParams.append('root_path', rootPath);
     

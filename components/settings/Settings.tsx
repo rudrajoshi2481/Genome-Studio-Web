@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { host, port, getServerConfig } from '@/config/server';
+import { getHost, getPort, getServerConfig } from '@/config/server';
 import { toast } from 'sonner';
 
 const config = getServerConfig();
@@ -91,7 +91,7 @@ export default function Settings() {
         return;
       }
 
-      const response = await fetch(`http://${host}:${port}/api/v1/me`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/me`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -144,7 +144,7 @@ export default function Settings() {
     if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
       return avatarPath;
     }
-    return `http://${host}:${port}${avatarPath}`;
+    return `http://${getHost()}:${getPort()}${avatarPath}`;
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,7 +177,7 @@ export default function Settings() {
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
 
-      const response = await fetch(`http://${host}:${port}/api/v1/upload-avatar`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/upload-avatar`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: uploadFormData,

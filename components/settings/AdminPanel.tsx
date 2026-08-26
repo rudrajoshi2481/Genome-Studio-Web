@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { host, port, getServerConfig } from '@/config/server';
+import { getHost, getPort, getServerConfig } from '@/config/server';
 import { toast } from 'sonner';
 import {
   Card,
@@ -103,7 +103,7 @@ export default function AdminPanel() {
 
       const token = tokenCookie.split('=')[1];
 
-      const response = await fetch(`http://${host}:${port}/api/v1/users`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/users`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -145,7 +145,7 @@ export default function AdminPanel() {
 
       const token = tokenCookie.split('=')[1];
 
-      const response = await fetch(`http://${host}:${port}/api/v1/users/${userId}/role`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/users/${userId}/role`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -231,7 +231,7 @@ export default function AdminPanel() {
       if (!tokenCookie) return;
       const token = tokenCookie.split('=')[1];
 
-      const response = await fetch(`http://${host}:${port}/api/v1/users/create`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/users/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -274,7 +274,7 @@ export default function AdminPanel() {
       if (!tokenCookie) return;
       const token = tokenCookie.split('=')[1];
 
-      const response = await fetch(`http://${host}:${port}/api/v1/users/bulk-delete`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/users/bulk-delete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -307,7 +307,7 @@ export default function AdminPanel() {
     if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
       return avatarPath;
     }
-    return `http://${host}:${port}${avatarPath}`;
+    return `http://${getHost()}:${getPort()}${avatarPath}`;
   };
 
   // Get user initials

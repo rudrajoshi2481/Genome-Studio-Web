@@ -7,9 +7,64 @@
  * Values can be overridden by environment variables.
  */
 
-const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
-export const host = (isElectron ? window.location.hostname : null) || process.env.NEXT_PUBLIC_API_HOST || '127.0.0.1';
-export const port = (isElectron ? window.location.port : null) || process.env.NEXT_PUBLIC_API_PORT || '8000';
+// --- Lazy host/port resolution ---
+// In Electron packaged mode, the backend serves the frontend on a dynamic port,
+// so window.location.port IS the backend port. In dev mode, the frontend runs on
+// port 3000 and the backend on a separate port (from env).
+// We detect Electron via TWO methods (belt-and-suspenders):
+//   1. window.electronAPI?.isElectron — injected by preload script
+//   2. navigator.userAgent.includes('Electron') — always present in Electron
+// IMPORTANT: These are evaluated at CALL TIME, not at module load time, so they
+// work correctly even in new windows opened after initial load.
+function _isElectron(): boolean {
+  if (typeof window === 'undefined') return false;
+  // Method 1: preload-injected flag
+  const hasElectronAPI = !!window.electronAPI?.isElectron;
+  // Method 2: user agent check (always works in Electron, even if preload fails)
+  const uaHasElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+  const result = hasElectronAPI || uaHasElectron;
+  if (typeof console !== 'undefined') {
+    console.log('[config/server] _isElectron:', { hasElectronAPI, uaHasElectron, result, ua: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 80) : 'no-navigator', locPort: window.location?.port });
+  }
+  return result;
+}
+
+export function getHost(): string {
+  if (_isElectron()) {
+    return window.location.hostname || process.env.NEXT_PUBLIC_API_HOST || '127.0.0.1';
+  }
+  return process.env.NEXT_PUBLIC_API_HOST || '127.0.0.1';
+}
+
+export function getPort(): string {
+  if (_isElectron()) {
+    // In Electron packaged mode, the backend serves the frontend, so
+    // window.location.port IS the backend port (e.g. 63023).
+    const locPort = window.location.port;
+    if (locPort) return locPort;
+    // Fallback to env var if port is empty (shouldn't happen with http URLs)
+    return process.env.NEXT_PUBLIC_API_PORT || '8000';
+  }
+  return process.env.NEXT_PUBLIC_API_PORT || '8000';
+}
+
+/** Returns `http://host:port` (without /api/v1) — evaluated at call time */
+export function getServerOrigin(): string {
+  return `${getProtocol()}://${getHost()}:${getPort()}`;
+}
+
+/** Returns the protocol (http or https) — evaluated at call time */
+export function getProtocol(): string {
+  if (_isElectron() && typeof window !== 'undefined') {
+    return window.location.protocol.replace(':', '') || 'http';
+  }
+  return process.env.NEXT_PUBLIC_API_PROTOCOL || 'http';
+}
+
+// Keep backward-compatible const exports for code that hasn't been migrated yet.
+// These are evaluated once at module load time and may be stale in dynamic-port scenarios.
+export const host = getHost();
+export const port = getPort();
 
 
 
@@ -75,29 +130,17 @@ export function getServerConfig(): ServerConfig {
  * Get the API base URL (including protocol, host, port, and base path)
  */
 export function getApiBaseUrl(): string {
-  const { protocol, port, baseUrl } = defaultConfig.api;
-  // Use window.location only in Electron mode, where the backend serves the
-  // frontend on the same dynamic port. In dev/browser mode, use env-configured values.
-  if (typeof window !== 'undefined' && window.electronAPI?.isElectron) {
-    const resolvedHost = window.location.hostname;
-    const resolvedPort = window.location.port || port;
-    return `${protocol}://${resolvedHost}:${resolvedPort}${baseUrl}`;
-  }
-  return `${protocol}://${defaultConfig.api.host}:${port}${baseUrl}`;
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
+  return `${getServerOrigin()}${baseUrl}`;
 }
 
 /**
  * Get the WebSocket URL (including protocol, host, port, and path)
  */
 export function getWebsocketUrl(endpoint: string = ''): string {
-  const { protocol, port, path } = defaultConfig.websocket;
-  if (typeof window !== 'undefined' && window.electronAPI?.isElectron) {
-    const resolvedHost = window.location.hostname;
-    const resolvedPort = window.location.port || port;
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${wsProtocol}://${resolvedHost}:${resolvedPort}${path}${endpoint}`;
-  }
-  return `${protocol}://${defaultConfig.websocket.host}:${port}${path}${endpoint}`;
+  const path = process.env.NEXT_PUBLIC_WS_PATH || '/ws';
+  const wsProtocol = getProtocol() === 'https' ? 'wss' : 'ws';
+  return `${wsProtocol}://${getHost()}:${getPort()}${path}${endpoint}`;
 }
 
 /**

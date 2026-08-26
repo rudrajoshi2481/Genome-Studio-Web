@@ -41,27 +41,29 @@ export const websocketUrls = {
 
 /**
  * Common API endpoints used throughout the application
+ * Uses getters so URLs are evaluated at access time (not module load time),
+ * ensuring the correct dynamic port is used in Electron mode.
  */
 export const endpoints = {
   auth: {
-    login: apiEndpoint('/token'),
-    refresh: apiEndpoint('/token/refresh'),
-    user: apiEndpoint('/me'),
+    get login() { return apiEndpoint('/token'); },
+    get refresh() { return apiEndpoint('/token/refresh'); },
+    get user() { return apiEndpoint('/me'); },
   },
   workflowManager: {
-    base: apiEndpoint('/workflow-manager'),
-    workflows: apiEndpoint('/workflow-manager/workflows'),
-    execute: apiEndpoint('/workflow-manager/execute'),
-    variables: apiEndpoint('/workflow-manager/execute/variables'),
-    functions: apiEndpoint('/workflow-manager/execute/functions'),
+    get base() { return apiEndpoint('/workflow-manager'); },
+    get workflows() { return apiEndpoint('/workflow-manager/workflows'); },
+    get execute() { return apiEndpoint('/workflow-manager/execute'); },
+    get variables() { return apiEndpoint('/workflow-manager/execute/variables'); },
+    get functions() { return apiEndpoint('/workflow-manager/execute/functions'); },
   },
   terminal: {
-    base: apiEndpoint('/terminal'),
+    get base() { return apiEndpoint('/terminal'); },
   },
   fileExplorer: {
-    base: apiEndpoint('/file-explorer'),
-    list: apiEndpoint('/file-explorer/list'),
-    content: apiEndpoint('/file-explorer/content'),
+    get base() { return apiEndpoint('/file-explorer'); },
+    get list() { return apiEndpoint('/file-explorer/list'); },
+    get content() { return apiEndpoint('/file-explorer/content'); },
   },
 };
 

@@ -35,7 +35,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
-import { host, port } from '@/config/server'
+import { getHost, getPort } from '@/config/server'
 import { getHandleTypeInfo } from '@/components/Editorwindow_new/editors/canvas/handleTypes'
 
 // Define interfaces for proper type safety
@@ -249,7 +249,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
       }
       
       // Make the API call
-      const response = await fetch(`http://${host}:${port}/api/v1/workflow-manager/execute/function/convert-to-node`, {
+      const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/workflow-manager/execute/function/convert-to-node`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -505,7 +505,7 @@ function CustomNode({ onSaveSuccess, nodeToEdit, isOpen, onOpenChange, hideCreat
         // Make the API call to save the node
         console.log('Making API call to save node')
         
-        const response = await fetch(`http://${host}:${port}/api/v1/workflow-manager/custom-nodes/`, {
+        const response = await fetch(`http://${getHost()}:${getPort()}/api/v1/workflow-manager/custom-nodes/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

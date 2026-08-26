@@ -23,7 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from '@/lib/utils'
-import { host, port, getApiBaseUrl } from '@/config/server'
+import { getHost, getPort, getApiBaseUrl } from '@/config/server'
 import * as authService from '@/lib/services/auth-service'
 import { useTerminalStore } from '@/components/Terminal/store/terminal-store'
 
@@ -48,7 +48,7 @@ interface FlowSubmission {
   }
 }
 
-const API_BASE_URL = `http://${host}:${port}`
+const API_BASE_URL = `http://${getHost()}:${getPort()}`
 
 const FIREBASE_STORAGE_BASE = "https://firebasestorage.googleapis.com/v0/b/genome-studio.firebasestorage.app/o"
 const CF_INCREMENT_DL = "https://incrementflowdownloadcount-4mch7ghcbq-uc.a.run.app"

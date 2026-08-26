@@ -8,8 +8,11 @@
 import { getApiBaseUrl } from '@/config/server';
 import { getToken } from '@/lib/services/auth-service';
 
-const API_BASE = getApiBaseUrl();
-const EXTENSIONS_HUB_BASE = `${API_BASE}/extensions-hub`;
+// Evaluate at call time, not at module load time, so the correct dynamic port
+// is used in Electron mode (where the backend port is selected at runtime).
+function getExtensionsHubBase(): string {
+  return `${getApiBaseUrl()}/extensions-hub`;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -134,14 +137,14 @@ export async function listPackages(params?: { q?: string; tag?: string; skip?: n
   if (params?.skip) query.set('skip', String(params.skip));
   if (params?.limit) query.set('limit', String(params.limit));
   const qs = query.toString();
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages${qs ? `?${qs}` : ''}`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages${qs ? `?${qs}` : ''}`, {
     headers: authHeaders(),
   });
   return handleResponse<Package[]>(resp);
 }
 
 export async function getPackage(packageId: number): Promise<PackageDetail> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}`, {
     headers: authHeaders(),
   });
   return handleResponse<PackageDetail>(resp);
@@ -157,7 +160,7 @@ export async function createPackage(data: {
   license?: string;
   visibility?: string;
 }): Promise<PackageDetail> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(data),
@@ -174,7 +177,7 @@ export async function updatePackage(packageId: number, data: Partial<{
   license: string;
   visibility: string;
 }>): Promise<PackageDetail> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}`, {
     method: 'PUT',
     headers: authHeaders(),
     body: JSON.stringify(data),
@@ -183,7 +186,7 @@ export async function updatePackage(packageId: number, data: Partial<{
 }
 
 export async function deletePackage(packageId: number): Promise<{ success: boolean; message: string }> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
@@ -194,7 +197,7 @@ export async function uploadPackageIcon(packageId: number, file: File): Promise<
   const token = getToken();
   const formData = new FormData();
   formData.append('file', file);
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/icon`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/icon`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
@@ -203,7 +206,7 @@ export async function uploadPackageIcon(packageId: number, file: File): Promise<
 }
 
 export async function deletePackageIcon(packageId: number): Promise<{ success: boolean }> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/icon`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/icon`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
@@ -211,21 +214,21 @@ export async function deletePackageIcon(packageId: number): Promise<{ success: b
 }
 
 export function getPackageIconUrl(packageId: number): string {
-  return `${EXTENSIONS_HUB_BASE}/packages/${packageId}/icon`;
+  return `${getExtensionsHubBase()}/packages/${packageId}/icon`;
 }
 
 // ---------------------------------------------------------------------------
 // Version management
 // ---------------------------------------------------------------------------
 export async function listVersions(packageId: number): Promise<PackageVersion[]> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/versions`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/versions`, {
     headers: authHeaders(),
   });
   return handleResponse<PackageVersion[]>(resp);
 }
 
 export async function publishVersion(packageId: number, version: string, changelog?: string): Promise<PackageVersion> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/versions/publish`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/versions/publish`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ version, changelog }),
@@ -237,7 +240,7 @@ export async function publishVersion(packageId: number, version: string, changel
 // Node CRUD
 // ---------------------------------------------------------------------------
 export async function listNodes(packageId: number): Promise<PackageNode[]> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/nodes`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/nodes`, {
     headers: authHeaders(),
   });
   return handleResponse<PackageNode[]>(resp);
@@ -257,7 +260,7 @@ export async function createNode(
     validate?: boolean;
   }
 ): Promise<PackageNode> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/nodes`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/nodes`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ ...data, validate: data.validate ?? true }),
@@ -280,7 +283,7 @@ export async function updateNode(
     validate?: boolean;
   }>
 ): Promise<PackageNode> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/nodes/${nodeId}`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/nodes/${nodeId}`, {
     method: 'PUT',
     headers: authHeaders(),
     body: JSON.stringify({ ...data, validate: data.validate ?? true }),
@@ -289,7 +292,7 @@ export async function updateNode(
 }
 
 export async function deleteNode(packageId: number, nodeId: number): Promise<{ success: boolean }> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/nodes/${nodeId}`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/nodes/${nodeId}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
@@ -300,7 +303,7 @@ export async function deleteNode(packageId: number, nodeId: number): Promise<{ s
 // Validation (standalone — validate without saving)
 // ---------------------------------------------------------------------------
 export async function validateNode(code: string, language: string = 'python'): Promise<ValidationResult> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/validate-node`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/validate-node`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ code, language }),
@@ -316,7 +319,7 @@ export async function uploadFile(packageId: number, file: File, fileType: string
   const formData = new FormData();
   formData.append('file', file);
   formData.append('file_type', fileType);
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/files`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/files`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
@@ -325,7 +328,7 @@ export async function uploadFile(packageId: number, file: File, fileType: string
 }
 
 export async function deleteFile(packageId: number, fileId: number): Promise<{ success: boolean }> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/files/${fileId}`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/files/${fileId}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
@@ -333,14 +336,14 @@ export async function deleteFile(packageId: number, fileId: number): Promise<{ s
 }
 
 export function getFileDownloadUrl(packageId: number, fileId: number): string {
-  return `${EXTENSIONS_HUB_BASE}/packages/${packageId}/files/${fileId}`;
+  return `${getExtensionsHubBase()}/packages/${packageId}/files/${fileId}`;
 }
 
 // ---------------------------------------------------------------------------
 // install.sh — get/update by name
 // ---------------------------------------------------------------------------
 export async function getInstallSh(packageId: number, version?: string): Promise<{ content: string; file_id: number | null }> {
-  const url = new URL(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/install.sh`, window.location.origin);
+  const url = new URL(`${getExtensionsHubBase()}/packages/${packageId}/install.sh`, window.location.origin);
   if (version) url.searchParams.set('version', version);
   const resp = await fetch(url.toString(), {
     headers: authHeaders(),
@@ -349,7 +352,7 @@ export async function getInstallSh(packageId: number, version?: string): Promise
 }
 
 export async function updateInstallSh(packageId: number, content: string): Promise<{ content: string; file_id: number }> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/install.sh`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/install.sh`, {
     method: 'PUT',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ content }),
@@ -383,7 +386,7 @@ export interface InstallResult {
 }
 
 export async function installPackage(packageId: number, version?: string): Promise<InstallResult> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/packages/${packageId}/install`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/install`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ version: version || null }),
@@ -409,14 +412,14 @@ export interface InstalledPackage {
 }
 
 export async function listInstalled(): Promise<InstalledPackage[]> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/installed`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/installed`, {
     headers: authHeaders(),
   });
   return handleResponse<InstalledPackage[]>(resp);
 }
 
 export async function uninstallPackage(installId: number): Promise<{ success: boolean; message: string; deleted_nodes: number }> {
-  const resp = await fetch(`${EXTENSIONS_HUB_BASE}/installed/${installId}`, {
+  const resp = await fetch(`${getExtensionsHubBase()}/installed/${installId}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
