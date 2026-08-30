@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { Loader2, Search, Package, Boxes, Download, CheckCircle2 } from 'lucide-react'
+import { Loader2, Search, Package, Boxes, Download, CheckCircle2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -34,18 +34,26 @@ export default function BrowseTab({ onOpenPackage }: BrowseTabProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [installingIds, setInstallingIds] = useState<Set<number>>(new Set())
   const [installResult, setInstallResult] = useState<{ pkg: PackageType; result: InstallResult } | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const loadPackages = useCallback(async () => {
-    setIsLoading(true)
+  const loadPackages = useCallback(async (showLoading = true) => {
+    if (showLoading) setIsLoading(true)
     try {
       const pkgs = await listPackages(searchQuery ? { q: searchQuery } : undefined)
       setPackages(pkgs)
     } catch (err: any) {
       toast.error(`Failed to load packages: ${err.message}`)
     } finally {
-      setIsLoading(false)
+      if (showLoading) setIsLoading(false)
     }
   }, [searchQuery])
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await loadPackages(false)
+    setIsRefreshing(false)
+    toast.success('Browse refreshed')
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => loadPackages(), 300)
@@ -93,9 +101,9 @@ export default function BrowseTab({ onOpenPackage }: BrowseTabProps) {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
-      {/* Search bar */}
-      <div className="flex-shrink-0 px-4 py-2 border-b">
-        <div className="relative max-w-md">
+      {/* Search bar + refresh */}
+      <div className="flex-shrink-0 px-4 py-2 border-b flex items-center gap-2">
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search packages..."
@@ -104,6 +112,16 @@ export default function BrowseTab({ onOpenPackage }: BrowseTabProps) {
             className="h-8 pl-7 text-xs"
           />
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 flex-shrink-0"
+          onClick={handleRefresh}
+          disabled={isRefreshing || isLoading}
+          title="Refresh"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
 
       {/* Package grid */}

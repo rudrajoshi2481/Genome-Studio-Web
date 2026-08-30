@@ -32,11 +32,11 @@ import { getHandleTypeInfo } from '@/components/Editorwindow_new/editors/canvas/
 import {
   PackageNode,
   PackageNodeIO,
-  createNode,
-  updateNode,
-  deleteNode,
-  validateNode,
-} from '@/lib/services/package-manager-service'
+  createLocalNode as createNode,
+  updateLocalNode as updateNode,
+  deleteLocalNode as deleteNode,
+  validateLocalNode as validateNode,
+} from '@/lib/services/local-package-manager-service'
 
 interface NodeEditorProps {
   packageId: number

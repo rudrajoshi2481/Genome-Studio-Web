@@ -53,7 +53,6 @@ export interface PackageVersion {
   package_id: number;
   version: string;
   changelog?: string;
-  description_md?: string;
   manifest?: Record<string, any>;
   published: boolean;
   created_at?: string;
@@ -66,7 +65,6 @@ export interface Package {
   name: string;
   display_name: string;
   description: string;
-  description_md: string;
   author: string;
   tags: string[];
   license: string;
@@ -76,6 +74,7 @@ export interface Package {
   download_count: number;
   created_at?: string;
   updated_at?: string;
+  has_unpushed_changes?: boolean;
   working_version?: PackageVersion | null;
 }
 
@@ -141,6 +140,39 @@ export async function listPackages(params?: { q?: string; tag?: string; skip?: n
     headers: authHeaders(),
   });
   return handleResponse<Package[]>(resp);
+}
+
+// ---------------------------------------------------------------------------
+// Backup — download all of the user's packages as a single JSON file
+// ---------------------------------------------------------------------------
+export async function backupPackages(): Promise<void> {
+  const resp = await fetch(`${getExtensionsHubBase()}/backup`, {
+    headers: authHeaders(),
+  });
+  if (!resp.ok) {
+    let detail: any;
+    try { detail = await resp.json(); } catch { detail = { detail: await resp.text() }; }
+    throw new Error(
+      typeof detail.detail === 'string'
+        ? detail.detail
+        : detail.detail?.error || detail.detail?.message || `HTTP ${resp.status}`
+    );
+  }
+  // Parse the Content-Disposition header to recover the server-suggested filename
+  const cd = resp.headers.get('content-disposition') || '';
+  let filename = `extension-hub-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const match = cd.match(/filename="?([^";]+)"?/);
+  if (match) filename = match[1];
+
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export async function getPackage(packageId: number): Promise<PackageDetail> {
@@ -361,6 +393,17 @@ export async function updateInstallSh(packageId: number, content: string): Promi
 }
 
 // ---------------------------------------------------------------------------
+// README.md — read from the git tree (read-only on hub, arrives via git push)
+// ---------------------------------------------------------------------------
+export async function getReadme(packageId: number, ref?: string): Promise<{ content: string }> {
+  const params = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/readme${params}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(resp);
+}
+
+// ---------------------------------------------------------------------------
 // Install — upload a package's published nodes to the user's custom_nodes table
 // ---------------------------------------------------------------------------
 export interface InstallResult {
@@ -424,4 +467,36 @@ export async function uninstallPackage(installId: number): Promise<{ success: bo
     headers: authHeaders(),
   });
   return handleResponse(resp);
+}
+
+// ---------------------------------------------------------------------------
+// Git file tree — browse all files in a published package's repo
+// ---------------------------------------------------------------------------
+export interface GitTreeEntry {
+  path: string;
+  size: number;
+  is_binary: boolean;
+}
+
+export interface GitFileContent {
+  path: string;
+  content: string;
+  is_binary: boolean;
+}
+
+export async function getTree(packageId: number, ref?: string): Promise<GitTreeEntry[]> {
+  const params = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/tree${params}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse<GitTreeEntry[]>(resp);
+}
+
+export async function getFileByPath(packageId: number, path: string, ref?: string): Promise<GitFileContent> {
+  const params = new URLSearchParams({ path });
+  if (ref) params.set('ref', ref);
+  const resp = await fetch(`${getExtensionsHubBase()}/packages/${packageId}/file?${params}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse<GitFileContent>(resp);
 }

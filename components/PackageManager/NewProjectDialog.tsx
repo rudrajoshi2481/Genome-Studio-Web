@@ -18,9 +18,9 @@ import {
 import { toast } from 'sonner'
 import TagInput from '@/components/Sidebar/Nodebar/CustomNode/TagInput'
 import {
-  createPackage,
+  createLocalPackage as createPackage,
   PackageDetail,
-} from '@/lib/services/package-manager-service'
+} from '@/lib/services/local-package-manager-service'
 
 interface NewProjectDialogProps {
   isOpen: boolean

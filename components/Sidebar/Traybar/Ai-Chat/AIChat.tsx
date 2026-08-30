@@ -41,7 +41,6 @@ function AIChat({ onClose }: { onClose?: () => void }) {
     conversations,
     setConversations,
     currentConversationId,
-    setLoading,
     isLoading: isLoadingConvs,
     clearMentions,
     clearUploadedFiles,
@@ -72,7 +71,6 @@ function AIChat({ onClose }: { onClose?: () => void }) {
     conversations: s.conversations,
     setConversations: s.setConversations,
     currentConversationId: s.currentConversationId,
-    setLoading: s.setLoading,
     isLoading: s.isLoading,
     clearMentions: s.clearMentions,
     clearUploadedFiles: s.clearUploadedFiles,
@@ -99,6 +97,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
 
   const [showAllConvs, setShowAllConvs] = useState(false);
   const [showConvList, setShowConvList] = useState(false);
+  const [isFetchingConvs, setIsFetchingConvs] = useState(false);
   const wasLoadingRef = useRef(false);
 
   // Auto-process queued messages when loading finishes
@@ -136,7 +135,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
   }, []);
 
   const fetchConversations = async (fetchAll: boolean) => {
-    setLoading(true);
+    setIsFetchingConvs(true);
     try {
       const url = `${getApiBaseUrl()}/ai-chat/conversations${fetchAll ? '?all=true' : ''}`;
       const response = await fetch(url);
@@ -147,7 +146,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
     } catch (error) {
       console.error('Failed to fetch conversations:', error);
     } finally {
-      setLoading(false);
+      setIsFetchingConvs(false);
     }
   };
 
@@ -445,7 +444,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
           <HistoryPanel
             conversations={conversations}
             currentConversationId={currentConversationId}
-            isLoading={isLoadingConvs}
+            isLoading={isFetchingConvs}
             showAll={showAllConvs}
             onToggleShowAll={handleToggleShowAll}
             onSelectConversation={handleSelectConversation}
@@ -478,7 +477,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
             </span>
           </div>
         )}
-        <Footer key={activeSessionId} onSendMessage={handleSendMessage} onStop={stopSending} onSendCommand={sendCommand} setInputRef={(fn) => { inputSetterRef.current = fn; }} />
+        <Footer onSendMessage={handleSendMessage} onStop={stopSending} onSendCommand={sendCommand} setInputRef={(fn) => { inputSetterRef.current = fn; }} />
       </div>
 
       {promptSuggestions.length > 0 && (

@@ -87,6 +87,31 @@ export const useChatWebSocket = () => {
 
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingAskUserResolverRef = useRef<((response: string) => void) | null>(null);
+  const cachedWorkspaceFolders = useRef<{ path: string; alias: string }[] | undefined>(undefined);
+
+  // Background-fetch workspace folders so sendMessage doesn't block
+  useEffect(() => {
+    const fetchWorkspaceFolders = async () => {
+      try {
+        const baseUrl = getApiBaseUrl();
+        const token = authService.getToken();
+        const response = await fetch(`${baseUrl}/file-explorer-new/workspace/folders`, {
+          headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+          credentials: 'include',
+        });
+        if (response.ok) {
+          const data = await response.json();
+          cachedWorkspaceFolders.current = data.folders || undefined;
+        }
+      } catch {
+        // Silently handle — workspace folders are optional context
+      }
+    };
+    fetchWorkspaceFolders();
+    // Refresh every 60s to pick up new workspaces
+    const interval = setInterval(fetchWorkspaceFolders, 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const connectWebSocket = async () => {
@@ -971,7 +996,7 @@ export const useChatWebSocket = () => {
             role: 'system',
             content: `Doom loop detected on ${message.tool_name}. ${message.content || ''}`
           });
-          if (isActiveSession) sessionSetLoading(false);
+          sessionSetLoading(false);
           break;
         case 'budget_stop':
           sessionAddMessage({
@@ -1058,6 +1083,11 @@ export const useChatWebSocket = () => {
           const parsed = parseLlmError(message.content || '');
           // Rate-limit and timeout errors are typically transient and safe to retry
           const canRetry = parsed.kind === 'rate_limit' || parsed.kind === 'timeout' || parsed.kind === 'connection';
+          // Remove thinking messages so the error is visible
+          sessionUpdateMessages(msgs => {
+            if (!msgs.some(m => m.type === 'thinking')) return msgs;
+            return msgs.filter(m => m.type !== 'thinking');
+          });
           sessionAddMessage({
             type: 'error',
             role: 'system',
@@ -1067,7 +1097,12 @@ export const useChatWebSocket = () => {
             errorDetail: parsed.detail,
             canRetry,
           });
-          if (isActiveSession) sessionSetLoading(false);
+          // Always clear loading state — works for both active and background sessions
+          sessionSetLoading(false);
+          if (isActiveSession) {
+            useChatStore.getState().setStreamingMessage(null);
+            useChatStore.getState().setCurrentReasoningId(null);
+          }
           break;
         }
         default:
@@ -1119,9 +1154,15 @@ export const useChatWebSocket = () => {
       const convId = state.currentConversationId;
       const isNew = state.isNewChat;
 
+      // Set loading immediately (synchronously) to prevent double-sends from
+      // rapid clicks — the Footer checks `loading` to queue subsequent messages.
+      useChatStore.getState().setLoading(true);
+
       // Finalize any ongoing reasoning/streaming from the active session only
       if (activeId && (state.currentReasoningId || state.currentStreamingMessageId)) {
         state.stopGeneration();
+        // stopGeneration sets isLoading=false, so restore it
+        useChatStore.getState().setLoading(true);
       }
 
       // Always send conversation_id so the backend uses the correct session.
@@ -1179,25 +1220,9 @@ export const useChatWebSocket = () => {
       // Get the active file explorer root path
       const activeRootPath = options?.rootPath || (typeof window !== 'undefined' ? localStorage.getItem('fileExplorer_rootPath') || undefined : undefined);
 
-      // Fetch all workspace folders so the AI agent knows which workspaces exist
-      let workspaceFolders: { path: string; alias: string }[] | undefined;
-      try {
-        const baseUrl = getApiBaseUrl();
-        const token = authService.getToken();
-        const url = `${baseUrl}/file-explorer-new/workspace/folders`;
-        const response = await fetch(url, {
-          headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const data = await response.json();
-          workspaceFolders = data.folders || undefined;
-        }
-      } catch (e) {
-        // Silently handle — workspace folders are optional context for the AI
-      }
+      // Use cached workspace folders (fetched in the background) to avoid
+      // blocking the message send with a synchronous HTTP call.
+      const workspaceFolders = cachedWorkspaceFolders.current;
 
       // Collect open tabs info (paths + active tab) so the backend agent knows
       // which files are open, especially .flow files for the canvas agent
@@ -1292,13 +1317,12 @@ export const useChatWebSocket = () => {
         }));
       }
 
-      // Sync loading state to the session
+      // Sync loading state to the session (isLoading was already set at the top)
       useChatStore.setState((state) => ({
         openSessions: state.openSessions.map(s =>
           s.id === activeId ? { ...s, isLoading: true } : s
         ),
       }));
-      useChatStore.getState().setLoading(true);
     } catch (error) {
       console.error('Failed to send message:', error);
       const parsed = parseLlmError(String((error as Error)?.message || error));

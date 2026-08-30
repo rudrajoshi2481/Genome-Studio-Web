@@ -1,6 +1,6 @@
 "use client"
 import React from 'react'
-import { X, FileText, FileCode, Palette, Globe, FileJson, FileType, Copy, Trash2, XCircle, ChevronsRight, ChevronsLeft, Minimize2, FolderTree } from 'lucide-react'
+import { X, FileText, FileCode, Palette, Globe, FileJson, FileType, Copy, Trash2, XCircle, ChevronsRight, ChevronsLeft, Minimize2, FolderTree, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -129,6 +129,17 @@ function FileTab({
     }
   }
 
+  const handleMoveToNewWindow = () => {
+    // Open this file in a standalone editor window via Electron IPC.
+    // In browser mode, falls back to window.open.
+    const url = `/editor-window?path=${encodeURIComponent(path)}`
+    if (typeof window !== 'undefined' && window.electronAPI?.openWindow) {
+      window.electronAPI.openWindow(url)
+    } else {
+      window.open(url, '_blank')
+    }
+  }
+
   // Check if there are tabs to the right or left
   const currentIndex = tabOrder.indexOf(id)
   const hasTabsToRight = currentIndex < tabOrder.length - 1
@@ -214,7 +225,12 @@ function FileTab({
           <FolderTree className="mr-2 h-4 w-4" />
           Reveal in Explorer
         </ContextMenuItem>
-        
+
+        <ContextMenuItem onClick={handleMoveToNewWindow}>
+          <ExternalLink className="mr-2 h-4 w-4" />
+          Move to New Window
+        </ContextMenuItem>
+
         <ContextMenuItem onClick={handleCopyPath}>
           <Copy className="mr-2 h-4 w-4" />
           Copy Path

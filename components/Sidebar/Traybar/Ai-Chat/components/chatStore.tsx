@@ -832,7 +832,12 @@ export const useChatStore = create<ChatState>()(
       partialize: (state) => ({
         enabledDatabases: state.enabledDatabases,
         keepIntermediateFiles: state.keepIntermediateFiles,
-        openSessions: state.openSessions,
+        // Cap persisted messages per session to avoid bloating localStorage.
+        // The last 100 messages are kept; older ones are discarded on reload.
+        openSessions: state.openSessions.map(s => ({
+          ...s,
+          messages: s.messages.slice(-100),
+        })),
         activeSessionId: state.activeSessionId,
         selectedModel: state.selectedModel,
         pinnedModels: state.pinnedModels,

@@ -381,11 +381,13 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           flushWsBatch();
         },
         onStatus: (msg: StatusUpdateMessage) => {
+          console.log('🎯 [CustomNode] onStatus received:', { msg, id, hasFinished, node_id: msg.node_id, status: msg.status });
           // Handle terminal statuses (completed/failed/cancelled) with node_id
           if (msg.node_id === id && (msg.status === 'completed' || msg.status === 'failed' || msg.status === 'cancelled')) {
             if (hasFinished) return;
             hasFinished = true;
             setIsExecuting(false);
+            console.log('🎯 [CustomNode] Processing completion for node', id, 'with unified_outputs:', (msg as any).unified_outputs);
 
             // Cancel any pending batch flush — final status replaces all streamed data
             if (wsBatchTimerRef.current) {
@@ -455,6 +457,74 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
       while (!wsConnected && Date.now() - startTime < 2000) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
+
+      // Polling fallback: if WebSocket misses the status_update message
+      // (race condition), polling will catch the final result.
+      const pollNodeStatus = async (pollExecId: string, attempts = 0) => {
+        if (hasFinished) return;
+        if (attempts > 60) return; // Stop after ~2 minutes
+        try {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          if (hasFinished) return;
+          const status = await workflowManagerAPI.getExecutionStatus(pollExecId);
+          console.log('🔄 [CustomNode] Poll status:', { execId: pollExecId, status: status.status, completed: status.completed_nodes, failed: status.failed_nodes, nodeResults: Object.keys(status.node_results || {}) });
+          if (status.completed_nodes?.includes(id) || status.failed_nodes?.includes(id) || status.status === 'completed' || status.status === 'failed') {
+            if (hasFinished) return;
+            hasFinished = true;
+            setIsExecuting(false);
+            // Get node results from the status response (added by backend)
+            const nodeResult = status.node_results?.[id];
+            setNodes((nds: Node[]) =>
+              nds.map((n: Node) => {
+                if (n.id !== id) return n;
+                const finalStatus = status.failed_nodes?.includes(id) ? 'failed' : 'completed';
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    status: finalStatus,
+                    logs: nodeResult?.unified_outputs
+                      ? nodeResult.unified_outputs.filter((o: Record<string, unknown>) => o.type === 'text').map((o: Record<string, unknown>) => ({ timestamp: new Date().toISOString(), level: 'INFO', message: o.content as string, source: 'stdout' }))
+                      : n.data.logs,
+                    output_html: nodeResult?.output_html || n.data.output_html || {},
+                    unified_outputs: nodeResult?.unified_outputs || n.data.unified_outputs || [],
+                    error_message: nodeResult?.error_message || undefined,
+                    error_traceback: nodeResult?.error_traceback || undefined,
+                    duration_seconds: nodeResult?.duration_seconds,
+                    lastExecution: {
+                      timestamp: new Date().toISOString(),
+                      status: finalStatus,
+                      duration_seconds: nodeResult?.duration_seconds,
+                      output_variables: nodeResult?.output_variables,
+                      output_html: nodeResult?.output_html || {},
+                      unified_outputs: nodeResult?.unified_outputs || [],
+                      error_message: nodeResult?.error_message,
+                      error_traceback: nodeResult?.error_traceback,
+                    },
+                  },
+                };
+              })
+            );
+            workflowWebSocket.unsubscribeFromExecution(pollExecId);
+            executionIdRef.current = null;
+            return;
+          }
+          // Continue polling
+          pollNodeStatus(pollExecId, attempts + 1);
+        } catch (err) {
+          // 404 means executor was cleaned up — stop polling
+          if ((err as any).status === 404) {
+            if (!hasFinished) {
+              hasFinished = true;
+              setIsExecuting(false);
+            }
+            return;
+          }
+          // Retry on other errors
+          pollNodeStatus(pollExecId, attempts + 1);
+        }
+      };
+      pollNodeStatus(execId);
 
     } catch (error) {
       // toast.error(`Failed to execute node: ${error instanceof Error ? error.message : 'Unknown error'}`);

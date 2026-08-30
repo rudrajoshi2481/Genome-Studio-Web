@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { Search, Download, Package, ArrowLeft, RefreshCw, Code2, FileText, GitBranch, CheckCircle2, Tag as TagIcon, Plus, Loader2, AlertTriangle, Terminal } from 'lucide-react'
+import { Search, Download, Package, ArrowLeft, RefreshCw, Code2, FileText, GitBranch, CheckCircle2, Tag as TagIcon, Plus, Loader2, AlertTriangle, Terminal, FolderTree } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -15,7 +15,8 @@ import MyPackagesTab from './tabs/MyPackagesTab'
 import InstalledTab from './tabs/InstalledTab'
 import NewProjectDialog from './NewProjectDialog'
 import CanvasStyleNodeCard from './CanvasStyleNodeCard'
-import { PackageDetail, installPackage, InstallResult, getPackage, getPackageIconUrl, getInstallSh } from '@/lib/services/package-manager-service'
+import FileTreeViewer from './FileTreeViewer'
+import { PackageDetail, installPackage, InstallResult, getPackage, getPackageIconUrl, getInstallSh, getTree, getFileByPath, getReadme } from '@/lib/services/package-manager-service'
 
 function PackageManagerPage({ onRegisterNewProjectOpener }: { onRegisterNewProjectOpener?: (open: () => void) => void }) {
   const [activeTab, setActiveTab] = useState<string>('browse')
@@ -108,11 +109,13 @@ function BrowsePackageDetail({ pkg, onBack, onRefresh }: { pkg: PackageDetail; o
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [installResult, setInstallResult] = useState<InstallResult | null>(null)
   const [installError, setInstallError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState('docs')
+  const [activeTab, setActiveTab] = useState('readme')
   const [installSh, setInstallSh] = useState('')
   const [isLoadingInstallSh, setIsLoadingInstallSh] = useState(false)
+  const [readme, setReadme] = useState('')
+  const [isLoadingReadme, setIsLoadingReadme] = useState(false)
 
-  // The version selected in the sidebar (drives docs/nodes display)
+  // The version selected in the sidebar (drives readme/nodes display)
   const selectedVersionData = publishedVersions.find(v => v.version === selectedVersion) || publishedVersions[0]
   // Install always uses the latest published version
   const latestPublished = publishedVersions.find(v => v.version === pkg.latest_version) || publishedVersions[0]
@@ -125,6 +128,16 @@ function BrowsePackageDetail({ pkg, onBack, onRefresh }: { pkg: PackageDetail; o
       .then(r => setInstallSh(r.content || ''))
       .catch(() => setInstallSh(''))
       .finally(() => setIsLoadingInstallSh(false))
+  }, [pkg.id, selectedVersionData?.version])
+
+  // Load README for the selected version
+  useEffect(() => {
+    if (!selectedVersionData) { setReadme(''); return }
+    setIsLoadingReadme(true)
+    getReadme(pkg.id, `v${selectedVersionData.version}`)
+      .then(r => setReadme(r.content || ''))
+      .catch(() => setReadme(''))
+      .finally(() => setIsLoadingReadme(false))
   }, [pkg.id, selectedVersionData?.version])
 
   const handleInstall = async () => {
@@ -323,13 +336,13 @@ function BrowsePackageDetail({ pkg, onBack, onRefresh }: { pkg: PackageDetail; o
             </div>
 
             {/* Content: Tabs (Documentation / Nodes) */}
-            <div className="flex-1 min-w-0 rounded-lg border bg-card">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <div className="flex-1 min-w-0 rounded-lg border bg-card flex flex-col">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
                 {/* Tab header with same bg-muted/30 style */}
                 <div className="px-4 py-2.5 border-b bg-muted/30 flex items-center justify-between">
                   <TabsList className="h-7 bg-transparent border-0 p-0 gap-1">
-                    <TabsTrigger value="docs" className="text-xs gap-1 h-6 px-2">
-                      <FileText className="h-3 w-3" /> Documentation
+                    <TabsTrigger value="readme" className="text-xs gap-1 h-6 px-2">
+                      <FileText className="h-3 w-3" /> README
                     </TabsTrigger>
                     <TabsTrigger value="nodes" className="text-xs gap-1 h-6 px-2">
                       <Code2 className="h-3 w-3" /> Nodes
@@ -342,19 +355,26 @@ function BrowsePackageDetail({ pkg, onBack, onRefresh }: { pkg: PackageDetail; o
                     <TabsTrigger value="install" className="text-xs gap-1 h-6 px-2">
                       <Terminal className="h-3 w-3" /> install.sh
                     </TabsTrigger>
+                    <TabsTrigger value="files" className="text-xs gap-1 h-6 px-2">
+                      <FolderTree className="h-3 w-3" /> Files
+                    </TabsTrigger>
                   </TabsList>
                   {selectedVersionData && (
                     <span className="text-[10px] text-muted-foreground font-mono">v{selectedVersionData.version}</span>
                   )}
                 </div>
 
-                {/* Documentation tab */}
-                <TabsContent value="docs" className="mt-0">
+                {/* README tab */}
+                <TabsContent value="readme" className="mt-0">
                   <div className="p-4">
-                    {selectedVersionData?.description_md ? (
-                      <Markdown>{selectedVersionData.description_md}</Markdown>
+                    {isLoadingReadme ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : readme.trim() ? (
+                      <Markdown>{readme}</Markdown>
                     ) : (
-                      <p className="text-xs text-muted-foreground py-8 text-center">No documentation available for this version.</p>
+                      <p className="text-xs text-muted-foreground py-8 text-center">No README.md for this version.</p>
                     )}
                   </div>
                 </TabsContent>
@@ -392,6 +412,17 @@ function BrowsePackageDetail({ pkg, onBack, onRefresh }: { pkg: PackageDetail; o
                     ) : (
                       <p className="text-xs text-muted-foreground py-8 text-center">No install.sh in this version.</p>
                     )}
+                  </div>
+                </TabsContent>
+
+                {/* Files tab — git file tree browser */}
+                <TabsContent value="files" className="mt-0 h-full min-h-0">
+                  <div className="h-full min-h-0">
+                    <FileTreeViewer
+                      onFetchTree={(ref) => getTree(pkg.id, ref)}
+                      onFetchFile={(path, ref) => getFileByPath(pkg.id, path, ref)}
+                      ref={selectedVersionData ? `v${selectedVersionData.version}` : undefined}
+                    />
                   </div>
                 </TabsContent>
               </Tabs>
