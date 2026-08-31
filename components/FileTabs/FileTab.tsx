@@ -1,6 +1,6 @@
 "use client"
 import React from 'react'
-import { X, FileText, FileCode, Palette, Globe, FileJson, FileType, Copy, Trash2, XCircle, ChevronsRight, ChevronsLeft, Minimize2, FolderTree, ExternalLink } from 'lucide-react'
+import { X, FileText, FileCode, Palette, Globe, FileJson, FileType, Copy, Trash2, XCircle, ChevronsRight, ChevronsLeft, Minimize2, FolderTree, ExternalLink, Workflow } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -61,6 +61,8 @@ function FileTab({
         return <FileJson {...iconProps} className="mr-1 flex-shrink-0 text-green-600" />
       case 'md':
         return <FileType {...iconProps} className="mr-1 flex-shrink-0 text-gray-600" />
+      case 'flow':
+        return <Workflow {...iconProps} className="mr-1 flex-shrink-0 text-indigo-600" />
       default:
         return <FileText {...iconProps} className="mr-1 flex-shrink-0 text-gray-500" />
     }

@@ -31,6 +31,15 @@ const getDefaultValueForType = (dataType: string): any => {
         view_group: 0,
         options: {},
       };
+    case 'ngl-structure':
+      return {
+        file_path: '',
+        file_type: 'auto',
+        representation: 'cartoon',
+        color_scheme: 'default',
+        name: '',
+        options: '',
+      };
     default:
       return '';
   }
@@ -170,7 +179,7 @@ export const useCanvasHandlers = (
       if (nodeData.type === 'dataType' || nodeData.node_type === 'dataTypeNode') {
         // Extract data type from tags if it's a saved node
         const dataType = nodeData.dataType || (nodeData.tags && nodeData.tags.find((tag: string) =>
-          ['string', 'int', 'float', 'bool', 'list', 'dict', 'higlass-track'].includes(tag)
+          ['string', 'int', 'float', 'bool', 'list', 'dict', 'higlass-track', 'ngl-structure'].includes(tag)
         )) || 'string';
         
         // Create a data type node

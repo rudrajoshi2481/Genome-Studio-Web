@@ -3,9 +3,10 @@
 import React from 'react';
 import { ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
 import { HiGlassViewer } from '@/components/Editorwindow_new/editors/canvas/HiGlassViewer';
+import { NGLViewer } from '@/components/Editorwindow_new/editors/canvas/NGLViewer';
 
 interface UnifiedOutput {
-  type: 'text' | 'rich' | 'error' | 'higlass';
+  type: 'text' | 'rich' | 'error' | 'higlass' | 'ngl';
   content: string | any;
   var_name?: string;
   traceback?: string;
@@ -33,6 +34,104 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
   })) || [];
 
   const hasHiglass = displayOutputs.some(o => o.type === 'higlass');
+
+  // If the only outputs are viewer types (higlass/ngl), render them bare —
+  // skip the "output" terminal box so the viewer fills the node cleanly.
+  const viewerOnly =
+    displayOutputs.length > 0 &&
+    displayOutputs.every(o => o.type === 'higlass' || o.type === 'ngl') &&
+    !isRunning;
+
+  const renderOutput = (output: UnifiedOutput, index: number) => {
+    if (output.type === 'text') {
+      const textContent = typeof output.content === 'string'
+        ? output.content
+        : (output.content?.text || output.content?.html || JSON.stringify(output.content));
+      return (
+        <div
+          key={index}
+          className="text-foreground/90 whitespace-pre-wrap break-words"
+        >
+          <span className="text-muted-foreground select-none">›</span>{' '}{textContent}
+        </div>
+      );
+    }
+
+    if (output.type === 'error') {
+      const errorContent = typeof output.content === 'string'
+        ? output.content
+        : (output.content?.text || output.content?.html || JSON.stringify(output.content));
+      return (
+        <div key={index} className="mt-1.5 rounded-md bg-destructive/5 border border-destructive/20 overflow-hidden">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-destructive/10 border-b border-destructive/20">
+            <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+            <span className="text-destructive font-semibold text-[11px]">Error</span>
+          </div>
+          <pre className="px-2.5 py-2 text-destructive whitespace-pre-wrap break-words text-[11px]">
+            {errorContent}
+          </pre>
+          {output.traceback && (
+            <details className="border-t border-destructive/20">
+              <summary className="cursor-pointer px-2.5 py-1.5 text-destructive/80 hover:text-destructive text-[11px] select-none">
+                Show Traceback
+              </summary>
+              <pre className="px-2.5 pb-2 text-destructive/70 whitespace-pre-wrap break-words text-[11px] max-h-40 overflow-y-auto">
+                {output.traceback}
+              </pre>
+            </details>
+          )}
+        </div>
+      );
+    }
+
+    if (output.type === 'higlass') {
+      const viewconf = output.content?.viewconf;
+      if (!viewconf) return null;
+      return (
+        <div key={index} className="mt-1.5 w-full">
+          <HiGlassViewer viewconf={viewconf} height={500} className="w-full" />
+        </div>
+      );
+    }
+
+    if (output.type === 'ngl') {
+      const spec = output.content?.spec;
+      if (!spec) return null;
+      return (
+        <div key={index} className="mt-1.5 w-full">
+          <NGLViewer spec={spec} height={400} className="w-full" />
+        </div>
+      );
+    }
+
+    if (output.type === 'rich') {
+      if (output.var_name && INTERNAL_VARS.includes(output.var_name)) return null;
+      if (output.content?.text && output.content.text.includes('module') && output.content.text.includes('from')) return null;
+
+      const htmlContent = typeof output.content === 'string' ? output.content : output.content?.html;
+      if (!htmlContent) return null;
+
+      return (
+        <div
+          key={index}
+          className="rich-terminal-output mt-1.5 rounded-md bg-muted/40 border border-border p-2"
+        >
+          <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  // Bare render for viewer-only outputs (no "output" box/accordion)
+  if (viewerOnly) {
+    return (
+      <div className="w-full">
+        {displayOutputs.map((output, index) => renderOutput(output, index))}
+      </div>
+    );
+  }
 
   return (
     <div className="w-full rounded-md border border-border bg-muted/30 overflow-hidden">
@@ -62,77 +161,7 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
           <div className="text-muted-foreground text-[11px] italic">No output yet…</div>
         )}
 
-        {displayOutputs.map((output, index) => {
-          if (output.type === 'text') {
-            const textContent = typeof output.content === 'string' 
-              ? output.content 
-              : (output.content?.text || output.content?.html || JSON.stringify(output.content));
-            return (
-              <div
-                key={index}
-                className="text-foreground/90 whitespace-pre-wrap break-words"
-              >
-                <span className="text-muted-foreground select-none">›</span>{' '}{textContent}
-              </div>
-            );
-          }
-
-          if (output.type === 'error') {
-            const errorContent = typeof output.content === 'string' 
-              ? output.content 
-              : (output.content?.text || output.content?.html || JSON.stringify(output.content));
-            return (
-              <div key={index} className="mt-1.5 rounded-md bg-destructive/5 border border-destructive/20 overflow-hidden">
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-destructive/10 border-b border-destructive/20">
-                  <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
-                  <span className="text-destructive font-semibold text-[11px]">Error</span>
-                </div>
-                <pre className="px-2.5 py-2 text-destructive whitespace-pre-wrap break-words text-[11px]">
-                  {errorContent}
-                </pre>
-                {output.traceback && (
-                  <details className="border-t border-destructive/20">
-                    <summary className="cursor-pointer px-2.5 py-1.5 text-destructive/80 hover:text-destructive text-[11px] select-none">
-                      Show Traceback
-                    </summary>
-                    <pre className="px-2.5 pb-2 text-destructive/70 whitespace-pre-wrap break-words text-[11px] max-h-40 overflow-y-auto">
-                      {output.traceback}
-                    </pre>
-                  </details>
-                )}
-              </div>
-            );
-          }
-
-          if (output.type === 'higlass') {
-            const viewconf = output.content?.viewconf;
-            if (!viewconf) return null;
-            return (
-              <div key={index} className="mt-1.5 w-full">
-                <HiGlassViewer viewconf={viewconf} height={500} className="w-full" />
-              </div>
-            );
-          }
-
-          if (output.type === 'rich') {
-            if (output.var_name && INTERNAL_VARS.includes(output.var_name)) return null;
-            if (output.content?.text && output.content.text.includes('module') && output.content.text.includes('from')) return null;
-
-            const htmlContent = typeof output.content === 'string' ? output.content : output.content?.html;
-            if (!htmlContent) return null;
-
-            return (
-              <div
-                key={index}
-                className="rich-terminal-output mt-1.5 rounded-md bg-muted/40 border border-border p-2"
-              >
-                <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-              </div>
-            );
-          }
-
-          return null;
-        })}
+        {displayOutputs.map((output, index) => renderOutput(output, index))}
 
         {isRunning && (
           <div className="text-green-500 mt-1.5 text-[11px] flex items-center gap-1">

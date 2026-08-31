@@ -6,6 +6,7 @@
 import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { HiGlassViewer } from './HiGlassViewer';
+import { NGLViewer } from './NGLViewer';
 
 interface RichOutput {
   html: string;
@@ -13,6 +14,7 @@ interface RichOutput {
   type?: string;
   mime_type?: string;
   viewconf?: Record<string, unknown>;
+  spec?: Record<string, unknown>;
 }
 
 interface RichOutputViewerProps {
@@ -59,6 +61,13 @@ export const RichOutputViewer: React.FC<RichOutputViewerProps> = ({ outputs, cla
             return (
               <div key={varName} className="rich-output-item w-full">
                 <HiGlassViewer viewconf={output.viewconf} height={500} className="w-full" />
+              </div>
+            );
+          }
+          if (output.type === 'ngl' && output.spec) {
+            return (
+              <div key={varName} className="rich-output-item w-full">
+                <NGLViewer spec={output.spec as any} height={400} className="w-full" />
               </div>
             );
           }

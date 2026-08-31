@@ -43,7 +43,7 @@ export type NodeExecutionStatus = 'idle' | 'queued' | 'running' | 'completed' | 
 
 // Define unified output type
 export interface UnifiedOutput {
-  type: 'text' | 'rich' | 'error' | 'higlass';
+  type: 'text' | 'rich' | 'error' | 'higlass' | 'ngl';
   content: unknown;
   order: number;
   var_name?: string;
@@ -368,9 +368,12 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
         onOutput: (msg: OutputStreamMessage) => {
           if (msg.node_id !== id) return;
           const isHiglass = msg.output.output_type === 'higlass' && msg.output.viewconf;
+          const isNgl = msg.output.output_type === 'ngl' && msg.output.spec;
           const newOutput: Record<string, unknown> = {
-            type: isHiglass ? 'higlass' : (msg.output.html ? 'rich' : 'text'),
-            content: isHiglass ? { viewconf: msg.output.viewconf, html: msg.output.html } : (msg.output.html || msg.output.text || ''),
+            type: isHiglass ? 'higlass' : (isNgl ? 'ngl' : (msg.output.html ? 'rich' : 'text')),
+            content: isHiglass
+              ? { viewconf: msg.output.viewconf, html: msg.output.html }
+              : (isNgl ? { spec: msg.output.spec, html: msg.output.html } : (msg.output.html || msg.output.text || '')),
             order: msg.output.order ?? -1,
           };
           wsBatchRef.current.outputs.push(newOutput);
@@ -1267,6 +1270,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
             if (output.type === 'text') return true;
             if (output.type === 'error') return true;
             if (output.type === 'higlass') return true;
+            if (output.type === 'ngl') return true;
             if (output.type === 'rich') {
               if (output.var_name && internalVars.includes(output.var_name)) return false;
               if ((output.content as any)?.text && (output.content as any).text.includes('module') && (output.content as any).text.includes('from')) return false;

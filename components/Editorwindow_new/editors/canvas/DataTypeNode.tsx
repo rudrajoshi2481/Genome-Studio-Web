@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Pencil, Focus, Trash2, Copy, Save, Code, Type, Hash, Braces, ToggleLeft, List as ListIcon, ChevronDown, ChevronRight, Dna } from 'lucide-react';
+import { Pencil, Focus, Trash2, Copy, Save, Code, Type, Hash, Braces, ToggleLeft, List as ListIcon, ChevronDown, ChevronRight, Dna, Boxes } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import {
   ContextMenu,
@@ -29,7 +29,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { createCustomNode } from '@/lib/services/custom-node-service';
 
 // Define data types
-export type DataType = 'string' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'higlass-track';
+export type DataType = 'string' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'higlass-track' | 'ngl-structure';
 
 // HiGlass track config: file types → valid track types + default
 export const HIGLASS_FILE_TYPES: Record<string, { label: string; tracks: string[] }> = {
@@ -45,6 +45,29 @@ export const HIGLASS_FILE_TYPES: Record<string, { label: string; tracks: string[
 };
 
 export const HIGLASS_POSITIONS = ['center', 'top', 'bottom', 'left', 'right', 'whole', 'gallery'];
+
+// NGL structure config: file types, representations, color schemes
+export const NGL_FILE_TYPES: Record<string, string> = {
+  auto: 'Auto (from extension)',
+  pdb: 'PDB (.pdb/.ent)',
+  cif: 'mmCIF (.cif/.mmcif)',
+  gro: 'GRO (.gro)',
+  pqr: 'PQR (.pqr)',
+  mol2: 'MOL2 (.mol2)',
+  sdf: 'SDF (.sdf)',
+};
+
+export const NGL_REPRESENTATIONS = [
+  'cartoon', 'backbone', 'ball+stick', 'licorice', 'hyperball',
+  'line', 'point', 'ribbon', 'surface', 'rocket', 'helixorient',
+  'contact', 'distance', 'label',
+];
+
+export const NGL_COLOR_SCHEMES = [
+  'default', 'atomindex', 'chainindex', 'chainname', 'element',
+  'residueindex', 'resname', 'sstruc', 'uniform', 'molecule',
+  'bfactor', 'hydrophobicity', 'occupancy', 'random',
+];
 
 export interface HiGlassTrackSpec {
   file_path: string;
@@ -64,6 +87,24 @@ const DEFAULT_TRACK_SPEC: HiGlassTrackSpec = {
   name: '',
   view_group: 0,
   options: {},
+};
+
+export interface NGLStructureSpec {
+  file_path: string;
+  file_type: string; // 'auto' = detect from extension
+  representation: string;
+  color_scheme: string; // 'default' = representation default
+  name: string;
+  options: string; // JSON string of extra NGL representation params
+}
+
+const DEFAULT_STRUCTURE_SPEC: NGLStructureSpec = {
+  file_path: '',
+  file_type: 'auto',
+  representation: 'cartoon',
+  color_scheme: 'default',
+  name: '',
+  options: '',
 };
 
 // Define the shape of the data type node data
@@ -177,6 +218,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return '{}';
       case 'higlass-track':
         return { ...DEFAULT_TRACK_SPEC };
+      case 'ngl-structure':
+        return { ...DEFAULT_STRUCTURE_SPEC };
       default:
         return '';
     }
@@ -199,6 +242,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return Braces;
       case 'higlass-track':
         return Dna;
+      case 'ngl-structure':
+        return Boxes;
       default:
         return Type;
     }
@@ -221,6 +266,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return 'bg-pink-500/10 text-pink-700 border-pink-500/20';
       case 'higlass-track':
         return 'bg-teal-500/10 text-teal-700 border-teal-500/20';
+      case 'ngl-structure':
+        return 'bg-rose-500/10 text-rose-700 border-rose-500/20';
       default:
         return 'bg-muted text-muted-foreground border-border';
     }
@@ -243,6 +290,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return 'bg-pink-500/10';
       case 'higlass-track':
         return 'bg-teal-500/10';
+      case 'ngl-structure':
+        return 'bg-rose-500/10';
       default:
         return 'bg-muted';
     }
@@ -265,6 +314,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return 'rgba(236, 72, 153, 0.12)';
       case 'higlass-track':
         return 'rgba(13, 148, 136, 0.12)';
+      case 'ngl-structure':
+        return 'rgba(244, 63, 94, 0.12)';
       default:
         return 'rgba(107, 114, 128, 0.10)';
     }
@@ -438,6 +489,11 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
           sourceCode = `def ${label}():\n    """Returns a HiGlass track spec"""\n    return ${JSON.stringify(spec)}`;
           break;
         }
+        case 'ngl-structure': {
+          const spec = value as NGLStructureSpec;
+          sourceCode = `def ${label}():\n    """Returns an NGL structure spec"""\n    return ${JSON.stringify(spec)}`;
+          break;
+        }
       }
 
       // Prepare node data for saving
@@ -500,6 +556,12 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         if (!spec?.file_path) return '— no file —';
         const base = spec.file_path.split('/').pop() || spec.file_path;
         return `${base} · ${spec.file_type}`;
+      }
+      case 'ngl-structure': {
+        const spec = value as NGLStructureSpec;
+        if (!spec?.file_path) return '— no file —';
+        const base = spec.file_path.split('/').pop() || spec.file_path;
+        return `${base} · ${spec.representation}`;
       }
       default:
         return String(value);
@@ -602,6 +664,109 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
             className="min-h-[72px] font-mono text-sm"
           />
         );
+
+      case 'ngl-structure': {
+        const spec: NGLStructureSpec =
+          value && typeof value === 'object' && !Array.isArray(value)
+            ? { ...DEFAULT_STRUCTURE_SPEC, ...(value as NGLStructureSpec) }
+            : { ...DEFAULT_STRUCTURE_SPEC };
+        const updateSpec = (key: keyof NGLStructureSpec, val: any) => {
+          handleValueChange({ ...spec, [key]: val });
+        };
+        return (
+          <div className="space-y-2.5">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">File Path</Label>
+              <Textarea
+                value={spec.file_path}
+                onChange={(e) => updateSpec('file_path', e.target.value)}
+                onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
+                placeholder="/data/1CKB.pdb"
+                className="min-h-[56px] font-mono text-xs"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">File Type</Label>
+                <Select
+                  value={spec.file_type}
+                  onValueChange={(v) => updateSpec('file_type', v)}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(NGL_FILE_TYPES).map(([ft, label]) => (
+                      <SelectItem key={ft} value={ft} className="text-xs">
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Representation</Label>
+                <Select
+                  value={spec.representation}
+                  onValueChange={(v) => updateSpec('representation', v)}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NGL_REPRESENTATIONS.map((r) => (
+                      <SelectItem key={r} value={r} className="text-xs">
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Color Scheme</Label>
+                <Select
+                  value={spec.color_scheme}
+                  onValueChange={(v) => updateSpec('color_scheme', v)}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NGL_COLOR_SCHEMES.map((c) => (
+                      <SelectItem key={c} value={c} className="text-xs">
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Name (optional)</Label>
+                <Input
+                  type="text"
+                  value={spec.name}
+                  onChange={(e) => updateSpec('name', e.target.value)}
+                  onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
+                  placeholder="Protein A"
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Options (JSON, optional)</Label>
+              <Textarea
+                value={typeof spec.options === 'string' ? spec.options : JSON.stringify(spec.options || {})}
+                onChange={(e) => updateSpec('options', e.target.value)}
+                onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
+                placeholder='{"radiusScale": 0.3, "opacity": 0.8}'
+                className="min-h-[48px] font-mono text-xs"
+              />
+            </div>
+          </div>
+        );
+      }
 
       case 'higlass-track': {
         const spec: HiGlassTrackSpec =
@@ -859,7 +1024,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
               ) : (
                 <span
                   className="text-xs font-mono text-foreground overflow-hidden whitespace-nowrap"
-                  style={['string', 'list', 'dict', 'higlass-track'].includes(nodeData.dataType) ? { direction: 'rtl', textAlign: 'left', unicodeBidi: 'plaintext' } : undefined}
+                  style={['string', 'list', 'dict', 'higlass-track', 'ngl-structure'].includes(nodeData.dataType) ? { direction: 'rtl', textAlign: 'left', unicodeBidi: 'plaintext' } : undefined}
                 >
                   {getValuePreview()}
                 </span>
@@ -872,7 +1037,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         {!isCollapsed && (
           <div className="p-3">
             <Label className="text-xs text-muted-foreground mb-1.5 block">
-              {nodeData.dataType === 'higlass-track' ? 'Track Config' : 'Value'}
+              {nodeData.dataType === 'higlass-track' ? 'Track Config' : nodeData.dataType === 'ngl-structure' ? 'Structure Config' : 'Value'}
             </Label>
             {renderInput()}
           </div>
