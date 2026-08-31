@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal, RefreshCw, Cpu, Check, WifiOff } from 'lucide-react'
+import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal, RefreshCw, Cpu, Check, WifiOff, Download, Boxes } from 'lucide-react'
 import ChatFeaturesDialog from './ChatFeaturesDialog'
 import { useChatStore } from './components/chatStore'
 import {
@@ -849,17 +849,19 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                   )}
 
                   {!ollamaAvailable && !zaiAvailable && !modelsLoading && (
-                    <div className="flex flex-col items-center justify-center gap-4 py-10 px-6 text-center">
-                      <div className="rounded-full bg-destructive/10 p-3">
-                        <WifiOff className="size-6 text-destructive" />
+                    <div className="flex flex-col items-center justify-center gap-3 py-12 px-6 text-center">
+                      <div className="rounded-xl border border-border/60 bg-muted/40 p-3">
+                        <Boxes className="size-6 text-muted-foreground" />
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">No models available</p>
+                      <div className="space-y-1.5">
+                        <p className="text-sm font-semibold">No models available</p>
                         <p className="text-xs text-muted-foreground leading-relaxed max-w-[280px]">
-                          Install Ollama to use local LLMs, or configure Z.ai API key in backend .env.
+                          Install Ollama for local LLMs, or configure a Z.ai API key in your backend{' '}
+                          <code className="font-mono text-[11px] px-1 py-0.5 rounded bg-muted border border-border/40">.env</code>{' '}
+                          file.
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 pt-1">
                         <a
                           href="https://ollama.com/"
                           target="_blank"
@@ -870,7 +872,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                             variant="default"
                             className="h-8 text-xs gap-1.5"
                           >
-                            Download Ollama
+                            <Download size={13} /> Download Ollama
                           </Button>
                         </a>
                         <Button

@@ -68,7 +68,7 @@ const components: Partial<Components> = {
   },
   p: ({ children }) => {
     return (
-      <p className="leading-normal my-0 break-words text-sm font-source-sans">
+      <p className="leading-normal my-0 break-words text-sm font-sans">
         {children}
       </p>
     );
@@ -103,7 +103,7 @@ const components: Partial<Components> = {
   },
   li: ({ children, ...props }) => {
     return (
-      <li className="py-0.5 break-words text-sm leading-normal font-source-sans" {...(props as any)}>
+      <li className="py-0.5 break-words text-sm leading-normal font-sans" {...(props as any)}>
         {children}
       </li>
     );
@@ -117,7 +117,7 @@ const components: Partial<Components> = {
   },
   strong: ({ children, ...props }) => {
     return (
-      <span className="font-semibold font-source-sans" {...(props as any)}>
+      <span className="font-semibold font-sans" {...(props as any)}>
         {children}
       </span>
     );
@@ -125,7 +125,7 @@ const components: Partial<Components> = {
   a: ({ children, ...props }) => {
     return (
       <a
-        className="text-blue-600 dark:text-blue-400 hover:underline inline-flex gap-1 items-center text-sm font-medium font-source-sans"
+        className="text-blue-600 dark:text-blue-400 hover:underline inline-flex gap-1 items-center text-sm font-medium font-sans"
         target="_blank"
         rel="noopener noreferrer"
         {...(props as any)}

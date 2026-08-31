@@ -120,7 +120,7 @@ function UserMessage({ message, isLast, onEdit, onDelete }: UserMessageProps) {
         {isLongText && !expanded && (
           <div className="absolute pointer-events-none bg-gradient-to-t from-accent to-transparent w-full h-16 bottom-0 left-0" />
         )}
-        <p className="whitespace-pre-wrap text-sm break-words font-source-sans">{displayText}</p>
+        <p className="whitespace-pre-wrap text-sm break-words font-sans">{displayText}</p>
         {isLongText && (
           <Button
             variant="ghost"

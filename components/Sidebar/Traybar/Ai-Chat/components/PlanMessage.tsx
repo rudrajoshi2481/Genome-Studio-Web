@@ -19,7 +19,7 @@ function PlanMessage({ message }: PlanMessageProps) {
         <div className="flex flex-col min-w-0 gap-0.5">
           <span className="text-sm font-medium leading-tight">{plan.title}</span>
           {plan.description && (
-            <span className="text-sm text-muted-foreground leading-tight font-source-sans">{plan.description}</span>
+            <span className="text-sm text-muted-foreground leading-tight font-sans">{plan.description}</span>
           )}
         </div>
       </div>

@@ -58,7 +58,7 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
                   <div
                     key={`${step.id}-${lineIdx}`}
                     className={cn(
-                      "text-xs text-muted-foreground/80 leading-relaxed font-source-sans",
+                      "text-xs text-muted-foreground/80 leading-relaxed font-sans",
                     )}
                   >
                     <span>{line}</span>
@@ -71,7 +71,7 @@ function ReasoningMessage({ message }: ReasoningMessageProps) {
             textSteps.map((step, idx) => (
               <div
                 key={`reasoning-${idx}`}
-                className="text-xs text-muted-foreground/80 leading-relaxed font-source-sans"
+                className="text-xs text-muted-foreground/80 leading-relaxed font-sans"
               >
                 <span>{step}</span>
               </div>

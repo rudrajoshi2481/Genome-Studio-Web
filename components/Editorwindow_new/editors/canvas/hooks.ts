@@ -21,6 +21,16 @@ const getDefaultValueForType = (dataType: string): any => {
       return '[]';
     case 'dict':
       return '{}';
+    case 'higlass-track':
+      return {
+        file_path: '',
+        file_type: 'cooler',
+        track_type: 'auto',
+        position: 'center',
+        name: '',
+        view_group: 0,
+        options: {},
+      };
     default:
       return '';
   }
@@ -159,8 +169,8 @@ export const useCanvasHandlers = (
       let newNode;
       if (nodeData.type === 'dataType' || nodeData.node_type === 'dataTypeNode') {
         // Extract data type from tags if it's a saved node
-        const dataType = nodeData.dataType || (nodeData.tags && nodeData.tags.find((tag: string) => 
-          ['string', 'int', 'float', 'bool', 'list', 'dict'].includes(tag)
+        const dataType = nodeData.dataType || (nodeData.tags && nodeData.tags.find((tag: string) =>
+          ['string', 'int', 'float', 'bool', 'list', 'dict', 'higlass-track'].includes(tag)
         )) || 'string';
         
         // Create a data type node

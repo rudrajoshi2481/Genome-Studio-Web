@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
-import { RefreshCcw, Search, Star, X, Filter, ChevronDown, ChevronUp, ArrowDownUp, Plus, Settings, Type, Hash, ToggleLeft, List as ListIcon, Braces, Workflow } from 'lucide-react'
+import { RefreshCcw, Search, Star, X, Filter, ChevronDown, ChevronUp, ArrowDownUp, Plus, Settings, Type, Hash, ToggleLeft, List as ListIcon, Braces, Workflow, Dna, Layers } from 'lucide-react'
 import CustomNode from './CustomNode/CustomNode'
 import CustomizeDialog from './CustomNode/CustomizeDialog'
 import NodeCard from './NodeCard'
@@ -35,6 +35,177 @@ type SortOption = 'name' | 'date' | 'favorites'
 
 const NODES_PER_PAGE = 30
 
+// Built-in Genome Browser renderer node — composes Track nodes into a HiGlass view.
+// Registers each sample file with the backend tile server and builds tracks that
+// point directly at it (no 'jupyter' pseudo-server indirection).
+const GENOME_BROWSER_SOURCE = `import higlass as hg
+import json
+import os
+import sys
+import traceback
+import urllib.request
+import urllib.parse
+from functools import reduce
+
+# Resolve backend tile server URL (supports dynamic port via SERVER__PORT=0)
+_port = os.environ.get('SERVER__PORT', '8000')
+if _port == '0':
+    try:
+        with open(os.path.join(os.path.expanduser('~'), '.bioinformatics-studio-port')) as _pf:
+            _port = _pf.read().strip()
+    except Exception:
+        _port = '8000'
+TILE_SERVER = 'http://127.0.0.1:' + _port + '/api/v1/higlass'
+
+TRACK_TYPES = {
+    'cooler':     ['heatmap', 'horizontal-heatmap', 'vertical-heatmap', '1d-heatmap'],
+    'bigwig':     ['line', 'bar', 'horizontal-line', 'horizontal-bar', '1d-heatmap'],
+    'bed':        ['bedlike', 'bar', 'horizontal-bar'],
+    'bed2d':      ['2d-rectangle-domains', 'horizontal-2d-rectangle-domains', 'vertical-2d-rectangle-domains'],
+    'vcf':        ['bedlike'],
+    'gff':        ['gene-annotations', 'horizontal-gene-annotations'],
+    'chromsizes': ['chromosome-labels', 'horizontal-chromosome-labels', 'vertical-chromosome-labels'],
+    'hitile':     ['line', 'bar', 'horizontal-line', 'horizontal-bar'],
+    'multivec':   ['heatmap', 'horizontal-multivec', 'vertical-multivec'],
+}
+
+EXT_MAP = [
+    ('.mcool', 'cooler'), ('.cool', 'cooler'),
+    ('.bigwig', 'bigwig'), ('.bw', 'bigwig'),
+    ('.bed.gz', 'bed'), ('.bed', 'bed'),
+    ('.bed2d.gz', 'bed2d'), ('.bed2d', 'bed2d'), ('.bedpe', 'bed2d'),
+    ('.vcf.gz', 'vcf'), ('.vcf', 'vcf'),
+    ('.gff.gz', 'gff'), ('.gff', 'gff'), ('.gtf.gz', 'gff'), ('.gtf', 'gff'),
+    ('.chromsizes', 'chromsizes'), ('.chrom.sizes', 'chromsizes'), ('.sizes', 'chromsizes'),
+    ('.hitile', 'hitile'),
+    ('.multivec', 'multivec'), ('.mv5', 'multivec'),
+]
+
+def _detect_file_type(fp):
+    low = str(fp).lower()
+    for ext, ft in EXT_MAP:
+        if low.endswith(ext):
+            return ft
+    raise ValueError("Cannot detect file type from extension: " + str(fp))
+
+def _register_tileset(fp):
+    fp = os.path.abspath(str(fp))
+    url = TILE_SERVER + '/register?filepath=' + urllib.parse.quote(fp)
+    req = urllib.request.Request(url, method='POST')
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read())['uid']
+
+def _default_track_type(file_type, position):
+    """Pick a default track type valid for the target position.
+    top/bottom take horizontal (or plain 1D) types, left/right take
+    vertical types, center/whole take 2D types."""
+    tracks = TRACK_TYPES[file_type]
+    if position in ('left', 'right'):
+        for t in tracks:
+            if t.startswith('vertical-'):
+                return t
+    elif position in ('top', 'bottom'):
+        for t in tracks:
+            if t.startswith('vertical-'):
+                continue
+            if t.startswith('horizontal-') or t in ('line', 'bar', 'bedlike', '1d-heatmap',
+                                                    'gene-annotations', 'chromosome-labels'):
+                return t
+    else:
+        for t in tracks:
+            if not t.startswith(('horizontal-', 'vertical-')):
+                return t
+    return tracks[0]
+
+@node()
+def genome_browser(samples, layout='horizontal', sync=True, initial_domain=None):
+    """Compose a HiGlass genome browser from connected Track nodes.
+
+    Each sample is a dict: {file_path, file_type, track_type, position,
+    name, view_group, options}. Samples sharing a view_group go into the
+    same view; different groups become separate synchronized views (small
+    multiples, e.g. for comparing multiple contact matrices).
+    """
+    if samples is None:
+        raise ValueError("No Track nodes connected. Connect one or more Track nodes to the samples input.")
+    if isinstance(samples, str):
+        samples = json.loads(samples)
+    if isinstance(samples, dict):
+        samples = [samples]
+    flat = []
+    for s in samples:
+        if isinstance(s, list):
+            flat.extend(s)
+        elif s:
+            flat.append(s)
+    samples = flat
+    if not samples:
+        raise ValueError("No valid samples provided.")
+
+    groups = {}
+    errors = []
+    for i, s in enumerate(samples):
+        if not isinstance(s, dict) or not s.get('file_path'):
+            errors.append("Sample #" + str(i + 1) + ": missing file_path")
+            continue
+        try:
+            ft = s.get('file_type') or _detect_file_type(s['file_path'])
+        except ValueError as e:
+            errors.append("Sample #" + str(i + 1) + ": " + str(e))
+            continue
+        if ft not in TRACK_TYPES:
+            errors.append("Sample #" + str(i + 1) + ": unsupported file_type '" + str(ft) + "'")
+            continue
+        s = dict(s)
+        s['file_type'] = ft
+        groups.setdefault(int(s.get('view_group') or 0), []).append(s)
+
+    if not groups:
+        raise RuntimeError("All samples failed validation:\\n" + "\\n".join(errors))
+
+    views = []
+    for gid in sorted(groups):
+        track_pairs = []
+        for s in groups[gid]:
+            try:
+                uid = _register_tileset(s['file_path'])
+                tt = s.get('track_type')
+                if tt in (None, '', 'auto'):
+                    tt = _default_track_type(s['file_type'], s.get('position', 'center'))
+                track = hg.track(tt, server=TILE_SERVER, tilesetUid=uid)
+                if s.get('name'):
+                    track = track.opts(name=s['name'])
+                opts = s.get('options') or {}
+                if opts:
+                    track = track.opts(**opts)
+                track_pairs.append((track, s.get('position', 'center')))
+            except Exception as e:
+                errors.append(str(s.get('file_path')) + ": " + str(e))
+                traceback.print_exc()
+        if track_pairs:
+            view_kwargs = {}
+            if initial_domain:
+                view_kwargs['initialXDomain'] = initial_domain
+            views.append(hg.view(*track_pairs, **view_kwargs))
+
+    if not views:
+        raise RuntimeError("No valid tracks to display:\\n" + "\\n".join(errors))
+
+    if len(views) == 1:
+        result = views[0].viewconf()
+    else:
+        concat_fn = hg.vconcat if layout == 'vertical' else hg.hconcat
+        result = reduce(concat_fn, views)
+        if sync:
+            result = result.locks(hg.lock(*views))
+
+    if errors:
+        print("WARNING: " + str(len(errors)) + " sample(s) skipped:\\n" + "\\n".join(errors), file=sys.stderr)
+
+    display(result)
+    return result
+`;
+
 
 function Nodebar() {
   const [customNodes, setCustomNodes] = useState<CustomNodeType[]>([])
@@ -58,6 +229,7 @@ function Nodebar() {
   const [visibleCount, setVisibleCount] = useState(NODES_PER_PAGE)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isDataTypesOpen, setIsDataTypesOpen] = useState(true)
+  const [isGenomicsOpen, setIsGenomicsOpen] = useState(true)
 
   // Ensure component only renders on client after hydration
   useEffect(() => {
@@ -152,15 +324,15 @@ function Nodebar() {
     try {
       const duplicatedNode = await duplicateCustomNode(token, nodeId)
       console.log('Duplicate node response:', duplicatedNode)
-      
-      toast.dismiss(loadingToast)
+
+      // toast.dismiss(loadingToast)
       // toast.success('Node duplicated successfully')
-      
+
       // Refresh the node list to show the new duplicate
       loadCustomNodes()
     } catch (error: any) {
       console.error('Failed to duplicate node:', error)
-      toast.dismiss(loadingToast)
+      // toast.dismiss(loadingToast)
       
       let errorMessage = 'Failed to duplicate node'
       if (error?.message) {
@@ -685,6 +857,83 @@ function Nodebar() {
                 <div className="flex items-center gap-1.5">
                   <Braces className="h-3.5 w-3.5 text-pink-700 shrink-0" />
                   <span className="text-xs font-medium text-pink-700">Dict</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Genomics Nodes Section - HiGlass Track + Genome Browser Renderer */}
+      <Collapsible open={isGenomicsOpen} onOpenChange={setIsGenomicsOpen} className="border-b border-gray-200 bg-gray-50">
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="w-full justify-between px-3 py-2 h-auto hover:bg-accent/50 rounded-none"
+          >
+            <h4 className="text-xs font-semibold text-gray-600">GENOMICS</h4>
+            {isGenomicsOpen ? (
+              <ChevronUp className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="p-2 pt-0">
+            <div className="grid grid-cols-2 gap-2">
+              {/* HiGlass Track Node (dataType — zero execution, config form on canvas) */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    type: 'dataType',
+                    dataType: 'higlass-track',
+                    label: 'Track'
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 border rounded cursor-move hover:shadow-md transition-all bg-teal-500/10 border-teal-500/20 hover:border-teal-500/40"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(13, 148, 136, 0.08) 6px, rgba(13, 148, 136, 0.08) 12px)',
+                }}
+                title="HiGlass track config: file path, file type, track type, position. Connect to Genome Browser."
+              >
+                <div className="flex items-center gap-1.5">
+                  <Dna className="h-3.5 w-3.5 text-teal-700 shrink-0" />
+                  <span className="text-xs font-medium text-teal-700">Track</span>
+                </div>
+              </div>
+
+              {/* Genome Browser Renderer Node (customNode — composes all connected Tracks) */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', JSON.stringify({
+                    title: 'Genome Browser',
+                    description: 'HiGlass renderer: composes all connected Track nodes (file path, file type, track type, position) into one genome browser view. Samples sharing a view group go in the same view; different groups become synchronized views.',
+                    language: 'python',
+                    function_name: 'genome_browser',
+                    source_code: GENOME_BROWSER_SOURCE,
+                    inputs: [
+                      { id: 'input_0', name: 'samples', type: 'any', description: 'Track node(s) — file path, file type, track type, position' }
+                    ],
+                    outputs: [
+                      { id: 'output_0', name: 'view', type: 'any', description: 'HiGlass viewconf' }
+                    ],
+                    tags: ['higlass', 'renderer', 'genomics'],
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="p-2 border rounded cursor-move hover:shadow-md transition-all bg-indigo-500/10 border-indigo-500/20 hover:border-indigo-500/40"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(99, 102, 241, 0.08) 6px, rgba(99, 102, 241, 0.08) 12px)',
+                }}
+                title="Composes all connected Track nodes into a HiGlass genome browser (multiple samples, multiple views)"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5 text-indigo-700 shrink-0" />
+                  <span className="text-xs font-medium text-indigo-700">Genome Browser</span>
                 </div>
               </div>
             </div>

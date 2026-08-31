@@ -115,10 +115,10 @@ export function PonderingIndicator({
 
   return (
     <div className={cn("flex items-center gap-1.5 ml-3", className)}>
-      <span className={cn("text-sm text-muted-foreground/50 font-source-sans")}>
+      <span className={cn("text-sm text-muted-foreground/50 font-sans")}>
         {displayVerb}
       </span>
-      <span className="inline-flex gap-0.5 text-muted-foreground/30 font-source-sans" style={{ fontSize: "1rem", lineHeight: 1 }}>
+      <span className="inline-flex gap-0.5 text-muted-foreground/30 font-sans" style={{ fontSize: "1rem", lineHeight: 1 }}>
         {[0, 1, 2].map((i) => (
           <span
             key={i}
@@ -144,7 +144,7 @@ export function ThinkingBadge({ durationSeconds, className }: ThinkingBadgeProps
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 text-sm italic text-muted-foreground/70 font-source-sans",
+          "inline-flex items-center gap-1 text-sm italic text-muted-foreground/70 font-sans",
           className
         )}
       >
@@ -157,7 +157,7 @@ export function ThinkingBadge({ durationSeconds, className }: ThinkingBadgeProps
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 text-sm italic text-muted-foreground/50 font-source-sans",
+        "inline-flex items-center gap-1 text-sm italic text-muted-foreground/50 font-sans",
         className
       )}
     >

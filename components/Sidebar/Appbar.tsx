@@ -48,8 +48,9 @@ function Appbar() {
 
   return (
     <div className="p-1  border-b flex justify-between items-center relative">
-      <div className='ml-2'>
-        <span className="font-serif text-sm">Bioinformatics Studio<span className="text-xs text-muted-foreground ml-1">v1.0.0</span></span>
+      <div className='ml-2 flex items-baseline whitespace-nowrap overflow-hidden'>
+        <span className="font-serif text-sm truncate max-w-[340px]">Bioinformatics Studio</span>
+        <span className="text-xs text-muted-foreground ml-1 shrink-0">v1.0.0</span>
       </div>
       
       {/* Command Palette Shortcut Indicator */}

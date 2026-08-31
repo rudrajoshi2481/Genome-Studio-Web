@@ -369,7 +369,7 @@ function AIChat({ onClose }: { onClose?: () => void }) {
         return <AIMessage key={message.id} message={message} isLast={isLast} isLoading={isLoadingConvs} onRegenerate={handleRegenerate} onDelete={handleDeleteMessage} />;
       case 'system':
         return (
-          <div key={message.id} className="text-sm text-muted-foreground text-center py-2 whitespace-pre-wrap font-source-sans">
+          <div key={message.id} className="text-sm text-muted-foreground text-center py-2 whitespace-pre-wrap font-sans">
             {message.content}
           </div>
         );

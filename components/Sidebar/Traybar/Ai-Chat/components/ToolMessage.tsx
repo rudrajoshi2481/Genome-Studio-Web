@@ -132,7 +132,7 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
   return (
     <div className="px-1 mt-1 mb-1 py-0 group/tool">
       {explanation && (
-        <p className="text-sm text-foreground mb-1 leading-relaxed font-source-sans">{explanation}</p>
+        <p className="text-sm text-foreground mb-1 leading-relaxed font-sans">{explanation}</p>
       )}
       <Tool defaultOpen={needsApproval}>
         <ToolHeader

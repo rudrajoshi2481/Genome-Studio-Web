@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Pencil, Focus, Trash2, Copy, Save, Code, Type, Hash, Braces, ToggleLeft, List as ListIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { Pencil, Focus, Trash2, Copy, Save, Code, Type, Hash, Braces, ToggleLeft, List as ListIcon, ChevronDown, ChevronRight, Dna } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import {
   ContextMenu,
@@ -17,12 +17,54 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from 'sonner';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { createCustomNode } from '@/lib/services/custom-node-service';
 
 // Define data types
-export type DataType = 'string' | 'int' | 'float' | 'bool' | 'list' | 'dict';
+export type DataType = 'string' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'higlass-track';
+
+// HiGlass track config: file types → valid track types + default
+export const HIGLASS_FILE_TYPES: Record<string, { label: string; tracks: string[] }> = {
+  cooler:     { label: 'Cooler (.mcool/.cool)',     tracks: ['heatmap', 'horizontal-heatmap', 'vertical-heatmap', '1d-heatmap'] },
+  bigwig:     { label: 'BigWig (.bw/.bigwig)',      tracks: ['line', 'bar', 'horizontal-line', 'horizontal-bar', '1d-heatmap'] },
+  bed:        { label: 'BED (.bed)',                tracks: ['bedlike', 'bar', 'horizontal-bar'] },
+  bed2d:      { label: 'BEDPE (.bedpe/.bed2d)',     tracks: ['2d-rectangle-domains', 'horizontal-2d-rectangle-domains', 'vertical-2d-rectangle-domains'] },
+  vcf:        { label: 'VCF (.vcf/.vcf.gz)',        tracks: ['bedlike'] },
+  gff:        { label: 'GFF/GTF (.gff/.gtf)',       tracks: ['gene-annotations', 'horizontal-gene-annotations'] },
+  chromsizes: { label: 'Chrom sizes (.sizes)',      tracks: ['chromosome-labels', 'horizontal-chromosome-labels', 'vertical-chromosome-labels'] },
+  hitile:     { label: 'Hitile (.hitile)',          tracks: ['line', 'bar', 'horizontal-line', 'horizontal-bar'] },
+  multivec:   { label: 'Multivec (.multivec/.mv5)', tracks: ['heatmap', 'horizontal-multivec', 'vertical-multivec'] },
+};
+
+export const HIGLASS_POSITIONS = ['center', 'top', 'bottom', 'left', 'right', 'whole', 'gallery'];
+
+export interface HiGlassTrackSpec {
+  file_path: string;
+  file_type: string;
+  track_type: string; // 'auto' = use default for file type
+  position: string;
+  name: string;
+  view_group: number;
+  options: Record<string, unknown>;
+}
+
+const DEFAULT_TRACK_SPEC: HiGlassTrackSpec = {
+  file_path: '',
+  file_type: 'cooler',
+  track_type: 'auto',
+  position: 'center',
+  name: '',
+  view_group: 0,
+  options: {},
+};
 
 // Define the shape of the data type node data
 export interface DataTypeNodeData extends Record<string, any> {
@@ -133,6 +175,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return '[]';
       case 'dict':
         return '{}';
+      case 'higlass-track':
+        return { ...DEFAULT_TRACK_SPEC };
       default:
         return '';
     }
@@ -153,6 +197,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return ListIcon;
       case 'dict':
         return Braces;
+      case 'higlass-track':
+        return Dna;
       default:
         return Type;
     }
@@ -173,6 +219,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return 'bg-orange-500/10 text-orange-700 border-orange-500/20';
       case 'dict':
         return 'bg-pink-500/10 text-pink-700 border-pink-500/20';
+      case 'higlass-track':
+        return 'bg-teal-500/10 text-teal-700 border-teal-500/20';
       default:
         return 'bg-muted text-muted-foreground border-border';
     }
@@ -193,6 +241,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return 'bg-orange-500/10';
       case 'dict':
         return 'bg-pink-500/10';
+      case 'higlass-track':
+        return 'bg-teal-500/10';
       default:
         return 'bg-muted';
     }
@@ -213,6 +263,8 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         return 'rgba(249, 115, 22, 0.12)';
       case 'dict':
         return 'rgba(236, 72, 153, 0.12)';
+      case 'higlass-track':
+        return 'rgba(13, 148, 136, 0.12)';
       default:
         return 'rgba(107, 114, 128, 0.10)';
     }
@@ -330,6 +382,9 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
     }
     
     // Create a duplicate node with offset position
+    // NOTE: labels become Python variable names in generated scripts, so the
+    // copy label must be a valid identifier (not "Name (Copy)")
+    const copyLabel = `${label}_copy`.replace(/\W/g, '_').replace(/^(\d)/, '_$1');
     const duplicateNode = {
       ...currentNode,
       id: duplicateId,
@@ -339,7 +394,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
       },
       data: {
         ...currentNode.data,
-        label: `${label} (Copy)`,
+        label: copyLabel,
       },
       selected: false,
     };
@@ -378,6 +433,11 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         case 'dict':
           sourceCode = `def ${label}():\n    """Returns a dictionary value"""\n    return ${value}`;
           break;
+        case 'higlass-track': {
+          const spec = value as HiGlassTrackSpec;
+          sourceCode = `def ${label}():\n    """Returns a HiGlass track spec"""\n    return ${JSON.stringify(spec)}`;
+          break;
+        }
       }
 
       // Prepare node data for saving
@@ -435,6 +495,12 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
       case 'list':
       case 'dict':
         return value.length > 40 ? `…${value.slice(-40)}` : value || '—';
+      case 'higlass-track': {
+        const spec = value as HiGlassTrackSpec;
+        if (!spec?.file_path) return '— no file —';
+        const base = spec.file_path.split('/').pop() || spec.file_path;
+        return `${base} · ${spec.file_type}`;
+      }
       default:
         return String(value);
     }
@@ -536,7 +602,124 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
             className="min-h-[72px] font-mono text-sm"
           />
         );
-      
+
+      case 'higlass-track': {
+        const spec: HiGlassTrackSpec =
+          value && typeof value === 'object' && !Array.isArray(value)
+            ? { ...DEFAULT_TRACK_SPEC, ...(value as HiGlassTrackSpec) }
+            : { ...DEFAULT_TRACK_SPEC };
+        const updateSpec = (key: keyof HiGlassTrackSpec, val: any) => {
+          handleValueChange({ ...spec, [key]: val });
+        };
+        const fileTypeMeta = HIGLASS_FILE_TYPES[spec.file_type] || HIGLASS_FILE_TYPES.cooler;
+        const availableTracks = fileTypeMeta.tracks;
+        const selectedTrackValid = spec.track_type !== 'auto' && availableTracks.includes(spec.track_type);
+        return (
+          <div className="space-y-2.5">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">File Path</Label>
+              <Textarea
+                value={spec.file_path}
+                onChange={(e) => updateSpec('file_path', e.target.value)}
+                onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
+                placeholder="/data/sample.mcool"
+                className="min-h-[56px] font-mono text-xs"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">File Type</Label>
+                <Select
+                  value={spec.file_type}
+                  onValueChange={(v) => {
+                    const meta = HIGLASS_FILE_TYPES[v] || HIGLASS_FILE_TYPES.cooler;
+                    // Reset track type if it's not valid for the new file type
+                    const newTrackType = spec.track_type !== 'auto' && meta.tracks.includes(spec.track_type)
+                      ? spec.track_type
+                      : 'auto';
+                    handleValueChange({ ...spec, file_type: v, track_type: newTrackType });
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(HIGLASS_FILE_TYPES).map(([ft, meta]) => (
+                      <SelectItem key={ft} value={ft} className="text-xs">
+                        {meta.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Position</Label>
+                <Select
+                  value={spec.position}
+                  onValueChange={(v) => updateSpec('position', v)}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HIGLASS_POSITIONS.map((p) => (
+                      <SelectItem key={p} value={p} className="text-xs">
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Track Type</Label>
+              <Select
+                value={selectedTrackValid ? spec.track_type : 'auto'}
+                onValueChange={(v) => updateSpec('track_type', v)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto" className="text-xs">
+                    Auto ({availableTracks[0]})
+                  </SelectItem>
+                  {availableTracks.map((t) => (
+                    <SelectItem key={t} value={t} className="text-xs">
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Name (optional)</Label>
+                <Input
+                  type="text"
+                  value={spec.name}
+                  onChange={(e) => updateSpec('name', e.target.value)}
+                  onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
+                  placeholder="Sample 1"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">View Group</Label>
+                <Input
+                  type="number"
+                  value={String(spec.view_group)}
+                  onChange={(e) => updateSpec('view_group', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                  onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }}
+                  className="h-8 text-xs"
+                  step="1"
+                />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       default:
         return (
           <Input
@@ -676,7 +859,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
               ) : (
                 <span
                   className="text-xs font-mono text-foreground overflow-hidden whitespace-nowrap"
-                  style={['string', 'list', 'dict'].includes(nodeData.dataType) ? { direction: 'rtl', textAlign: 'left', unicodeBidi: 'plaintext' } : undefined}
+                  style={['string', 'list', 'dict', 'higlass-track'].includes(nodeData.dataType) ? { direction: 'rtl', textAlign: 'left', unicodeBidi: 'plaintext' } : undefined}
                 >
                   {getValuePreview()}
                 </span>
@@ -689,7 +872,7 @@ export const DataTypeNode = ({ id, data, selected }: DataTypeNodeProps) => {
         {!isCollapsed && (
           <div className="p-3">
             <Label className="text-xs text-muted-foreground mb-1.5 block">
-              Value
+              {nodeData.dataType === 'higlass-track' ? 'Track Config' : 'Value'}
             </Label>
             {renderInput()}
           </div>
