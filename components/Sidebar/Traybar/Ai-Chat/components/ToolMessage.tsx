@@ -131,58 +131,77 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
   // --- Generic tool rendering using ai-elements Tool ---
   return (
     <div className="px-1 mt-1 mb-1 py-0 group/tool">
-      {explanation && (
-        <p className="text-sm text-foreground mb-1 leading-relaxed font-sans">{explanation}</p>
-      )}
-      <Tool defaultOpen={needsApproval}>
-        <ToolHeader
-          title={headerTitle}
-          command={headerCommand}
-          filePath={filePath || undefined}
-          type="dynamic-tool"
-          state={toolState as any}
-          toolName={toolName}
-          actions={isRunning && onStopCommand ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                onStopCommand(message.metadata?.toolMessageId || message.id);
-              }}
-              title="Stop command"
-            >
-              <Square className="size-2.5" />
-            </Button>
-          ) : undefined}
-        />
-        <ToolContent className="space-y-2">
-          {Object.keys(toolArgs).length > 0 && (
-            <ToolInput input={toolArgs} />
+      {needsApproval && explanation ? (
+        // When awaiting approval, show the explanation as the primary content
+        // instead of raw tool args JSON
+        <div className="rounded-lg border border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/10 p-3 space-y-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+            <ShieldCheck className="size-3" />
+            <span>Permission required: {toolName}</span>
+          </div>
+          <p className="text-sm text-foreground leading-relaxed">{explanation}</p>
+          {(command || filePath) && (
+            <code className="block text-[10px] font-mono text-muted-foreground bg-muted/40 rounded px-2 py-1 truncate">
+              {command || filePath}
+            </code>
           )}
-          {rawOutput && (
-            <ToolOutput
-              output={rawOutput}
-              errorText={hasError || undefined}
+        </div>
+      ) : (
+        <>
+          {explanation && (
+            <p className="text-sm text-foreground mb-1 leading-relaxed font-sans">{explanation}</p>
+          )}
+          <Tool defaultOpen={needsApproval}>
+            <ToolHeader
+              title={headerTitle}
+              command={headerCommand}
+              filePath={filePath || undefined}
+              type="dynamic-tool"
+              state={toolState as any}
+              toolName={toolName}
+              actions={isRunning && onStopCommand ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStopCommand(message.metadata?.toolMessageId || message.id);
+                  }}
+                  title="Stop command"
+                >
+                  <Square className="size-2.5" />
+                </Button>
+              ) : undefined}
             />
-          )}
-          {searchResults.length > 0 && (
-            <Sources>
-              <SourcesTrigger count={searchResults.length} />
-              <SourcesContent>
-                {searchResults.map((source, idx) => (
-                  <Source
-                    key={`${source.href}-${idx}`}
-                    href={source.href}
-                    title={source.title}
-                  />
-                ))}
-              </SourcesContent>
-            </Sources>
-          )}
-        </ToolContent>
-      </Tool>
+            <ToolContent className="space-y-2">
+              {Object.keys(toolArgs).length > 0 && (
+                <ToolInput input={toolArgs} />
+              )}
+              {rawOutput && (
+                <ToolOutput
+                  output={rawOutput}
+                  errorText={hasError || undefined}
+                />
+              )}
+              {searchResults.length > 0 && (
+                <Sources>
+                  <SourcesTrigger count={searchResults.length} />
+                  <SourcesContent>
+                    {searchResults.map((source, idx) => (
+                      <Source
+                        key={`${source.href}-${idx}`}
+                        href={source.href}
+                        title={source.title}
+                      />
+                    ))}
+                  </SourcesContent>
+                </Sources>
+              )}
+            </ToolContent>
+          </Tool>
+        </>
+      )}
       {needsApproval && (
         <ApprovalButtons messageId={message.id} onApprove={onApprove} onReject={onReject} />
       )}
@@ -195,13 +214,18 @@ function ApprovalButtons({ messageId, onApprove, onReject }: {
   onApprove?: (id: string, approvalMode?: 'once' | 'always' | 'lytic') => void;
   onReject?: (id: string) => void;
 }) {
+  const [responded, setResponded] = useState(false);
+
+  // Hide the buttons immediately after the user clicks — don't wait for backend round-trip
+  if (responded) return null;
+
   return (
     <div className="flex items-center gap-1.5 pt-1.5">
       <Button
         size="sm"
         variant="outline"
         className="h-6 text-xs gap-1"
-        onClick={() => onReject?.(messageId)}
+        onClick={() => { setResponded(true); onReject?.(messageId); }}
       >
         <X className="size-2.5" />
         Decline
@@ -210,7 +234,7 @@ function ApprovalButtons({ messageId, onApprove, onReject }: {
         <Button
           size="sm"
           className="h-6 text-xs gap-1 rounded-r-none"
-          onClick={() => onApprove?.(messageId, 'once')}
+          onClick={() => { setResponded(true); onApprove?.(messageId, 'once'); }}
         >
           <Check className="size-2.5" />
           Accept
@@ -227,14 +251,14 @@ function ApprovalButtons({ messageId, onApprove, onReject }: {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => onApprove?.(messageId, 'once')}>
+              <DropdownMenuItem onClick={() => { setResponded(true); onApprove?.(messageId, 'once'); }}>
                 <CheckCircle2 className="size-3.5" />
                 <div className="flex flex-col">
                   <span className="font-medium">Just once</span>
                   <span className="text-[10px] text-muted-foreground">Ask again next time</span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onApprove?.(messageId, 'always')}>
+              <DropdownMenuItem onClick={() => { setResponded(true); onApprove?.(messageId, 'always'); }}>
                 <ShieldCheck className="size-3.5" />
                 <div className="flex flex-col">
                   <span className="font-medium">Always allow</span>
@@ -244,7 +268,7 @@ function ApprovalButtons({ messageId, onApprove, onReject }: {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => onApprove?.(messageId, 'lytic')}>
+              <DropdownMenuItem onClick={() => { setResponded(true); onApprove?.(messageId, 'lytic'); }}>
                 <Zap className="size-3.5" />
                 <div className="flex flex-col">
                   <span className="font-medium">Lytic mode</span>

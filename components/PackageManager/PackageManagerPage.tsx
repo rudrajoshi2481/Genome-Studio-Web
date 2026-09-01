@@ -51,6 +51,12 @@ function PackageManagerPage({ onRegisterNewProjectOpener }: { onRegisterNewProje
         onCreated={handlePackageCreated}
       />
 
+      {/* Header — Genome Studio title + version, centered */}
+      <div className="flex-shrink-0 border-b px-4 py-2.5 flex items-center justify-center bg-muted/20">
+        <span className="text-sm font-semibold tracking-tight">Bioinformatics Studio</span>
+        <span className="ml-2 text-[10px] font-medium text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 tabular-nums">v0.1.0</span>
+      </div>
+
       {/* Tabs */}
       <div className="flex-1 min-h-0 flex flex-col">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col gap-0">

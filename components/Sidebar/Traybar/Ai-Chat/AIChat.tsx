@@ -23,7 +23,7 @@ import {
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation';
 import { ShieldCheck } from 'lucide-react';
-import { PonderingIndicator, SpinnerMode } from './components/PonderingIndicator';
+
 import QueuePanel from './components/QueuePanel';
 import HistoryPanel from './components/HistoryPanel';
 import FileApprovalPanel from './components/FileApprovalPanel';
@@ -358,11 +358,9 @@ function AIChat({ onClose }: { onClose?: () => void }) {
         return <TaskMessage key={message.id} message={message} />;
       case 'thinking':
         return (
-          <div key={message.id} className="py-1">
-            <PonderingIndicator
-              verb={message.content || undefined}
-              mode="thinking"
-            />
+          <div key={message.id} className="flex items-center gap-2 py-1 px-1 text-xs text-muted-foreground/70">
+            <span className="inline-block size-1.5 rounded-full bg-current animate-pulse" />
+            <span className="text-muted-foreground/60">{message.content || 'Thinking...'}</span>
           </div>
         );
       case 'stream':
@@ -414,15 +412,16 @@ function AIChat({ onClose }: { onClose?: () => void }) {
           ) : (
             <>
               {messages.map((msg, idx) => renderMessage(msg, idx))}
-              {isLoadingConvs && !messages.some(m => m.isStreaming) && !messages.some(m => m.type === 'thinking') && (() => {
-                const hasRunningTools = messages.some(m => (m.type === 'tool' || m.type === 'tool_code') && m.isRunning);
-                const spinnerMode: SpinnerMode = hasRunningTools ? 'tool-use' : 'requesting';
-                return (
-                  <PonderingIndicator
-                    mode={spinnerMode}
-                  />
-                );
-              })()}
+              {isLoadingConvs && !messages.some(m => m.isStreaming) && !messages.some(m => m.type === 'thinking') && (
+                <div className="flex items-center gap-2 py-2 px-3 text-xs text-muted-foreground/70">
+                  <span className="inline-block size-1.5 rounded-full bg-current animate-pulse" />
+                  <span className="text-muted-foreground/60">
+                    {messages.some(m => (m.type === 'tool' || m.type === 'tool_code') && m.isRunning)
+                      ? 'Running tools...'
+                      : 'Working...'}
+                  </span>
+                </div>
+              )}
             </>
           )}
         </ConversationContent>

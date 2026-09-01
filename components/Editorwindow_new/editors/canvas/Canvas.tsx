@@ -923,7 +923,14 @@ const CanvasContent: React.FC<CanvasProps> = ({ tabId, filePath, isActive }) => 
         onRealtimeProgress={handleRealtimeProgress}
       />
       
-      <div className={`flex-1 relative bg-transparent ${isTabDirty ? 'ring-2 ring-yellow-400 ring-inset' : ''}`}>
+      <div className="flex-1 relative bg-transparent">
+        {/* Dirty-state overlay — high z-index so it sits on top of the canvas */}
+        {isTabDirty && (
+          <div
+            className="absolute inset-0 pointer-events-none z-50 ring-2 ring-inset ring-yellow-400"
+            aria-hidden="true"
+          />
+        )}
         <ReactFlow
           id={`rf-${tabId}`}
           nodes={nodesWithDeleteHandler}

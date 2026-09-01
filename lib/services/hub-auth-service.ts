@@ -43,6 +43,49 @@ function getHubBaseUrl(): string {
 }
 
 /**
+ * Register an account on the Extension Hub.
+ */
+export async function hubRegister(
+  username: string,
+  password: string,
+  display_name?: string,
+  email?: string,
+): Promise<HubAuthResponse> {
+  try {
+    const resp = await fetch(`${getHubBaseUrl()}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, display_name, email }),
+    })
+
+    const data = await resp.json()
+
+    if (!resp.ok) {
+      return { success: false, message: data.detail || data.message || 'Registration failed' }
+    }
+
+    if (!data.token) {
+      return { success: false, message: 'No token returned' }
+    }
+
+    const token = data.token as string
+    const expiresIn = data.expires_in || 86400 * 7
+    localStorage.setItem(HUB_TOKEN_KEY, token)
+    localStorage.setItem(HUB_USER_KEY, JSON.stringify(data.user || { username }))
+    localStorage.setItem(HUB_TOKEN_EXPIRY_KEY, String(Date.now() + expiresIn * 1000))
+
+    return {
+      success: true,
+      token,
+      expires_in: expiresIn,
+      user: data.user || { username },
+    }
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Network error' }
+  }
+}
+
+/**
  * Sign in to the Extension Hub.
  * Sends credentials to the hub auth endpoint and stores the returned token.
  */

@@ -40,10 +40,10 @@ class WebSocketService {
         this.ws.onopen = () => {
           console.log('WebSocket connected to:', wsUrl);
           this.reconnectAttempts = 0;
-          // Re-send Lytic mode if it was active before reconnection
+          // Re-send the current permission mode so the backend agent stays in sync
           const { permissionMode } = useChatStore.getState();
-          if (permissionMode === 'bypass') {
-            this.sendMessage({ type: 'set_permission_mode', mode: 'bypass' });
+          if (permissionMode === 'bypass' || permissionMode === 'default' || permissionMode === 'always') {
+            this.sendMessage({ type: 'set_permission_mode', mode: permissionMode });
           }
           resolve();
         };

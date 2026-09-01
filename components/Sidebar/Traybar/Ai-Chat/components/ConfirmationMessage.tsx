@@ -35,10 +35,10 @@ function ConfirmationMessage({ message, onApprove, onRespond }: ConfirmationMess
       >
         <ConfirmationTitle>
           <span className="font-medium text-xs">{conf.toolName}</span>
-          {conf.toolArgs && Object.keys(conf.toolArgs).length > 0 && !isAskUserQuestion && (
-            <code className="ml-1.5 px-1 py-0 rounded bg-muted text-[10px] font-mono">
-              {JSON.stringify(conf.toolArgs)}
-            </code>
+          {conf.toolArgs && !isAskUserQuestion && (
+            <span className="ml-1.5 text-[10px] text-muted-foreground">
+              {conf.toolArgs.explanation || conf.toolArgs.command || conf.toolArgs.filepath || conf.toolArgs.path || ''}
+            </span>
           )}
         </ConfirmationTitle>
         <ConfirmationRequest>

@@ -877,6 +877,28 @@ export const useChatWebSocket = () => {
               }
               return m;
             }));
+          } else if (message.mode === 'default') {
+            // Default mode — ask before destructive tools only
+            if (isActiveSession || !msgSessionId) {
+              useChatStore.getState().setPermissionMode('default');
+            } else {
+              useChatStore.setState(state => ({
+                openSessions: state.openSessions.map(s =>
+                  s.id === msgSessionId ? { ...s, permissionMode: 'default' as const } : s
+                ),
+              }));
+            }
+          } else if (message.mode === 'always' && !message.tool_name) {
+            // Global mode change to "always ask" — every tool call requires confirmation
+            if (isActiveSession || !msgSessionId) {
+              useChatStore.getState().setPermissionMode('always');
+            } else {
+              useChatStore.setState(state => ({
+                openSessions: state.openSessions.map(s =>
+                  s.id === msgSessionId ? { ...s, permissionMode: 'always' as const } : s
+                ),
+              }));
+            }
           } else if (message.mode === 'always' && message.tool_name) {
             if (isActiveSession || !msgSessionId) {
               useChatStore.getState().addAllowedTool(message.tool_name);

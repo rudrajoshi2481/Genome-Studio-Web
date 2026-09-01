@@ -1,6 +1,9 @@
 "use client"
-import React from 'react'
-import { X, FileText, FileCode, Palette, Globe, FileJson, FileType, Copy, Trash2, XCircle, ChevronsRight, ChevronsLeft, Minimize2, FolderTree, ExternalLink, Workflow } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import {
+  X, FileText, FileCode, Palette, Globe, FileJson, FileType, Copy, Trash2, XCircle,
+  ChevronsRight, ChevronsLeft, Minimize2, FolderTree, ExternalLink, Workflow
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -11,7 +14,6 @@ import {
 } from "@/components/ui/context-menu"
 import { useTabStore } from './useTabStore'
 import { useFileExplorerStore } from '@/components/Sidebar/FileExplorer_New/store/fileExplorerStore'
-import { toast } from 'sonner'
 
 interface FileTabProps {
   id: string
@@ -38,37 +40,46 @@ function FileTab({
   onClose,
   onDelete
 }: FileTabProps) {
-  const { closeTabsToRight, closeTabsToLeft, closeOtherTabs, closeAllTabs, tabOrder } = useTabStore();
-  const { revealInExplorer } = useFileExplorerStore();
+  const { closeTabsToRight, closeTabsToLeft, closeOtherTabs, closeAllTabs, tabOrder, moveTab } = useTabStore()
+  const { revealInExplorer } = useFileExplorerStore()
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragOver, setDragOver] = useState<'left' | 'right' | null>(null)
+  const tabRef = useRef<HTMLDivElement>(null)
 
   const getFileIcon = () => {
-    const iconProps = { size: 14, className: "mr-1 flex-shrink-0" }
-    
-    switch(extension?.toLowerCase()) {
+    const iconProps = { size: 14, className: "mr-1.5 flex-shrink-0" }
+
+    switch (extension?.toLowerCase()) {
       case 'js':
       case 'jsx':
-        return <FileCode {...iconProps} className="mr-1 flex-shrink-0 text-yellow-600" />
+        return <FileCode {...iconProps} className="mr-1.5 flex-shrink-0 text-yellow-600" />
       case 'ts':
       case 'tsx':
-        return <FileCode {...iconProps} className="mr-1 flex-shrink-0 text-blue-600" />
+        return <FileCode {...iconProps} className="mr-1.5 flex-shrink-0 text-blue-600" />
       case 'css':
       case 'scss':
       case 'sass':
-        return <Palette {...iconProps} className="mr-1 flex-shrink-0 text-pink-600" />
+        return <Palette {...iconProps} className="mr-1.5 flex-shrink-0 text-pink-600" />
       case 'html':
-        return <Globe {...iconProps} className="mr-1 flex-shrink-0 text-orange-600" />
+        return <Globe {...iconProps} className="mr-1.5 flex-shrink-0 text-orange-600" />
       case 'json':
-        return <FileJson {...iconProps} className="mr-1 flex-shrink-0 text-green-600" />
+        return <FileJson {...iconProps} className="mr-1.5 flex-shrink-0 text-green-600" />
       case 'md':
-        return <FileType {...iconProps} className="mr-1 flex-shrink-0 text-gray-600" />
+        return <FileType {...iconProps} className="mr-1.5 flex-shrink-0 text-gray-500" />
       case 'flow':
-        return <Workflow {...iconProps} className="mr-1 flex-shrink-0 text-indigo-600" />
+        return <Workflow {...iconProps} className="mr-1.5 flex-shrink-0 text-indigo-600" />
       default:
-        return <FileText {...iconProps} className="mr-1 flex-shrink-0 text-gray-500" />
+        return <FileText {...iconProps} className="mr-1.5 flex-shrink-0 text-gray-500" />
     }
   }
 
   const handleActivate = (e: React.MouseEvent) => {
+    // Allow middle-click to close without activating
+    if (e.button === 1) {
+      e.preventDefault()
+      onClose?.(id)
+      return
+    }
     e.stopPropagation()
     onActivate?.(id)
   }
@@ -77,13 +88,6 @@ function FileTab({
     e.stopPropagation()
     e.preventDefault()
     onClose?.(id)
-  }
-
-  const handleAuxClick = (e: React.MouseEvent) => {
-    if (e.button === 1) {
-      e.preventDefault()
-      onClose?.(id)
-    }
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -95,7 +99,6 @@ function FileTab({
 
   const handleCopyPath = () => {
     navigator.clipboard.writeText(path)
-    // toast.success('Path copied to clipboard')
   }
 
   const handleDelete = () => {
@@ -105,44 +108,80 @@ function FileTab({
     }
   }
 
-  const handleCloseOthers = () => {
-    closeOtherTabs(id)
+  // Drag and drop
+  const handleDragStart = (e: React.DragEvent) => {
+    setIsDragging(true)
+    e.dataTransfer.setData('text/tab-id', id)
+    e.dataTransfer.effectAllowed = 'move'
   }
 
-  const handleCloseToRight = () => {
-    closeTabsToRight(id)
+  const handleDragEnd = () => {
+    setIsDragging(false)
+    setDragOver(null)
   }
 
-  const handleCloseToLeft = () => {
-    closeTabsToLeft(id)
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+
+    const rect = tabRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const midX = rect.left + rect.width / 2
+    setDragOver(e.clientX < midX ? 'left' : 'right')
   }
 
-  const handleCloseAll = () => {
-    closeAllTabs()
+  const handleDragLeave = () => {
+    setDragOver(null)
   }
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const draggedId = e.dataTransfer.getData('text/tab-id')
+    if (!draggedId || draggedId === id) {
+      setDragOver(null)
+      return
+    }
+    setDragOver(null)
+
+    const draggedIndex = tabOrder.indexOf(draggedId)
+    const targetIndex = tabOrder.indexOf(id)
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    const rect = tabRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const midX = rect.left + rect.width / 2
+    const dropAfter = e.clientX >= midX
+
+    let newIndex = targetIndex
+    if (draggedIndex < targetIndex) {
+      newIndex = dropAfter ? targetIndex : targetIndex - 1
+    } else {
+      newIndex = dropAfter ? targetIndex + 1 : targetIndex
+    }
+    moveTab(draggedId, newIndex)
+  }
+
+  // Context menu
+  const handleCloseOthers = () => closeOtherTabs(id)
+  const handleCloseToRight = () => closeTabsToRight(id)
+  const handleCloseToLeft = () => closeTabsToLeft(id)
+  const handleCloseAll = () => closeAllTabs()
   const handleRevealInExplorer = async () => {
     try {
       await revealInExplorer(path)
-      // toast.success('File revealed in explorer')
     } catch (error) {
       console.error('Failed to reveal file:', error)
-      // toast.error('Failed to reveal file in explorer')
     }
   }
-
   const handleMoveToNewWindow = () => {
-    // Open this file in a standalone editor window via Electron IPC.
-    // In browser mode, falls back to window.open.
     const url = `/editor-window?path=${encodeURIComponent(path)}`
-    if (typeof window !== 'undefined' && window.electronAPI?.openWindow) {
-      window.electronAPI.openWindow(url)
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.openWindow) {
+      ;(window as any).electronAPI.openWindow(url)
     } else {
       window.open(url, '_blank')
     }
   }
 
-  // Check if there are tabs to the right or left
   const currentIndex = tabOrder.indexOf(id)
   const hasTabsToRight = currentIndex < tabOrder.length - 1
   const hasTabsToLeft = currentIndex > 0
@@ -151,78 +190,85 @@ function FileTab({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div 
+        <div
+          ref={tabRef}
+          draggable
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          data-tab-id={id}
+          title={`${path}${isDirty ? ' (modified)' : ''}`}
           className={cn(
-            'flex items-center h-9 px-3 py-1 text-sm cursor-pointer group relative overflow-hidden flex-shrink-0',
-            'transition-all duration-150 border-t-2',
+            'flex items-center h-8 max-w-[200px] min-w-fit px-3 text-xs cursor-pointer group relative overflow-hidden flex-shrink-0 select-none',
+            'transition-all duration-100 border-r border-border/60',
             isActive
-              ? 'bg-background text-foreground border-t-blue-500'
-              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground border-t-transparent',
-            isDirty && !isExecuting && 'border-b-2 border-b-yellow-400',
-            isExecuting && 'border-b-2 border-b-green-500',
+              ? 'bg-background text-foreground border-t-2 border-t-primary'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground border-t-2 border-t-transparent',
+            isDragging && 'opacity-50',
+            dragOver === 'left' && 'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-0.5 before:bg-primary',
+            dragOver === 'right' && 'after:absolute after:right-0 after:top-0 after:bottom-0 after:w-0.5 after:bg-primary'
           )}
           onClick={handleActivate}
-          onAuxClick={handleAuxClick}
           onMouseDown={handleMouseDown}
-          data-tab-id={id}
-          title={path}
           suppressHydrationWarning
         >
           {isExecuting && (
-            <div className="absolute inset-0 pointer-events-none running-stripes" />
+            <div className="absolute inset-0 pointer-events-none running-stripes opacity-60" />
           )}
-      {getFileIcon()}
-      <span className="whitespace-nowrap">{name}</span>
-      {isDirty && (
-        <span 
-          className="ml-1 text-orange-500 font-bold text-lg leading-none" 
-          title="Unsaved changes"
-        >
-          •
-        </span>
-      )}
-          <button 
+          {getFileIcon()}
+          <span className="whitespace-nowrap truncate leading-tight">{name}</span>
+          {isDirty && (
+            <span
+              className="ml-1 text-orange-500 font-bold text-lg leading-none"
+              title="Unsaved changes"
+            >
+              •
+            </span>
+          )}
+          <button
+            type="button"
             className={cn(
-              'ml-2 rounded p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-150',
+              'ml-2 rounded p-0.5 hover:bg-muted-foreground/20 text-muted-foreground hover:text-foreground transition-all duration-100',
               isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
             )}
             onClick={handleClose}
             aria-label={`Close ${name} tab`}
-            type="button"
           >
-            <X size={14} />
+            <X size={13} />
           </button>
         </div>
       </ContextMenuTrigger>
-      
+
       <ContextMenuContent className="w-56">
         <ContextMenuItem onClick={handleClose}>
           <XCircle className="mr-2 h-4 w-4" />
           Close
         </ContextMenuItem>
-        
+
         <ContextMenuItem onClick={handleCloseOthers} disabled={!hasOtherTabs}>
           <Minimize2 className="mr-2 h-4 w-4" />
           Close Others
         </ContextMenuItem>
-        
+
         <ContextMenuItem onClick={handleCloseToRight} disabled={!hasTabsToRight}>
           <ChevronsRight className="mr-2 h-4 w-4" />
           Close to the Right
         </ContextMenuItem>
-        
+
         <ContextMenuItem onClick={handleCloseToLeft} disabled={!hasTabsToLeft}>
           <ChevronsLeft className="mr-2 h-4 w-4" />
           Close to the Left
         </ContextMenuItem>
-        
+
         <ContextMenuItem onClick={handleCloseAll}>
           <XCircle className="mr-2 h-4 w-4" />
           Close All
         </ContextMenuItem>
-        
+
         <ContextMenuSeparator />
-        
+
         <ContextMenuItem onClick={handleRevealInExplorer}>
           <FolderTree className="mr-2 h-4 w-4" />
           Reveal in Explorer
@@ -237,7 +283,7 @@ function FileTab({
           <Copy className="mr-2 h-4 w-4" />
           Copy Path
         </ContextMenuItem>
-        
+
         {onDelete && (
           <>
             <ContextMenuSeparator />

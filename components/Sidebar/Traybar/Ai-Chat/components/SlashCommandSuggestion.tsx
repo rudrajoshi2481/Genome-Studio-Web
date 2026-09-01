@@ -170,7 +170,7 @@ export function SlashCommandSuggestion({
 
         <div className="overflow-hidden max-h-[240px] overflow-y-auto p-1">
           {filteredCommands.length === 0 ? (
-            <div className="flex items-center justify-center text-xs text-muted-foreground p-6">
+            <div className="flex items-center justify-start text-xs text-muted-foreground p-6">
               No commands found
             </div>
           ) : (
@@ -186,9 +186,9 @@ export function SlashCommandSuggestion({
                 onClick={() => onSelect(cmd)}
               >
                 <span className="text-muted-foreground shrink-0">{cmd.icon}</span>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="font-mono font-medium truncate">{cmd.name}</span>
-                  <span className="text-[10px] text-muted-foreground truncate">{cmd.description}</span>
+                <div className="flex flex-col min-w-0 flex-1 text-left">
+                  <span className="font-mono font-medium truncate text-left">{cmd.name}</span>
+                  <span className="text-[10px] text-muted-foreground truncate text-left">{cmd.description}</span>
                 </div>
               </button>
             ))

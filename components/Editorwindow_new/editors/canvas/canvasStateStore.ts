@@ -10,7 +10,7 @@
 
 export interface CanvasNodeData {
   id: string;
-  type: string;
+  type?: string;
   position: { x: number; y: number };
   data: {
     title?: string;

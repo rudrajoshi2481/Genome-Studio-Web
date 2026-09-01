@@ -16,6 +16,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Focus, Trash2, Copy, Save, Eye, Code, Lock, Unlock, ChevronRight, ChevronDown, Terminal, Square } from 'lucide-react';
+import { PythonIcon, BashIcon, RIcon } from './LanguageIcon';
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuthStore } from '@/lib/stores/auth-store';
@@ -820,11 +821,26 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
           (lang === 'bash' || lang === 'shell') ? 'bg-orange-500/10 text-orange-700 border-orange-500/20' :
           'bg-background text-muted-foreground'
         );
+        const LangIcon = (() => {
+          switch (lang) {
+            case 'python': return PythonIcon;
+            case 'bash':
+            case 'shell': return BashIcon;
+            case 'r': return RIcon;
+            default: return PythonIcon;
+          }
+        })();
+        const langColorClass = isRunning
+          ? 'text-white'
+          : lang === 'python' ? 'text-blue-600'
+          : lang === 'r' ? 'text-green-600'
+          : (lang === 'bash' || lang === 'shell') ? 'text-orange-600'
+          : 'text-muted-foreground';
         return (
         <div
           className={cn(
             "border-b border-border px-4 py-2 flex items-center justify-between relative overflow-hidden",
-            isRunning ? "bg-yellow-500/80 stripe-flow" : langBgClass,
+            isRunning ? "bg-yellow-500/80" : langBgClass,
             isRunning && "text-white",
             isCollapsed && "border-b-0"
           )}
@@ -859,6 +875,7 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
               : <ChevronDown className={cn("h-3.5 w-3.5", isRunning ? "text-white/80" : "text-muted-foreground")} />
             }
           </button>
+          <LangIcon className={cn("h-4 w-4 shrink-0", langColorClass)} />
           <div className={cn("font-medium text-sm truncate", isRunning ? "text-white" : "text-foreground")}>{nodeData.title || 'Untitled Node'}</div>
         </div>
         {/* <div className="font-medium text-sm text-foreground">{nodeData.function_name || 'Untitled Node'}</div> */}

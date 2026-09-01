@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal, RefreshCw, Cpu, Check, WifiOff, Download, Boxes } from 'lucide-react'
+import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal, RefreshCw, Check, WifiOff, Download, Boxes, ShieldCheck, ShieldAlert, Shield, ChevronDown } from 'lucide-react'
 import ChatFeaturesDialog from './ChatFeaturesDialog'
 import { useChatStore } from './components/chatStore'
 import {
@@ -30,6 +30,16 @@ import ChatMentionInput, { type ChatMention } from './components/ChatMentionInpu
 import { SlashCommandSuggestion, type SlashCommand } from './components/SlashCommandSuggestion'
 import { Editor } from '@tiptap/react'
 import { cn } from '@/lib/utils'
+import { wsService } from './hooks/wsService'
+import { ProviderIcon, detectProvider } from './components/ProviderIcon'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface ModelPricing {
   input: number | null
@@ -127,6 +137,8 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
     setSelectedModel: storeSetSelectedModel,
     pinnedModels: storePinnedModels,
     setPinnedModels: storeSetPinnedModels,
+    permissionMode,
+    setPermissionMode,
   } = useChatStore()
 
   // Use store values as source of truth. Initialize with default for SSR consistency;
@@ -266,6 +278,22 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
       setContextWindow(ctxLen)
     }
   }
+
+  // Permission mode change — persists to backend AND notifies the live agent via WebSocket
+  const handlePermissionChange = useCallback(async (mode: 'default' | 'bypass' | 'always') => {
+    setPermissionMode(mode)
+    try {
+      await fetch(`${getApiBaseUrl()}/ai-chat/permissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      })
+    } catch (err) {
+      console.error('Failed to persist permission mode:', err)
+    }
+    // Notify the live agent so it picks up the change mid-conversation
+    wsService.sendMessage({ type: 'set_permission_mode', mode })
+  }, [setPermissionMode])
 
   const loading = isLoading || storeLoading
 
@@ -533,7 +561,10 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
 
   return (
     <TooltipProvider>
-    <div ref={containerRef} className="rounded-xl border bg-background shadow-sm relative">
+    <div ref={containerRef} className="rounded-2xl border bg-muted/40 backdrop-blur-sm shadow-lg shadow-black/[0.03] relative overflow-hidden @container">
+      {/* Subtle gradient accent at top */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
       {showSlashMenu && (
         <SlashCommandSuggestion
           onSelect={handleSlashCommandSelect}
@@ -546,26 +577,30 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
       )}
 
       {uploadedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 p-2 border-b">
+        <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
           {uploadedFiles.map((file) => (
             <div
               key={file.id}
-              className="flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-[10px]"
+              className="flex items-center gap-2 rounded-lg border bg-background/80 px-2.5 py-1.5 text-[11px] shadow-sm"
             >
               {file.previewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={file.previewUrl}
                   alt={file.name}
-                  className="size-6 rounded object-cover"
+                  className="size-5 rounded-md object-cover ring-1 ring-border/50"
                 />
               )}
-              {!file.previewUrl && <Paperclip className="size-3 text-muted-foreground" />}
-              <span className="truncate max-w-[120px]">{file.name}</span>
-              <span className="text-muted-foreground">{formatFileSize(file.size)}</span>
+              {!file.previewUrl && (
+                <div className="flex size-5 items-center justify-center rounded-md bg-muted">
+                  <Paperclip className="size-3 text-muted-foreground" />
+                </div>
+              )}
+              <span className="truncate max-w-[120px] font-medium">{file.name}</span>
+              <span className="text-muted-foreground tabular-nums">{formatFileSize(file.size)}</span>
               <button
                 onClick={() => removeUploadedFile(file.id)}
-                className="text-muted-foreground hover:text-foreground"
+                className="ml-0.5 rounded-md p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               >
                 <X className="size-3" />
               </button>
@@ -582,21 +617,21 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
         onChange={handleFileUpload}
       />
 
-      <PromptInput onSubmit={handleSubmit} className="rounded-xl">
-        <div className="w-full px-3 pt-3">
+      <PromptInput onSubmit={handleSubmit} className="rounded-2xl bg-transparent border-0 shadow-none focus-visible:ring-0">
+        <div className="w-full px-3.5 pt-3">
           <ChatMentionInput
             input={inputValue}
             onChange={handleInputChange}
             onChangeMention={(m) => { setMentions(m); setStoreMentions(m); }}
             onEnter={handleSubmit}
-            placeholder="Ask anything... (@ for skills/agents, / for commands)"
+            placeholder="Ask anything..."
             ref={editorRef}
           />
         </div>
-        <PromptInputFooter className="py-2 px-1">
-          <PromptInputTools className="flex-wrap gap-1">
+        <PromptInputFooter className="py-2 px-2">
+          <PromptInputTools className="flex-nowrap min-w-0 items-center gap-0.5 shrink-0">
             <ChatFeaturesDialog>
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all shrink-0" aria-label="Chat settings">
                 <Settings size={15} />
               </Button>
             </ChatFeaturesDialog>
@@ -606,8 +641,9 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                  className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all shrink-0"
                   onClick={() => fileInputRef.current?.click()}
+                  aria-label="Upload files"
                 >
                   <Paperclip size={15} />
                 </Button>
@@ -615,15 +651,74 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
               <TooltipContent side="top">Upload files</TooltipContent>
             </Tooltip>
 
+            {/* Permission mode selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 rounded-lg text-xs gap-1.5 transition-all font-medium border border-transparent hover:border-border/50 hover:bg-background/80 shrink-0"
+                  title="Permission mode"
+                >
+                  {permissionMode === 'bypass' && <ShieldCheck size={13} className="text-emerald-500" />}
+                  {permissionMode === 'default' && <ShieldAlert size={13} className="text-amber-500" />}
+                  {permissionMode === 'always' && <Shield size={13} className="text-blue-500" />}
+                  <span className="text-muted-foreground hidden @[360px]:inline">
+                    {permissionMode === 'bypass' ? 'Lytic' : permissionMode === 'default' ? 'Default' : 'Always Ask'}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" className="w-56">
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">Permission Mode</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className={cn("gap-2.5 py-2 cursor-pointer", permissionMode === 'bypass' && "bg-emerald-50/50 dark:bg-emerald-950/20")}
+                  onClick={() => handlePermissionChange('bypass')}
+                >
+                  <ShieldCheck size={15} className={permissionMode === 'bypass' ? 'text-emerald-500' : 'text-muted-foreground'} />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-medium">Bypass (Lytic)</span>
+                    <span className="text-[10px] text-muted-foreground">Auto-approve all tool calls</span>
+                  </div>
+                  {permissionMode === 'bypass' && <Check size={13} className="ml-auto text-emerald-500" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className={cn("gap-2.5 py-2 cursor-pointer", permissionMode === 'default' && "bg-amber-50/50 dark:bg-amber-950/20")}
+                  onClick={() => handlePermissionChange('default')}
+                >
+                  <ShieldAlert size={15} className={permissionMode === 'default' ? 'text-amber-500' : 'text-muted-foreground'} />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-medium">Default</span>
+                    <span className="text-[10px] text-muted-foreground">Ask before destructive tools</span>
+                  </div>
+                  {permissionMode === 'default' && <Check size={13} className="ml-auto text-amber-500" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className={cn("gap-2.5 py-2 cursor-pointer", permissionMode === 'always' && "bg-blue-50/50 dark:bg-blue-950/20")}
+                  onClick={() => handlePermissionChange('always')}
+                >
+                  <Shield size={15} className={permissionMode === 'always' ? 'text-blue-500' : 'text-muted-foreground'} />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-medium">Always Ask</span>
+                    <span className="text-[10px] text-muted-foreground">Confirm every tool call</span>
+                  </div>
+                  {permissionMode === 'always' && <Check size={13} className="ml-auto text-blue-500" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </PromptInputTools>
+
+          <div className="flex items-center gap-0.5 shrink-0 min-w-0">
             <ModelSelector open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
               <ModelSelectorTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+                  className="h-7 px-2.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-background/80 gap-1.5 transition-all font-medium"
                   title="Select model"
                 >
-                  <span className="whitespace-nowrap truncate max-w-[120px]">{selectedModel ? formatModelName(selectedModel) : 'No model'}</span>
+                  <ProviderIcon provider={selectedModel ? detectProvider(selectedModel) : "unknown"} size={13} className="text-muted-foreground/70" />
+                  <span className="whitespace-nowrap truncate max-w-[120px] hidden @[420px]:inline">{selectedModel ? formatModelName(selectedModel) : 'No model'}</span>
                 </Button>
               </ModelSelectorTrigger>
               <ModelSelectorContent title="Select Model">
@@ -661,6 +756,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                             .filter((m): m is OllamaModel => !!m)
                             .map((model) => {
                               const isSelected = model.name === selectedModel
+                              const provider = zaiModels.some(z => z.name === model.name) ? "zai" : "ollama"
                               return (
                                 <ModelSelectorItem
                                   key={`pinned-${model.name}`}
@@ -671,7 +767,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                                     {isSelected ? (
                                       <Check size={14} className="text-primary shrink-0" />
                                     ) : (
-                                      <Pin size={14} className="text-primary shrink-0 fill-primary" />
+                                      <ProviderIcon provider={provider} size={14} className="text-primary shrink-0" />
                                     )}
                                     <span className="truncate text-sm font-medium flex-1 min-w-0">{formatModelName(model.name)}</span>
                                     <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground font-mono">
@@ -733,7 +829,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                                   {isSelected ? (
                                     <Check size={14} className="text-primary shrink-0" />
                                   ) : (
-                                    <Cpu size={14} className="text-muted-foreground shrink-0" />
+                                    <ProviderIcon provider="ollama" size={14} className="text-muted-foreground shrink-0" />
                                   )}
                                   <span className="truncate text-sm font-medium flex-1 min-w-0">{formatModelName(model.name)}</span>
                                   <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground font-mono">
@@ -793,7 +889,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                                 {isSelected ? (
                                   <Check size={14} className="text-primary shrink-0" />
                                 ) : (
-                                  <Cpu size={14} className="text-muted-foreground shrink-0" />
+                                  <ProviderIcon provider="zai" size={14} className="text-muted-foreground shrink-0" />
                                 )}
                                 <span className="truncate text-sm font-medium flex-1 min-w-0">{formatModelName(model.name)}</span>
                                 <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground font-mono">
@@ -889,23 +985,24 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
                 </ModelSelectorList>
               </ModelSelectorContent>
             </ModelSelector>
-          </PromptInputTools>
 
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="font-mono text-xs text-muted-foreground px-2">
-              {new Intl.NumberFormat("en-US", { notation: "compact" }).format(contextTokens || tokenUsage.totalTokens || 0)} / {new Intl.NumberFormat("en-US", { notation: "compact" }).format(contextWindow)}
-            </span>
+            {/* Token counter — subtle pill */}
+            {(contextTokens > 0 || tokenUsage.totalTokens > 0) && (
+              <span className="font-mono text-[10px] text-muted-foreground/70 bg-background/60 rounded-md px-1.5 py-0.5 tabular-nums hidden @[520px]:inline">
+                {new Intl.NumberFormat("en-US", { notation: "compact" }).format(contextTokens || tokenUsage.totalTokens || 0)} / {new Intl.NumberFormat("en-US", { notation: "compact" }).format(contextWindow)}
+              </span>
+            )}
 
             <Button
               size="sm"
               variant="default"
-              className="h-7 w-7 p-0 rounded-full shrink-0 disabled:opacity-40"
+              className="h-8 w-8 p-0 rounded-xl shrink-0 disabled:opacity-30 disabled:shadow-none shadow-sm transition-all hover:shadow-md hover:scale-[1.03] active:scale-[0.98]"
               type={loading ? 'button' : 'submit'}
               aria-label={loading ? 'Stop generation' : 'Send message'}
               disabled={!loading && !inputValue.trim() && uploadedFiles.length === 0}
               onClick={loading ? onStop : undefined}
             >
-              {loading ? <SquareIcon size={14} /> : <ArrowUp size={16} />}
+              {loading ? <SquareIcon size={14} className="fill-current" /> : <ArrowUp size={16} />}
             </Button>
           </div>
         </PromptInputFooter>

@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 
 import MentionInput from "./MentionInput";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -490,187 +489,213 @@ export function ChatMentionInputSuggestion({
     return groups;
   }, [allMentions]);
 
-  const trigger = useMemo(() => {
-    return (
-      <span
-        className="fixed z-50"
-        style={{
-          top,
-          left,
-        }}
-      ></span>
-    );
-  }, [top, left]);
+  const popupWidth = style?.width || "480px";
+
+  // Two-pane state
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [focusPane, setFocusPane] = useState<"categories" | "items">("items");
+  const [categoryIndex, setCategoryIndex] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Build the category list with counts (only show categories with items)
+  const categories = useMemo(() => {
+    const cats = [
+      { key: "all", label: "All", icon: <SearchIcon className="size-3.5 shrink-0" />, items: allMentions },
+      { key: "skill", label: "Skills", icon: <Zap className="size-3.5 shrink-0" />, items: groupedMentions.skill.items },
+      { key: "database", label: "Databases", icon: <Database className="size-3.5 shrink-0" />, items: groupedMentions.database.items },
+      { key: "agent", label: "Agents", icon: <Bot className="size-3.5 shrink-0" />, items: groupedMentions.agent.items },
+      { key: "tool", label: "Tools", icon: <Wrench className="size-3.5 shrink-0" />, items: groupedMentions.tool.items },
+      { key: "file", label: "Files", icon: <FileIcon className="size-3.5 shrink-0" />, items: groupedMentions.file.items },
+      { key: "workflow", label: "Workflows", icon: <Workflow className="size-3.5 shrink-0" />, items: groupedMentions.workflow.items },
+    ];
+    return cats.filter(c => c.key === "all" || c.items.length > 0);
+  }, [allMentions, groupedMentions]);
+
+  // Items to show in the right pane based on selected category
+  const rightPaneItems = useMemo(() => {
+    if (activeCategory === "all") return allMentions;
+    const cat = categories.find(c => c.key === activeCategory);
+    return cat ? cat.items : [];
+  }, [activeCategory, allMentions, categories]);
+
+  // Reset selected index when category or items change
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [activeCategory, rightPaneItems.length]);
+
+  // Keep categoryIndex in sync with activeCategory
+  useEffect(() => {
+    const idx = categories.findIndex(c => c.key === activeCategory);
+    if (idx >= 0) setCategoryIndex(idx);
+  }, [activeCategory, categories]);
+
+  useEffect(() => {
+    const selectedItem = rightPaneItems[selectedIndex];
+    if (selectedItem && itemRefs.current[selectedItem.id]) {
+      itemRefs.current[selectedItem.id]?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }
+  }, [selectedIndex, rightPaneItems]);
+
+  // Refocus search input after category click
+  const selectCategory = (key: string) => {
+    setActiveCategory(key);
+    setFocusPane("items");
+    // Refocus the search input so typing still works
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  };
 
   return (
-    <Popover open={true} onOpenChange={(f: boolean) => { !f && onClose(); }}>
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent
-        className={cn("p-0 w-[420px] max-w-[500px] shadow-lg border rounded-lg", className)}
-        align="start"
-        side="top"
-        style={{
-          ...style,
-          width: style?.width || "420px",
-          maxWidth: "500px",
-        }}
-      >
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2 px-3 py-2 border-b">
-            <SearchIcon className="size-3.5 shrink-0 opacity-50" />
-            <input
-              className="flex h-7 w-full rounded-md bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-              placeholder="Search..."
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  onClose();
+    <div
+      className={cn("fixed z-50 rounded-lg border bg-popover shadow-md text-left", className)}
+      style={{
+        top,
+        left,
+        width: popupWidth,
+        maxWidth: "520px",
+        transform: "translateY(-100%)",
+        marginTop: "-4px",
+        textAlign: "left",
+      }}
+    >
+      <div className="flex flex-col text-left items-start">
+        {/* Search bar */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b w-full">
+          <SearchIcon className="size-3.5 shrink-0 opacity-50" />
+          <input
+            ref={searchInputRef}
+            className="flex h-7 w-full rounded-md bg-transparent text-xs outline-none placeholder:text-muted-foreground text-left"
+            placeholder="Search..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                onClose();
+              }
+              if (e.key === "Backspace" && !e.currentTarget.value) {
+                e.preventDefault();
+                onDeleteTrigger?.();
+              }
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (focusPane === "categories" && categories[categoryIndex]) {
+                  // Enter on a category: select it and jump to items
+                  selectCategory(categories[categoryIndex].key);
+                } else if (focusPane === "items" && rightPaneItems.length > 0) {
+                  rightPaneItems[selectedIndex].onSelect();
                 }
-                if (e.key === "Backspace" && !e.currentTarget.value) {
-                  e.preventDefault();
-                  onDeleteTrigger?.();
-                }
-                if (e.key === "Enter" && allMentions.length > 0) {
-                  e.preventDefault();
-                  allMentions[selectedIndex].onSelect();
-                }
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setSelectedIndex((prev) =>
-                    prev < allMentions.length - 1 ? prev + 1 : 0,
+              }
+              // Up/Down — navigate within whichever pane is focused
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                if (focusPane === "categories") {
+                  setCategoryIndex(prev =>
+                    prev < categories.length - 1 ? prev + 1 : 0,
+                  );
+                } else {
+                  setSelectedIndex(prev =>
+                    prev < rightPaneItems.length - 1 ? prev + 1 : 0,
                   );
                 }
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setSelectedIndex((prev) =>
-                    prev > 0 ? prev - 1 : allMentions.length - 1,
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                if (focusPane === "categories") {
+                  setCategoryIndex(prev =>
+                    prev > 0 ? prev - 1 : categories.length - 1,
+                  );
+                } else {
+                  setSelectedIndex(prev =>
+                    prev > 0 ? prev - 1 : rightPaneItems.length - 1,
                   );
                 }
-              }}
-              autoFocus
-            />
-          </div>
-
-          <div className="overflow-hidden max-h-[280px] overflow-y-auto">
-            {allMentions.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-xs text-muted-foreground p-8 gap-1.5">
-                <SearchIcon className="size-4 opacity-40" />
-                <div className="text-center">
-                  {searchValue ? `No results for "${searchValue}"` : "Type @ to see available mentions"}
-                </div>
-              </div>
-            ) : (
-              <>
-                {groupedMentions.skill.items.length > 0 && (
-                  <div className="p-1.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
-                      {groupedMentions.skill.title}
-                    </div>
-                    <div className="space-y-0.5">
-                      {groupedMentions.skill.items.map((item) => (
-                        <MentionItemRow
-                          key={item.id}
-                          item={item}
-                          isSelected={allMentions[selectedIndex]?.id === item.id}
-                          ref={(el) => { itemRefs.current[item.id] = el; }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {groupedMentions.database.items.length > 0 && (
-                  <div className="p-1.5 border-t">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
-                      {groupedMentions.database.title}
-                    </div>
-                    <div className="space-y-0.5">
-                      {groupedMentions.database.items.map((item) => (
-                        <MentionItemRow
-                          key={item.id}
-                          item={item}
-                          isSelected={allMentions[selectedIndex]?.id === item.id}
-                          ref={(el) => { itemRefs.current[item.id] = el; }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {groupedMentions.agent.items.length > 0 && (
-                  <div className="p-1.5 border-t">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
-                      {groupedMentions.agent.title}
-                    </div>
-                    <div className="space-y-0.5">
-                      {groupedMentions.agent.items.map((item) => (
-                        <MentionItemRow
-                          key={item.id}
-                          item={item}
-                          isSelected={allMentions[selectedIndex]?.id === item.id}
-                          ref={(el) => { itemRefs.current[item.id] = el; }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {groupedMentions.tool.items.length > 0 && (
-                  <div className="p-1.5 border-t">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
-                      {groupedMentions.tool.title}
-                    </div>
-                    <div className="space-y-0.5">
-                      {groupedMentions.tool.items.map((item) => (
-                        <MentionItemRow
-                          key={item.id}
-                          item={item}
-                          isSelected={allMentions[selectedIndex]?.id === item.id}
-                          ref={(el) => { itemRefs.current[item.id] = el; }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {groupedMentions.file.items.length > 0 && (
-                  <div className="p-1.5 border-t">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
-                      {groupedMentions.file.title}
-                    </div>
-                    <div className="space-y-0.5">
-                      {groupedMentions.file.items.map((item) => (
-                        <MentionItemRow
-                          key={item.id}
-                          item={item}
-                          isSelected={allMentions[selectedIndex]?.id === item.id}
-                          ref={(el) => { itemRefs.current[item.id] = el; }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {groupedMentions.workflow.items.length > 0 && (
-                  <div className="p-1.5 border-t">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 py-1">
-                      {groupedMentions.workflow.title}
-                    </div>
-                    <div className="space-y-0.5">
-                      {groupedMentions.workflow.items.map((item) => (
-                        <MentionItemRow
-                          key={item.id}
-                          item={item}
-                          isSelected={allMentions[selectedIndex]?.id === item.id}
-                          ref={(el) => { itemRefs.current[item.id] = el; }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+              }
+              // Left arrow — move focus to categories pane
+              if (e.key === "ArrowLeft" && focusPane === "items") {
+                e.preventDefault();
+                setFocusPane("categories");
+              }
+              // Right arrow — move focus to items pane
+              if (e.key === "ArrowRight" && focusPane === "categories") {
+                e.preventDefault();
+                setFocusPane("items");
+              }
+              // Tab — cycle categories (same as before)
+              if (e.key === "Tab") {
+                e.preventDefault();
+                const currentIdx = categories.findIndex(c => c.key === activeCategory);
+                const nextIdx = e.shiftKey
+                  ? (currentIdx - 1 + categories.length) % categories.length
+                  : (currentIdx + 1) % categories.length;
+                setActiveCategory(categories[nextIdx].key);
+                setCategoryIndex(nextIdx);
+              }
+            }}
+            autoFocus
+          />
         </div>
-      </PopoverContent>
-    </Popover>
+
+        {/* Two-pane layout */}
+        {allMentions.length === 0 ? (
+          <div className="flex-1 flex flex-col items-start justify-start text-xs text-muted-foreground p-8 gap-1.5">
+            <SearchIcon className="size-4 opacity-40" />
+            <div className="text-left">
+              {searchValue ? `No results for "${searchValue}"` : "Type @ to see available mentions"}
+            </div>
+          </div>
+        ) : (
+          <div className="flex w-full max-h-[280px]">
+            {/* Left pane — category list */}
+            <div className="w-32 shrink-0 border-r overflow-y-auto py-1">
+              {categories.map((cat, idx) => (
+                <button
+                  key={cat.key}
+                  className={cn(
+                    "flex items-center gap-2 w-full px-2.5 py-1.5 text-xs text-left cursor-pointer transition-colors",
+                    activeCategory === cat.key
+                      ? "bg-accent text-accent-foreground font-medium"
+                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                    focusPane === "categories" && idx === categoryIndex && activeCategory !== cat.key
+                      && "ring-1 ring-inset ring-primary/40",
+                  )}
+                  // preventDefault on mousedown so the search input keeps focus
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => selectCategory(cat.key)}
+                  onMouseEnter={() => setCategoryIndex(idx)}
+                >
+                  <span className="shrink-0">{cat.icon}</span>
+                  <span className="truncate flex-1">{cat.label}</span>
+                  {cat.items.length > 0 && (
+                    <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">{cat.items.length}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Right pane — items for selected category */}
+            <div className="flex-1 min-w-0 overflow-y-auto p-1">
+              {rightPaneItems.length === 0 ? (
+                <div className="flex items-center justify-start text-xs text-muted-foreground p-4">
+                  No items in this category
+                </div>
+              ) : (
+                rightPaneItems.map((item) => (
+                  <MentionItemRow
+                    key={item.id}
+                    item={item}
+                    isSelected={focusPane === "items" && rightPaneItems[selectedIndex]?.id === item.id}
+                    ref={(el) => { itemRefs.current[item.id] = el; }}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -686,7 +711,7 @@ const MentionItemRow = React.forwardRef<
     <button
       ref={ref}
       className={cn(
-        "flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs outline-none cursor-pointer transition-colors",
+        "flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs outline-none cursor-pointer transition-colors text-left",
         "hover:bg-accent hover:text-accent-foreground",
         isSelected && "bg-accent text-accent-foreground",
       )}
@@ -695,10 +720,10 @@ const MentionItemRow = React.forwardRef<
       <span className="shrink-0 text-muted-foreground">
         {item.icon}
       </span>
-      <div className="flex flex-col min-w-0 flex-1">
-        <span className="truncate leading-tight">{item.label}</span>
+      <div className="flex flex-col min-w-0 flex-1 items-start text-left">
+        <span className="truncate leading-tight text-left">{item.label}</span>
         {mention?.description && (
-          <span className="truncate text-[10px] text-muted-foreground leading-tight">
+          <span className="truncate text-[10px] text-muted-foreground leading-tight text-left">
             {mention.description}
           </span>
         )}

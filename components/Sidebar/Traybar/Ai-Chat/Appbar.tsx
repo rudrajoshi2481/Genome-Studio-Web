@@ -98,7 +98,7 @@ function Appbar({ onNewChat, onToggleHistory, showHistory, onClose }: { onNewCha
                       title={session.title}
                     >
                       {isStreaming && (
-                        <div className="absolute inset-0 pointer-events-none running-stripes" />
+                        <span className="relative z-10 inline-flex h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse mr-1.5" />
                       )}
                       <MessageSquare size={12} className={cn('flex-shrink-0 relative z-10 transition-colors', isActive ? 'text-green-500' : 'opacity-60')} />
                       <span className="whitespace-nowrap max-w-[140px] truncate relative z-10">
