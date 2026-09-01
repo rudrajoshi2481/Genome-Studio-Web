@@ -7,7 +7,6 @@ import { FileExplorer_New } from './FileExplorer_New'
 import Nodebar from './Nodebar/Nodebar'
 import PackageManager from './PackageManager/PackageManager'
 import CronJobs from './CronJobs/CronJobs'
-import Extensions from './Extensions/Extensions'
 import ServerPanel from './ServerPanel/ServerPanel'
 import { cn } from '@/lib/utils'
 
@@ -26,7 +25,6 @@ function Sidebar() {
           <div className={cn("absolute inset-0", activeItem === 'Nodebar' ? 'block' : 'hidden')}><Nodebar /></div>
           <div className={cn("absolute inset-0", activeItem === 'Package Manager' ? 'block' : 'hidden')}><PackageManager /></div>
           <div className={cn("absolute inset-0", activeItem === 'Cron Jobs' ? 'block' : 'hidden')}><CronJobs /></div>
-          <div className={cn("absolute inset-0", activeItem === 'Extensions' ? 'block' : 'hidden')}><Extensions /></div>
           <div className={cn("absolute inset-0", activeItem === 'Server' ? 'block' : 'hidden')}><ServerPanel /></div>
         </div>
       </div>

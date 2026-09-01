@@ -25,6 +25,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Message } from "./chatStore";
+import AgentTaskPanel from "./AgentTaskPanel";
+import type { QueueTodoItem } from "./chatStore";
 
 interface ToolMessageProps {
   message: Message;
@@ -43,9 +45,39 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
 
   const isCommandTool = toolName === "run_command";
   const isWebSearch = toolName === "web_search" || toolName === "web_fetch";
+  const isTodoWrite = toolName === "todo_write";
   const command = toolArgs?.command || "";
   const explanation = toolArgs?.explanation || "";
   const needsApproval = message.confirmation?.state === "approval-requested";
+
+  // --- Parse todo_write args into QueueTodoItem[] for AgentTaskPanel ---
+  const todoItems: QueueTodoItem[] = isTodoWrite
+    ? (() => {
+        try {
+          let rawTodos = toolArgs?.todos;
+          if (typeof rawTodos === "string") {
+            rawTodos = JSON.parse(rawTodos);
+          }
+          if (!Array.isArray(rawTodos)) return [];
+          return rawTodos.map((item: any, idx: number) => {
+            const status: QueueTodoItem["status"] =
+              item.status === "completed"
+                ? "completed"
+                : item.status === "in_progress" || item.status === "active"
+                  ? "active"
+                  : "pending";
+            return {
+              id: `todo-${idx}-${item.content?.slice(0, 20) || idx}`,
+              title: item.content || item.title || "",
+              description: item.description,
+              status,
+            };
+          });
+        } catch {
+          return [];
+        }
+      })()
+    : [];
 
   const filePathTools = ["read_file", "edit_file", "write_file", "list_directory", "notebook_edit", "lsp_tool"];
   const filePath = filePathTools.includes(toolName)
@@ -131,7 +163,14 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
   // --- Generic tool rendering using ai-elements Tool ---
   return (
     <div className="px-1 mt-1 mb-1 py-0 group/tool">
-      {needsApproval && explanation ? (
+      {/* --- Special rendering for todo_write: use AgentTaskPanel --- */}
+      {isTodoWrite && todoItems.length > 0 && !needsApproval ? (
+        <AgentTaskPanel
+          todos={todoItems}
+          readOnly
+          defaultOpen={true}
+        />
+      ) : needsApproval && explanation ? (
         // When awaiting approval, show the explanation as the primary content
         // instead of raw tool args JSON
         <div className="rounded-lg border border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/10 p-3 space-y-2">

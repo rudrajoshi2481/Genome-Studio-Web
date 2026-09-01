@@ -174,7 +174,17 @@ function FileTab({
     }
   }
   const handleMoveToNewWindow = () => {
-    const url = `/editor-window?path=${encodeURIComponent(path)}`
+    // Pass the auth token as a query param so the new window is authenticated
+    // (SameSite=Strict cookies may not be sent on window.open navigation)
+    let token = ''
+    try {
+      const cookies = document.cookie.split(';')
+      const tokenCookie = cookies.find(c => c.trim().startsWith('bioinformatics_studio_token='))
+      if (tokenCookie) token = tokenCookie.split('=')[1]
+      if (!token) token = localStorage.getItem('bioinformatics_studio_token') || ''
+    } catch {}
+
+    const url = `/editor-window?path=${encodeURIComponent(path)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
     if (typeof window !== 'undefined' && (window as any).electronAPI?.openWindow) {
       ;(window as any).electronAPI.openWindow(url)
     } else {

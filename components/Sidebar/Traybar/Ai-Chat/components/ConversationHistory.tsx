@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Plus, MessageSquare, Clock, Zap, FlaskConical, Code2, BarChart3, Dna, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { useChatStore, Conversation } from './chatStore';
+import { shallow } from 'zustand/shallow';
 import { getApiBaseUrl } from '@/config/server';
 import { cn } from '@/lib/utils';
 
@@ -21,7 +22,14 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({ onNewConversa
     isLoading,
     setLoading,
     currentConversationId,
-  } = useChatStore();
+  } = useChatStore(s => ({
+    conversations: s.conversations,
+    setCurrentConversation: s.setCurrentConversation,
+    setConversations: s.setConversations,
+    isLoading: s.isLoading,
+    setLoading: s.setLoading,
+    currentConversationId: s.currentConversationId,
+  }), shallow);
 
   const [showAll, setShowAll] = useState(false);
 

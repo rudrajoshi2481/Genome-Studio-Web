@@ -426,6 +426,12 @@ export interface InstallResult {
     output: string;
     error: string | null;
   };
+  pip_install?: {
+    ran: boolean;
+    output: string;
+    error: string | null;
+  };
+  conda_envs?: string[];
 }
 
 export async function installPackage(packageId: number, version?: string): Promise<InstallResult> {
@@ -450,6 +456,8 @@ export interface InstalledPackage {
   installed_node_db_ids: number[];
   node_count: number;
   install_summary: InstallResult | null;
+  conda_envs?: string[];
+  pip_packages?: string[];
   icon_url: string | null;
   created_at: string | null;
 }

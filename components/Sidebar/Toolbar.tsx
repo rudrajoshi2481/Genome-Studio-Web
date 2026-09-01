@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, TimerReset, Puzzle, Server, Boxes } from 'lucide-react'
+import { Folder, LucideIcon, Workflow, KanbanSquare, PackageSearch, TimerReset, Server, Boxes } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { getHost, getPort } from '@/config/server'
@@ -24,7 +24,6 @@ import Nodebar from './Nodebar/Nodebar'
 import Settings from '../settings/Settings'
 import PackageManager from './PackageManager/PackageManager'
 import CronJobs from './CronJobs/CronJobs'
-import Extensions from './Extensions/Extensions'
 import ServerPanel from './ServerPanel/ServerPanel'
 
 /**
@@ -120,17 +119,11 @@ function Toolbar({ onActiveItemChange, sidebarOpen, onToggleSidebar }: ToolbarPr
       component: () => <CronJobs />
     },
     {
-      name: "Extensions",
-      icon: Puzzle,
-      type: "sidebar",
-      component: () => <Extensions />,
-      separatorAfter: true
-    },
-    {
       name: "Extensions Hub",
       icon: Boxes,
       type: "page",
-      link: "/extensions-hub"
+      link: "/extensions-hub",
+      separatorAfter: true
     },
     {
       name: "Server",

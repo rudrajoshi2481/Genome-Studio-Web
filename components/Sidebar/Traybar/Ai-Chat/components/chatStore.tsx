@@ -29,7 +29,7 @@ export interface QueueTodoItem {
   id: string
   title: string
   description?: string
-  status: 'completed' | 'pending'
+  status: 'completed' | 'active' | 'pending'
 }
 
 export interface PendingFile {
@@ -80,11 +80,13 @@ export interface Message {
   errorKind?: 'rate_limit' | 'timeout' | 'context_length' | 'auth' | 'connection' | 'generic'
   errorTitle?: string
   errorDetail?: string
+  errorCode?: string
   canRetry?: boolean
   // Retry message metadata (type === 'retry')
   retryAttempt?: number
   retryMaxAttempts?: number
   retryDelay?: number
+  // errorCode is shared with error messages (declared above)
   reasoning?: {
     content: string
     isStreaming?: boolean

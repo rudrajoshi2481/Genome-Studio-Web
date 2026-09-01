@@ -16,55 +16,87 @@ function parseLlmError(raw: string): {
   kind: 'rate_limit' | 'timeout' | 'context_length' | 'auth' | 'connection' | 'generic';
   title: string;
   detail: string;
+  errorCode?: string;
 } {
   const text = (raw || '').trim();
   const lower = text.toLowerCase();
 
-  // Strip the "LLM error: " / "Error: " prefix from the user-facing detail
-  const detail = text
+  // Strip the "LLM error: " / "Error: " prefix
+  const cleaned = text
     .replace(/^llm error:\s*/i, '')
     .replace(/^error:\s*/i, '')
     .trim();
 
-  if (lower.includes('rate limit') || lower.includes('429') || lower.includes('1302')) {
+  // Try to extract a JSON payload from the error string
+  // e.g. "429 - {'error': {'code': '1305', 'message': 'The service may be temporarily overloaded...'}}"
+  let extractedMessage = '';
+  let extractedCode: string | undefined;
+
+  // Python-style single quotes → JSON double quotes
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const jsonStr = jsonMatch[0].replace(/'/g, '"');
+      const parsed = JSON.parse(jsonStr);
+      const error = parsed.error || parsed;
+      if (typeof error === 'object' && error !== null) {
+        extractedMessage = error.message || error.error_message || (typeof error.error === 'string' ? error.error : '') || '';
+        extractedCode = typeof error.code === 'string' ? error.code : (typeof error.code === 'number' ? String(error.code) : undefined);
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  // Use the extracted message if available, otherwise the cleaned text
+  const detail = extractedMessage || cleaned;
+  const displayLower = (extractedMessage || cleaned).toLowerCase();
+
+  if (lower.includes('rate limit') || lower.includes('429') || lower.includes('1302') || lower.includes('1305') || (extractedCode && ['1302', '1305', '429'].includes(extractedCode))) {
     return {
       kind: 'rate_limit',
       title: 'Rate limit reached',
-      detail: detail || 'The AI provider is throttling requests. Please wait a moment and try again.',
+      detail: extractedMessage || 'The AI provider is throttling requests. Please wait a moment and try again.',
+      errorCode: extractedCode,
     };
   }
   if (lower.includes('timed out') || lower.includes('timeout') || lower.includes('no chunk received')) {
     return {
       kind: 'timeout',
       title: 'Response timed out',
-      detail: detail || 'The model took too long to respond. It may still be loading — try again in a few seconds.',
+      detail: extractedMessage || 'The model took too long to respond. It may still be loading — try again in a few seconds.',
+      errorCode: extractedCode,
     };
   }
   if (lower.includes('context length') || lower.includes('prompt is too long') || lower.includes('too many tokens') || lower.includes('maximum context')) {
     return {
       kind: 'context_length',
       title: 'Conversation too long',
-      detail: detail || 'The conversation exceeded the model\'s context window. Try starting a new chat or removing some context.',
+      detail: extractedMessage || 'The conversation exceeded the model\'s context window. Try starting a new chat or removing some context.',
+      errorCode: extractedCode,
     };
   }
   if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('authentication') || lower.includes('api key')) {
     return {
       kind: 'auth',
       title: 'Authentication error',
-      detail: detail || 'The AI provider rejected the request due to missing or invalid credentials.',
+      detail: extractedMessage || 'The AI provider rejected the request due to missing or invalid credentials.',
+      errorCode: extractedCode,
     };
   }
   if (lower.includes('connection') || lower.includes('econnrefused') || lower.includes('network') || lower.includes('websocket')) {
     return {
       kind: 'connection',
       title: 'Connection problem',
-      detail: detail || 'Could not reach the AI service. Check your network and try again.',
+      detail: extractedMessage || 'Could not reach the AI service. Check your network and try again.',
+      errorCode: extractedCode,
     };
   }
   return {
     kind: 'generic',
     title: 'Something went wrong',
     detail: detail || text || 'An unexpected error occurred while contacting the AI model.',
+    errorCode: extractedCode,
   };
 }
 
@@ -318,32 +350,38 @@ export const useChatWebSocket = () => {
         case 'complete': {
           // Final completion - finalize streaming ai message and reasoning blocks
           if (isActiveSession) {
-            useChatStore.setState((state) => ({
-              messages: state.messages
-                .filter(m => m.type !== 'thinking')
-                .map(m => {
-                  if (m.type === 'ai' && m.isStreaming) {
-                    return { ...m, isStreaming: false, isComplete: true };
-                  }
-                  if (m.type === 'reasoning' && m.reasoning?.isStreaming) {
-                    return { ...m, reasoning: { ...m.reasoning, isStreaming: false } };
-                  }
-                  return m;
-                })
-            }));
-            // Add a separator to visually mark the end of the AI response
-            const sepState = useChatStore.getState();
-            const lastMsg = sepState.messages[sepState.messages.length - 1];
-            if (lastMsg && lastMsg.type !== 'separator' && lastMsg.type !== 'human') {
-              sepState.addMessage({
-                type: 'separator',
-                role: 'system',
-                content: '',
+            // Batch all state changes into a single setState to avoid
+            // "Maximum update depth exceeded" from multiple synchronous
+            // forceStoreRerender calls.
+            const prevState = useChatStore.getState();
+            const finalized = prevState.messages
+              .filter(m => m.type !== 'thinking')
+              .map(m => {
+                if (m.type === 'ai' && m.isStreaming) {
+                  return { ...m, isStreaming: false, isComplete: true };
+                }
+                if (m.type === 'reasoning' && m.reasoning?.isStreaming) {
+                  return { ...m, reasoning: { ...m.reasoning, isStreaming: false } };
+                }
+                return m;
               });
-            }
-              useChatStore.getState().setStreamingMessage(null);
-              useChatStore.getState().setCurrentReasoningId(null);
-              sessionSetLoading(false);
+            // Add separator if needed
+            const lastMsg = finalized[finalized.length - 1];
+            const messages: any[] = (lastMsg && lastMsg.type !== 'separator' && lastMsg.type !== 'human')
+              ? [...finalized, {
+                  id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                  timestamp: new Date().toISOString(),
+                  type: 'separator' as const,
+                  role: 'system' as const,
+                  content: '',
+                }]
+              : finalized;
+            useChatStore.setState({
+              messages,
+              currentStreamingMessageId: null,
+              currentReasoningId: null,
+              isLoading: false,
+            });
           } else {
             // Background session — finalize streaming messages there
             sessionUpdateMessages(msgs =>
@@ -981,16 +1019,21 @@ export const useChatWebSocket = () => {
           }
           break;
         }
-        case 'retry':
+        case 'retry': {
+          // Parse the raw error string to extract a clean message + code
+          const rawReason = message.message || '';
+          const parsedRetry = parseLlmError(rawReason);
           sessionAddMessage({
             type: 'retry',
             role: 'system',
-            content: message.message || '',
+            content: parsedRetry.detail || rawReason,
             retryAttempt: message.attempt,
             retryMaxAttempts: message.max_attempts,
             retryDelay: message.delay,
+            errorCode: parsedRetry.errorCode,
           });
           break;
+        }
         case 'model_fallback':
           sessionAddMessage({
             type: 'system',
@@ -1105,25 +1148,49 @@ export const useChatWebSocket = () => {
           const parsed = parseLlmError(message.content || '');
           // Rate-limit and timeout errors are typically transient and safe to retry
           const canRetry = parsed.kind === 'rate_limit' || parsed.kind === 'timeout' || parsed.kind === 'connection';
-          // Remove thinking messages so the error is visible
-          sessionUpdateMessages(msgs => {
-            if (!msgs.some(m => m.type === 'thinking')) return msgs;
-            return msgs.filter(m => m.type !== 'thinking');
-          });
-          sessionAddMessage({
-            type: 'error',
-            role: 'system',
-            content: parsed.detail,
-            errorKind: parsed.kind,
-            errorTitle: parsed.title,
-            errorDetail: parsed.detail,
-            canRetry,
-          });
-          // Always clear loading state — works for both active and background sessions
-          sessionSetLoading(false);
-          if (isActiveSession) {
-            useChatStore.getState().setStreamingMessage(null);
-            useChatStore.getState().setCurrentReasoningId(null);
+          // Batch all state changes into a single setState to avoid
+          // "Maximum update depth exceeded" from multiple synchronous
+          // forceStoreRerender calls.
+          if (isActiveSession || !msgSessionId) {
+            const prev = useChatStore.getState();
+            const filtered = prev.messages.some(m => m.type === 'thinking')
+              ? prev.messages.filter(m => m.type !== 'thinking')
+              : prev.messages;
+            const errorId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+            useChatStore.setState({
+              messages: [...filtered, {
+                id: errorId,
+                timestamp: new Date().toISOString(),
+                type: 'error' as const,
+                role: 'system' as const,
+                content: parsed.detail,
+                errorKind: parsed.kind,
+                errorTitle: parsed.title,
+                errorDetail: parsed.detail,
+                errorCode: parsed.errorCode,
+                canRetry,
+              }],
+              isLoading: false,
+              currentStreamingMessageId: null,
+              currentReasoningId: null,
+            });
+          } else {
+            // Background session — route to session
+            useChatStore.getState().addMessageToSession(msgSessionId, {
+              type: 'error',
+              role: 'system',
+              content: parsed.detail,
+              errorKind: parsed.kind,
+              errorTitle: parsed.title,
+              errorDetail: parsed.detail,
+              errorCode: parsed.errorCode,
+              canRetry,
+            });
+            useChatStore.setState(state => ({
+              openSessions: state.openSessions.map(s =>
+                s.id === msgSessionId ? { ...s, isLoading: false } : s
+              ),
+            }));
           }
           break;
         }
@@ -1355,6 +1422,7 @@ export const useChatWebSocket = () => {
         errorKind: parsed.kind,
         errorTitle: parsed.title,
         errorDetail: parsed.detail,
+        errorCode: parsed.errorCode,
         canRetry: true,
       });
       useChatStore.getState().setLoading(false);

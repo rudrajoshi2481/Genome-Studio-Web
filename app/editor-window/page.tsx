@@ -28,15 +28,35 @@ function EditorWindowContent() {
   const tabId = `editor-window-${filePath}`
 
   useEffect(() => {
-    // Ensure auth is available in this new window (shared via localStorage)
-    const authState = useAuthStore.getState()
-    if (authState.isAuthenticated && authState.token) {
+    // Check for token passed via URL query param (for new windows where
+    // SameSite=Strict cookies aren't sent on initial navigation)
+    const urlToken = searchParams.get('token')
+
+    if (urlToken) {
+      // Store token in cookie and localStorage so API calls work
       const maxAge = 7 * 24 * 60 * 60
-      document.cookie = `${config.auth.tokenStorageKey}=${authState.token}; path=/; max-age=${maxAge}; SameSite=Strict`
+      document.cookie = `${config.auth.tokenStorageKey}=${urlToken}; path=/; max-age=${maxAge}; SameSite=Strict`
+      localStorage.setItem(config.auth.tokenStorageKey, urlToken)
+      const expiryTime = Date.now() + maxAge * 1000
+      localStorage.setItem(config.auth.tokenExpiryKey, expiryTime.toString())
+      useAuthStore.setState({ isAuthenticated: true, token: urlToken, isLoading: false })
+
+      // Clean the URL so the token doesn't stay visible
+      if (typeof window !== 'undefined') {
+        const cleanUrl = window.location.pathname + `?path=${encodeURIComponent(filePath)}`
+        window.history.replaceState({}, '', cleanUrl)
+      }
     } else {
-      const token = getToken()
-      if (token) {
-        useAuthStore.setState({ isAuthenticated: true, token, isLoading: false })
+      // No token in URL — check if already authenticated via auth store
+      const authState = useAuthStore.getState()
+      if (authState.isAuthenticated && authState.token) {
+        const maxAge = 7 * 24 * 60 * 60
+        document.cookie = `${config.auth.tokenStorageKey}=${authState.token}; path=/; max-age=${maxAge}; SameSite=Strict`
+      } else {
+        const token = getToken()
+        if (token) {
+          useAuthStore.setState({ isAuthenticated: true, token, isLoading: false })
+        }
       }
     }
 
@@ -63,7 +83,7 @@ function EditorWindowContent() {
     }
 
     setReady(true)
-  }, [config.auth.tokenStorageKey, filePath, tabId])
+  }, [config.auth.tokenStorageKey, config.auth.tokenExpiryKey, searchParams, filePath, tabId])
 
   if (!ready) {
     return (

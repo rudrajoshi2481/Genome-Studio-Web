@@ -23,9 +23,38 @@ import { CodeBlock } from "./code-block";
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
+// ---------------------------------------------------------------------------
+// Tool category → color mapping (for left strip + header stripes)
+// ---------------------------------------------------------------------------
+export type ToolCategory =
+  | "command" | "file" | "database" | "web" | "canvas" | "todo" | "generic";
+
+export const toolCategoryColors: Record<
+  ToolCategory,
+  { strip: string; stripe: string; bg: string; icon: string }
+> = {
+  command:  { strip: "bg-orange-500",   stripe: "rgba(249, 115, 22, 0.10)",  bg: "bg-orange-500/5",   icon: "text-orange-500" },
+  file:     { strip: "bg-blue-500",     stripe: "rgba(59, 130, 246, 0.10)",  bg: "bg-blue-500/5",     icon: "text-blue-500" },
+  database: { strip: "bg-purple-500",   stripe: "rgba(168, 85, 247, 0.10)",  bg: "bg-purple-500/5",   icon: "text-purple-500" },
+  web:      { strip: "bg-cyan-500",     stripe: "rgba(6, 182, 212, 0.10)",   bg: "bg-cyan-500/5",     icon: "text-cyan-500" },
+  canvas:   { strip: "bg-emerald-500",  stripe: "rgba(16, 185, 129, 0.10)",  bg: "bg-emerald-500/5",  icon: "text-emerald-500" },
+  todo:     { strip: "bg-pink-500",     stripe: "rgba(236, 72, 153, 0.10)",  bg: "bg-pink-500/5",     icon: "text-pink-500" },
+  generic:  { strip: "bg-muted-foreground", stripe: "rgba(107, 114, 128, 0.08)", bg: "bg-muted/30",    icon: "text-muted-foreground" },
+};
+
+export function categorizeTool(toolName: string): ToolCategory {
+  if (toolName === "run_command") return "command";
+  if (["read_file", "edit_file", "write_file", "list_directory", "notebook_edit", "lsp_tool"].includes(toolName)) return "file";
+  if (["query_entrez_database", "bio_query", "query_bio_database"].includes(toolName)) return "database";
+  if (["web_search", "web_fetch"].includes(toolName)) return "web";
+  if (toolName.startsWith("canvas_")) return "canvas";
+  if (toolName === "todo_write") return "todo";
+  return "generic";
+}
+
 export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
-    className={cn("group not-prose mb-1 w-full rounded-md border", className)}
+    className={cn("group not-prose mb-1 w-full rounded-md border overflow-hidden", className)}
     {...props}
   />
 );
@@ -95,19 +124,31 @@ export const ToolHeader = ({
     return { name, dir };
   })() : null;
 
+  // --- Color-coded strip by tool category ---
+  const category = toolName ? categorizeTool(toolName) : "generic";
+  const colors = toolCategoryColors[category];
+  const isRunning = state === "input-available" || state === "input-streaming";
+
   return (
     <CollapsibleTrigger
       asChild
     >
       <div
         className={cn(
-          "flex w-full items-center justify-between gap-2 p-2 cursor-pointer",
+          "flex w-full items-center justify-between gap-2 p-2 cursor-pointer relative overflow-hidden",
+          colors.bg,
           className
         )}
+        style={{
+          backgroundImage: `repeating-linear-gradient(135deg, transparent, transparent 6px, ${colors.stripe} 6px, ${colors.stripe} 12px)`,
+          backgroundSize: "200% 100%",
+        }}
         {...props}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
-          <WrenchIcon className="size-3.5 text-muted-foreground shrink-0" />
+        {/* Left color strip */}
+        <div className={cn("absolute left-0 top-0 bottom-0 w-0.5", colors.strip)} />
+        <div className="flex items-center gap-1.5 min-w-0 pl-1">
+          <WrenchIcon className={cn("size-3.5 shrink-0", colors.icon)} />
           <span className="font-bold text-xs shrink-0">{title ?? derivedName}</span>
           {command && (() => {
             const isPath = command.startsWith("/") || command.startsWith("./") || command.startsWith("~/");

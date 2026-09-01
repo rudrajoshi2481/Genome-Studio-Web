@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useChatStore, PendingFile } from "./chatStore";
+import { shallow } from "zustand/shallow";
 import { useTabStore } from "@/components/FileTabs/useTabStore";
 import { getApiBaseUrl } from "@/config/server";
 
@@ -74,7 +75,13 @@ const FileApprovalPanel: React.FC<FileApprovalPanelProps> = ({ sessionId }) => {
     removePendingFile,
     clearPendingFiles,
     setShowFilePanel,
-  } = useChatStore();
+  } = useChatStore(s => ({
+    pendingFiles: s.pendingFiles,
+    showFilePanel: s.showFilePanel,
+    removePendingFile: s.removePendingFile,
+    clearPendingFiles: s.clearPendingFiles,
+    setShowFilePanel: s.setShowFilePanel,
+  }), shallow);
 
   const [collapsed, setCollapsed] = React.useState(false);
 

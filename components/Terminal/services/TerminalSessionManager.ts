@@ -4,13 +4,17 @@
  * to prevent history loss during component remounts and resizes.
  */
 
+interface IDisposable {
+  dispose(): void;
+}
+
 interface XTerminal {
   dispose(): void;
   open(element: HTMLElement): void;
   write(data: string): void;
   writeln(data: string): void;
   clear(): void;
-  onData(callback: (data: string) => void): void;
+  onData(callback: (data: string) => void): IDisposable;
   loadAddon(addon: any): void;
   cols: number;
   rows: number;
@@ -30,6 +34,7 @@ interface TerminalSession {
   buffer: string; // Store terminal output for persistence
   isAttached: boolean; // Track if terminal is currently attached to DOM
   dataHandler: ((data: string) => void) | null; // Track data handler for cleanup
+  dataHandlerDisposable: IDisposable | null; // Disposable for the onData listener
   reconnectAttempts: number; // Track reconnection attempts
   tmuxUnavailable: boolean; // Track if tmux is not available on the server
   cwd?: string; // Working directory for the terminal session
@@ -144,6 +149,7 @@ class TerminalSessionManager {
         buffer: '',
         isAttached: false,
         dataHandler: null,
+        dataHandlerDisposable: null,
         reconnectAttempts: 0,
         tmuxUnavailable: false,
         cwd: undefined
@@ -263,7 +269,13 @@ class TerminalSessionManager {
     }
 
     // Remove existing data handler to prevent duplicates
-    if (session.dataHandler) {
+    if (session.dataHandlerDisposable) {
+      try {
+        session.dataHandlerDisposable.dispose();
+      } catch (e) {
+        console.warn('Failed to dispose terminal data handler:', e);
+      }
+      session.dataHandlerDisposable = null;
       session.dataHandler = null;
     }
 
@@ -345,17 +357,15 @@ class TerminalSessionManager {
           resolve(false);
         };
 
-        // Handle terminal input - only add handler if we don't have one
-        if (!session.dataHandler) {
-          const dataHandler = (data: string) => {
-            if (session.websocket?.readyState === WebSocket.OPEN) {
-              session.websocket.send(data);
-            }
-          };
-          
-          session.dataHandler = dataHandler;
-          session.terminal.onData(dataHandler);
-        }
+        // Handle terminal input - always re-register after disposing the old one
+        const dataHandler = (data: string) => {
+          if (session.websocket?.readyState === WebSocket.OPEN) {
+            session.websocket.send(data);
+          }
+        };
+
+        session.dataHandler = dataHandler;
+        session.dataHandlerDisposable = session.terminal.onData(dataHandler);
 
         // Timeout for connection
         setTimeout(() => {

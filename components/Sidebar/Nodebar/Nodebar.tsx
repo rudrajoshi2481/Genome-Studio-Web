@@ -184,15 +184,19 @@ function Nodebar() {
     }
   }, [token, isAuthenticated, isClient])
 
-  // Listen for extension-installed events to refresh nodes
+  // Listen for extension-installed and package-installed events to refresh nodes
   useEffect(() => {
     if (!isClient) return
-    const handleExtensionInstalled = () => {
-      console.log('[Nodebar] extension-installed event received, refreshing nodes...')
+    const handleInstalled = () => {
+      console.log('[Nodebar] install event received, refreshing nodes...')
       loadCustomNodes()
     }
-    window.addEventListener('extension-installed', handleExtensionInstalled)
-    return () => window.removeEventListener('extension-installed', handleExtensionInstalled)
+    window.addEventListener('extension-installed', handleInstalled)
+    window.addEventListener('package-installed', handleInstalled)
+    return () => {
+      window.removeEventListener('extension-installed', handleInstalled)
+      window.removeEventListener('package-installed', handleInstalled)
+    }
   }, [isClient, token, isAuthenticated])
   
   // Function to load favorites from backend

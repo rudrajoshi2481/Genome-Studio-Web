@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { getApiBaseUrl } from "@/config/server"
 import { useChatStore } from "../components/chatStore"
+import { shallow } from "zustand/shallow"
 import { wsService } from "../hooks/wsService"
 import type {
   ProviderInfo,
@@ -58,7 +59,16 @@ export function useChatSettings(open: boolean) {
     permissionMode,
     setPermissionMode,
     resetPermissionMode,
-  } = useChatStore()
+  } = useChatStore(s => ({
+    enabledDatabases: s.enabledDatabases,
+    toggleDatabase: s.toggleDatabase,
+    setEnabledDatabases: s.setEnabledDatabases,
+    keepIntermediateFiles: s.keepIntermediateFiles,
+    setKeepIntermediateFiles: s.setKeepIntermediateFiles,
+    permissionMode: s.permissionMode,
+    setPermissionMode: s.setPermissionMode,
+    resetPermissionMode: s.resetPermissionMode,
+  }), shallow)
 
   // Permission state
   const [permAllowedTools, setPermAllowedTools] = useState<string[]>([])

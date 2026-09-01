@@ -1,12 +1,57 @@
 "use client";
 
 import React from "react";
-import { Loader2, RefreshCw } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { RefreshCw, Clock } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Message as ChatMessage } from "./chatStore";
 
 interface RetryMessageProps {
   message: ChatMessage;
+}
+
+function parseErrorReason(reason: string | undefined): {
+  title: string;
+  code?: string;
+} {
+  if (!reason) return { title: "" };
+
+  // Try to extract a JSON-ish error payload
+  // Backend sends Python-style single quotes: {'error': {'code': '1305', 'message': '...'}}
+  const jsonMatch = reason.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      // Convert Python single quotes to JSON double quotes
+      const jsonStr = jsonMatch[0].replace(/'/g, '"');
+      const parsed = JSON.parse(jsonStr);
+      const error = parsed.error || parsed;
+      if (typeof error === "object" && error !== null) {
+        const message =
+          error.message ||
+          error.error_message ||
+          (typeof error.error === "string" ? error.error : "");
+        const code = error.code;
+        if (message) {
+          return {
+            title: message,
+            code: typeof code === "string" ? code : (typeof code === "number" ? String(code) : undefined),
+          };
+        }
+      }
+    } catch {
+      // fall through to text cleanup
+    }
+  }
+
+  // Friendly text cleanup
+  const title = reason
+    .replace(/^LLM stream timed out.*?(?:\(.*?\))?/i, "Model is taking a while to respond")
+    .replace(/^LLM error:\s*/i, "")
+    .replace(/^Error code:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return { title };
 }
 
 function RetryMessage({ message }: RetryMessageProps) {
@@ -15,39 +60,41 @@ function RetryMessage({ message }: RetryMessageProps) {
   const delay = message.retryDelay;
   const reason = message.content;
 
-  // Friendly reason text — strip verbose prefixes from the backend
-  const friendlyReason = reason
-    ? reason
-        .replace(/^LLM stream timed out.*?(?:\(.*?\))?/i, "Model is taking a while to respond")
-        .replace(/^LLM error:\s*/i, "")
-        .trim()
-    : "";
+  // If the WebSocket handler already parsed the error, use that code.
+  // Otherwise parse the content ourselves.
+  const { title } = parseErrorReason(reason);
+  const code = message.errorCode;
 
   return (
     <div className="my-1 px-1">
-      <div className="rounded-lg border border-amber-500/25 dark:border-amber-400/20 bg-amber-500/10 px-3 py-2 flex gap-2.5 items-center">
-        <Loader2 className="size-4 shrink-0 text-amber-600 dark:text-amber-400 animate-spin" />
-        <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap text-xs">
-          <span className="font-medium text-foreground inline-flex items-center gap-1.5">
-            <RefreshCw className="size-3 text-amber-600 dark:text-amber-400" />
-            Retrying
-            {typeof attempt === "number" && (
-              <span className="text-muted-foreground font-normal">
-                attempt {attempt}
-                {typeof maxAttempts === "number" ? ` of ${maxAttempts}` : ""}
-              </span>
-            )}
-          </span>
-          {friendlyReason && (
-            <span className="text-muted-foreground truncate">— {friendlyReason}</span>
+      <Alert className="py-2.5 px-3">
+        <RefreshCw className="size-4" />
+        <AlertTitle className="flex items-center gap-2 flex-wrap text-sm">
+          Retrying
+          {typeof attempt === "number" && (
+            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+              attempt {attempt}
+              {typeof maxAttempts === "number" ? ` / ${maxAttempts}` : ""}
+            </Badge>
           )}
           {typeof delay === "number" && delay > 0 && (
-            <span className={cn("text-[10px] text-amber-700/80 dark:text-amber-300/80")}>
+            <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1 font-normal">
+              <Clock className="size-3" />
               in {delay}s
             </span>
           )}
-        </div>
-      </div>
+        </AlertTitle>
+        {title && (
+          <AlertDescription className="text-xs leading-relaxed break-words">
+            {title}
+            {code && (
+              <span className="ml-1.5 text-[10px] text-muted-foreground/70 font-mono">
+                (code {code})
+              </span>
+            )}
+          </AlertDescription>
+        )}
+      </Alert>
     </div>
   );
 }

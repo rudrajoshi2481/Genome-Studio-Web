@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal, RefreshCw, Check, WifiOff, Download, Boxes, ShieldCheck, ShieldAlert, Shield, ChevronDown } from 'lucide-react'
 import ChatFeaturesDialog from './ChatFeaturesDialog'
 import { useChatStore } from './components/chatStore'
+import { shallow } from 'zustand/shallow'
 import {
   PromptInput,
   PromptInputFooter,
@@ -139,7 +140,30 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
     setPinnedModels: storeSetPinnedModels,
     permissionMode,
     setPermissionMode,
-  } = useChatStore()
+  } = useChatStore(s => ({
+    isLoading: s.isLoading,
+    tokenUsage: s.tokenUsage,
+    contextWindow: s.contextWindow,
+    contextTokens: s.contextTokens,
+    setContextWindow: s.setContextWindow,
+    addQueuedMessage: s.addQueuedMessage,
+    uploadedFiles: s.uploadedFiles,
+    addUploadedFile: s.addUploadedFile,
+    removeUploadedFile: s.removeUploadedFile,
+    clearUploadedFiles: s.clearUploadedFiles,
+    clearMentions: s.clearMentions,
+    setMentions: s.setMentions,
+    clearMessages: s.clearMessages,
+    setCurrentConversation: s.setCurrentConversation,
+    openSession: s.openSession,
+    cacheCurrentSession: s.cacheCurrentSession,
+    selectedModel: s.selectedModel,
+    setSelectedModel: s.setSelectedModel,
+    pinnedModels: s.pinnedModels,
+    setPinnedModels: s.setPinnedModels,
+    permissionMode: s.permissionMode,
+    setPermissionMode: s.setPermissionMode,
+  }), shallow)
 
   // Use store values as source of truth. Initialize with default for SSR consistency;
   // actual value from localStorage/store is applied in useEffect after hydration.

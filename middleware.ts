@@ -38,9 +38,15 @@ export function middleware(request: NextRequest) {
   
   // Get the token from cookies
   const token = request.cookies.get('bioinformatics_studio_token')?.value;
-  
+
+  // Also check for token in query params — this allows opening authenticated
+  // pages in new windows (e.g. /editor-window?path=...&token=... or
+  // /terminal-window?tabId=...&token=...) where SameSite=Strict cookies
+  // are not sent on the initial navigation.
+  const queryToken = request.nextUrl.searchParams.get('token');
+
   // Debug logging
-  console.log(`[Auth] ${pathname} - Public: ${isPublicPath}, Static: ${isStaticAsset}, API: ${isApiRoute}, Token: ${!!token}`);
+  console.log(`[Auth] ${pathname} - Public: ${isPublicPath}, Static: ${isStaticAsset}, API: ${isApiRoute}, Cookie Token: ${!!token}, Query Token: ${!!queryToken}`);
   
   // Special handling for root path - redirect to login
   if (pathname === '/') {
@@ -52,21 +58,34 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  // If there's no token and the path requires authentication, redirect to login
-  if (!token && !isApiRoute) {
+  // If there's no token (cookie or query) and the path requires authentication, redirect to login
+  if (!token && !queryToken && !isApiRoute) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', encodeURIComponent(pathname));
     return NextResponse.redirect(loginUrl);
   }
-  
+
   // If there's no token and it's an API route, return 401
-  if (!token && isApiRoute) {
+  if (!token && !queryToken && isApiRoute) {
     return new NextResponse(
       JSON.stringify({ success: false, message: 'Authentication required' }),
       { status: 401, headers: { 'content-type': 'application/json' } }
     );
   }
-  
+
+  // If we have a query token but no cookie, set the cookie on the response
+  // so subsequent requests (API calls, etc.) are authenticated.
+  if (!token && queryToken) {
+    const response = NextResponse.next();
+    const maxAge = 7 * 24 * 60 * 60; // 7 days
+    response.cookies.set('bioinformatics_studio_token', queryToken, {
+      path: '/',
+      maxAge,
+      sameSite: 'strict',
+    });
+    return response;
+  }
+
   // If there's a token, allow the request to proceed
   return NextResponse.next();
 }

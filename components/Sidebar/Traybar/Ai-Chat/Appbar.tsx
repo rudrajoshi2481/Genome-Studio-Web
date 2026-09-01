@@ -16,11 +16,20 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { useChatStore } from './components/chatStore'
+import { shallow } from 'zustand/shallow'
 import { cn } from '@/lib/utils'
 import React from 'react'
 
 function Appbar({ onNewChat, onToggleHistory, showHistory, onClose }: { onNewChat?: () => void; onToggleHistory?: () => void; showHistory?: boolean; onClose?: () => void }) {
-  const { isConnected, openSessions, activeSessionId, switchSession, closeSession, isLoading, currentStreamingMessageId } = useChatStore()
+  const { isConnected, openSessions, activeSessionId, switchSession, closeSession, isLoading, currentStreamingMessageId } = useChatStore(s => ({
+    isConnected: s.isConnected,
+    openSessions: s.openSessions,
+    activeSessionId: s.activeSessionId,
+    switchSession: s.switchSession,
+    closeSession: s.closeSession,
+    isLoading: s.isLoading,
+    currentStreamingMessageId: s.currentStreamingMessageId,
+  }), shallow)
 
   const handleNewChat = () => {
     onNewChat?.()

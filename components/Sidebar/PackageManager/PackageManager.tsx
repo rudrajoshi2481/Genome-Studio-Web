@@ -102,38 +102,45 @@ function PackageManager() {
     loadExtensionInstalledEnvs()
   }, [])
 
-  // Listen for extension install events
+  // Listen for extension/package install events
   useEffect(() => {
     const handler = () => loadExtensionInstalledEnvs()
     window.addEventListener('extension-installed', handler)
-    return () => window.removeEventListener('extension-installed', handler)
+    window.addEventListener('package-installed', handler)
+    return () => {
+      window.removeEventListener('extension-installed', handler)
+      window.removeEventListener('package-installed', handler)
+    }
   }, [])
 
   const loadExtensionInstalledEnvs = async () => {
     try {
       const token = authService.getToken()
       if (!token) {
-        console.warn('[PackageManager] No auth token, skipping extension envs load')
+        console.warn('[PackageManager] No auth token, skipping installed packages load')
         return
       }
-      const resp = await fetch(`${getApiBaseUrl()}/genomic-hub/installed/list`, {
+      const resp = await fetch(`${getApiBaseUrl()}/extensions-hub/installed`, {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       })
       if (!resp.ok) {
-        console.warn('[PackageManager] Failed to load extension installed envs:', resp.status)
+        console.warn('[PackageManager] Failed to load installed packages:', resp.status)
         return
       }
       const data = await resp.json()
+      const items = Array.isArray(data) ? data : (data.installed || [])
       const map: Record<string, { submissionTitle: string; condaEnvs: string[] }> = {}
-      for (const item of data.installed || []) {
-        for (const envName of item.condaEnvs || []) {
-          map[envName] = { submissionTitle: item.submissionTitle, condaEnvs: item.condaEnvs }
+      for (const item of items) {
+        const displayName = item.package_display_name || item.package_name || 'Unknown'
+        const envs: string[] = item.conda_envs || item.condaEnvs || []
+        for (const envName of envs) {
+          map[envName] = { submissionTitle: displayName, condaEnvs: envs }
         }
       }
-      console.log('[PackageManager] Loaded extension installed envs:', map)
+      console.log('[PackageManager] Loaded installed packages:', map)
       setExtensionInstalledEnvs(map)
     } catch (e) {
-      console.error('[PackageManager] Failed to load extension installed envs:', e)
+      console.error('[PackageManager] Failed to load installed packages:', e)
     }
   }
 

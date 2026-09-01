@@ -29,6 +29,7 @@ import { Editor } from "@tiptap/react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getApiBaseUrl } from "@/config/server";
 import { useChatStore } from "./chatStore";
+import { shallow } from "zustand/shallow";
 
 export interface ChatMention {
   type: "tool" | "agent" | "workflow" | "database" | "command" | "file" | "skill";
@@ -304,7 +305,7 @@ export function ChatMentionInputSuggestion({
   const [searchValue, setSearchValue] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [backendMentions, setBackendMentions] = useState<BackendMentions>({ agents: [], files: [], skills: [], commands: [], databases: [], tools: [] });
-  const { enabledDatabases } = useChatStore();
+  const { enabledDatabases } = useChatStore(s => ({ enabledDatabases: s.enabledDatabases }), shallow);
   const itemRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
   useEffect(() => {

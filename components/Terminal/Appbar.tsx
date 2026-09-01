@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { TerminalIcon, X as CloseIcon, Pencil, Trash2, Pin, PinOff, ChevronDown, Zap, Box, XCircle, ArrowRight, Layers } from 'lucide-react'
+import { TerminalIcon, X as CloseIcon, Pencil, Trash2, Pin, PinOff, ChevronDown, Zap, Box, XCircle, ArrowRight, Layers, ExternalLink } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { useTerminalStore } from './store/terminal-store'
@@ -111,6 +111,26 @@ function Appbar() {
     tabs.forEach(tab => closeTab(tab.id));
     // toast.success(`Closed all ${tabCount} tab(s)`);
   };
+
+  // Move terminal tab to a new standalone window
+  const handleMoveToNewWindow = (tabId: string, tabName: string, tabType: 'tmux' | 'simple') => {
+    // Pass the auth token as a query param so the new window is authenticated
+    // (SameSite=Strict cookies may not be sent on window.open navigation)
+    let token = ''
+    try {
+      const cookies = document.cookie.split(';')
+      const tokenCookie = cookies.find(c => c.trim().startsWith('bioinformatics_studio_token='))
+      if (tokenCookie) token = tokenCookie.split('=')[1]
+      if (!token) token = localStorage.getItem('bioinformatics_studio_token') || ''
+    } catch {}
+
+    const url = `/terminal-window?tabId=${encodeURIComponent(tabId)}&type=${encodeURIComponent(tabType)}&name=${encodeURIComponent(tabName)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.openWindow) {
+      ;(window as any).electronAPI.openWindow(url)
+    } else {
+      window.open(url, '_blank', 'width=900,height=600')
+    }
+  };
   
   return (
     <TooltipProvider>
@@ -205,6 +225,13 @@ function Appbar() {
                   >
                     <XCircle className="mr-2 h-4 w-4" />
                     Close All
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={() => handleMoveToNewWindow(tab.id, tab.name, tab.type)}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Move to New Window
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>

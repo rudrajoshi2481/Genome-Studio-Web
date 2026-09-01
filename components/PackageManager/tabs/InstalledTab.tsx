@@ -157,6 +157,7 @@ function InstalledPackageCard({
   const failedCount = summary?.failed || 0
   const successNodes = summary?.results?.filter(r => r.status === 'success') || []
   const nodeTitles = successNodes.map(r => r.title).join(', ')
+  const condaEnvs = record.conda_envs || []
 
   return (
     <div
@@ -198,6 +199,17 @@ function InstalledPackageCard({
         <p className="text-[10px] text-muted-foreground truncate mt-1.5 pl-10">
           {nodeTitles}
         </p>
+      )}
+
+      {/* Conda environment badges */}
+      {condaEnvs.length > 0 && (
+        <div className="flex items-center gap-1 mt-1.5 pl-10 flex-wrap">
+          {condaEnvs.map(env => (
+            <Badge key={env} className="text-[9px] h-3.5 px-1 bg-purple-500/10 text-purple-600 border-purple-500/20">
+              conda: {env}
+            </Badge>
+          ))}
+        </div>
       )}
 
       {/* Uninstall button — appears on hover */}

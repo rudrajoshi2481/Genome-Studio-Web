@@ -75,8 +75,9 @@ export default function BrowseTab({ onOpenPackage }: BrowseTabProps) {
       } else {
         toast.warning(`Installed ${result.installed}/${result.total} nodes from "${pkg.display_name}"`)
       }
-      // Notify InstalledTab to refresh
+      // Notify InstalledTab and Nodebar to refresh
       window.dispatchEvent(new Event('package-installed'))
+      window.dispatchEvent(new Event('extension-installed'))
     } catch (err: any) {
       toast.error(`Install failed: ${err.message}`)
     } finally {
