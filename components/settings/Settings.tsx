@@ -223,9 +223,16 @@ export default function Settings() {
       </DialogTrigger>
 
       <DialogContent className="max-w-5xl max-h-[88vh] min-w-[70vw] p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
-          <DialogTitle className="text-xl font-semibold tracking-tight">Settings</DialogTitle>
-          <DialogDescription>Manage your account and preferences</DialogDescription>
+        <DialogHeader className="px-6 pt-5 pb-3 border-b bg-gradient-to-r from-muted/40 to-muted/10">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10 text-primary">
+              <SettingsIcon className="h-4 w-4" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-semibold tracking-tight">Settings</DialogTitle>
+              <DialogDescription className="text-xs">Manage your account and preferences</DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         {isLoading ? (
@@ -249,7 +256,8 @@ export default function Settings() {
         ) : (
           <Tabs defaultValue="account" className="flex-1 flex-row gap-0">
             {/* Sidebar Tab Navigation */}
-            <TabsList className="w-52 shrink-0 border-r bg-muted/20 p-3 h-auto flex-col items-stretch justify-start gap-1 rounded-none">
+            <TabsList className="w-56 shrink-0 border-r bg-muted/20 p-3 h-auto flex-col items-stretch justify-start gap-1 rounded-none">
+              <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-3 pb-1.5 pt-1">General</p>
               <TabsTrigger value="account" className="justify-start w-full h-auto flex-none px-3 py-2 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
                 <User className="h-4 w-4 mr-2.5" />
                 Account
@@ -265,6 +273,7 @@ export default function Settings() {
                 Storage
               </TabsTrigger>
               <Separator className="my-2" />
+              <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-3 pb-1.5">Session</p>
               <Button
                 onClick={handleLogout}
                 variant="ghost"
@@ -278,123 +287,126 @@ export default function Settings() {
             {/* Account Tab Content */}
             <TabsContent value="account" className="flex-1 m-0 p-0">
               <ScrollArea className="h-[calc(88vh-73px)]">
-                <div className="p-6 space-y-6 max-w-3xl mx-auto">
+                <div className="p-8 space-y-8 max-w-2xl mx-auto">
 
-                  {/* Profile Header */}
-                  <div className="flex items-center gap-5">
-                    <div className="relative group shrink-0">
-                      <Avatar className="h-20 w-20 ring-2 ring-border shadow-sm">
-                        <AvatarImage
-                          src={getAvatarUrl(formData.avatar)}
-                          alt="Profile picture"
-                          className="object-cover"
-                        />
-                        <AvatarFallback className="text-xl font-semibold bg-muted">
-                          {getInitials()}
-                        </AvatarFallback>
-                      </Avatar>
+                  {/* Profile Header — no card, just the gradient flowing into the page */}
+                  <div className="relative">
+                    <div className="h-24 rounded-xl bg-gradient-to-r from-primary/15 via-primary/5 to-transparent" />
+                    <div className="px-1 -mt-12">
+                      <div className="flex items-end gap-4">
+                        <div className="relative group shrink-0">
+                          <Avatar className="h-24 w-24 ring-4 ring-background shadow-lg">
+                            <AvatarImage
+                              src={getAvatarUrl(formData.avatar)}
+                              alt="Profile picture"
+                              className="object-cover"
+                            />
+                            <AvatarFallback className="text-2xl font-semibold bg-muted">
+                              {getInitials()}
+                            </AvatarFallback>
+                          </Avatar>
 
-                      {isEditing && (
-                        <div
-                          className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full cursor-pointer transition-opacity opacity-0 group-hover:opacity-100"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          {isUploadingAvatar ? (
-                            <Loader2 className="h-6 w-6 text-white animate-spin" />
+                          {isEditing && (
+                            <div
+                              className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full cursor-pointer transition-opacity opacity-0 group-hover:opacity-100"
+                              onClick={() => fileInputRef.current?.click()}
+                            >
+                              {isUploadingAvatar ? (
+                                <Loader2 className="h-7 w-7 text-white animate-spin" />
+                              ) : (
+                                <Camera className="h-7 w-7 text-white" />
+                              )}
+                            </div>
+                          )}
+
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            onChange={handleAvatarUpload}
+                          />
+                        </div>
+
+                        <div className="flex-1 min-w-0 pb-2">
+                          <div className="flex items-center gap-2.5">
+                            <h2 className="text-2xl font-bold tracking-tight truncate">
+                              {formData.full_name || user.username}
+                            </h2>
+                            {user.is_admin && (
+                              <Badge variant="outline" className="border-primary/30 text-primary gap-1 shrink-0 bg-primary/5">
+                                <Shield className="h-3 w-3" />
+                                Admin
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">@{user.username}</p>
+                        </div>
+
+                        <div className="shrink-0 flex gap-2 pb-2">
+                          {!isEditing ? (
+                            <Button onClick={() => setIsEditing(true)} variant="outline" size="sm" className="h-8">
+                              <User className="h-3.5 w-3.5 mr-1.5" />
+                              Edit Profile
+                            </Button>
                           ) : (
-                            <Camera className="h-6 w-6 text-white" />
+                            <>
+                              <Button onClick={handleCancel} disabled={isSaving} variant="ghost" size="sm" className="h-8">
+                                <X className="h-3.5 w-3.5 mr-1.5" />
+                                Cancel
+                              </Button>
+                              <Button onClick={handleSave} disabled={isSaving} size="sm" className="h-8">
+                                {isSaving ? (
+                                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                ) : (
+                                  <Check className="h-3.5 w-3.5 mr-1.5" />
+                                )}
+                                {isSaving ? 'Saving...' : 'Save Changes'}
+                              </Button>
+                            </>
                           )}
                         </div>
-                      )}
-
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
-                        className="hidden"
-                        onChange={handleAvatarUpload}
-                      />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2.5">
-                        <h2 className="text-xl font-bold tracking-tight truncate">
-                          {formData.full_name || user.username}
-                        </h2>
-                        {user.is_admin && (
-                          <Badge variant="outline" className="border-primary/30 text-primary gap-1 shrink-0">
-                            <Shield className="h-3 w-3" />
-                            Admin
-                          </Badge>
-                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-0.5">@{user.username}</p>
-                    </div>
 
-                    <div className="shrink-0 flex gap-2">
-                      {!isEditing ? (
-                        <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
-                          <User className="h-3.5 w-3.5 mr-1.5" />
-                          Edit Profile
-                        </Button>
-                      ) : (
-                        <>
-                          <Button onClick={handleCancel} disabled={isSaving} variant="ghost" size="sm">
-                            <X className="h-3.5 w-3.5 mr-1.5" />
-                            Cancel
+                      {/* Avatar Actions Bar */}
+                      {isEditing && (
+                        <div className="flex items-center gap-3 mt-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploadingAvatar}
+                            className="text-xs h-7"
+                          >
+                            <Upload className="h-3 w-3 mr-1.5" />
+                            Upload Photo
                           </Button>
-                          <Button onClick={handleSave} disabled={isSaving} size="sm">
-                            {isSaving ? (
-                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                            ) : (
-                              <Check className="h-3.5 w-3.5 mr-1.5" />
-                            )}
-                            {isSaving ? 'Saving...' : 'Save Changes'}
-                          </Button>
-                        </>
+                          {formData.avatar && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleRemoveAvatar}
+                              className="text-xs h-7 text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1.5" />
+                              Remove
+                            </Button>
+                          )}
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            JPG, PNG, GIF or WebP — Max 5MB
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Avatar Actions Bar */}
-                  {isEditing && (
-                    <div className="flex items-center gap-3 -mt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploadingAvatar}
-                        className="text-xs h-8"
-                      >
-                        <Upload className="h-3.5 w-3.5 mr-1.5" />
-                        Upload Photo
-                      </Button>
-                      {formData.avatar && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleRemoveAvatar}
-                          className="text-xs h-8 text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                          Remove
-                        </Button>
-                      )}
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        JPG, PNG, GIF or WebP — Max 5MB
-                      </span>
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  {/* Personal Information */}
+                  {/* Personal Information — flat section, no card border */}
                   <div className="space-y-5">
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                        Personal Information
-                      </h3>
-                      <p className="text-xs text-muted-foreground">Update your personal details</p>
+                    <div className="flex items-baseline justify-between">
+                      <div>
+                        <h3 className="text-base font-semibold tracking-tight">Personal Information</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">Update your personal details</p>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-5">
@@ -460,47 +472,47 @@ export default function Settings() {
 
                   <Separator />
 
-                  {/* Account Metadata */}
+                  {/* Account Details — flat inline rows instead of card grid */}
                   <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                      Account Details
-                    </h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="rounded-lg border bg-muted/20 p-4 space-y-2">
-                        <div className="flex items-center gap-2 text-muted-foreground">
+                    <div>
+                      <h3 className="text-base font-semibold tracking-tight">Account Details</h3>
+                    </div>
+                    <div className="space-y-px">
+                      <div className="flex items-center justify-between py-2.5">
+                        <div className="flex items-center gap-2.5 text-muted-foreground">
                           <IdCard className="h-4 w-4" />
-                          <span className="text-xs font-medium uppercase tracking-wider">Account ID</span>
+                          <span className="text-sm">Account ID</span>
                         </div>
-                        <p className="font-mono text-base font-semibold tabular-nums">#{user.id}</p>
+                        <p className="font-mono text-sm font-semibold tabular-nums">#{user.id}</p>
                       </div>
-                      <div className="rounded-lg border bg-muted/20 p-4 space-y-2">
-                        <div className="flex items-center gap-2 text-muted-foreground">
+                      <div className="flex items-center justify-between py-2.5 border-t">
+                        <div className="flex items-center gap-2.5 text-muted-foreground">
                           <Calendar className="h-4 w-4" />
-                          <span className="text-xs font-medium uppercase tracking-wider">Member Since</span>
+                          <span className="text-sm">Member Since</span>
                         </div>
-                        <p className="text-base font-semibold">{formatDate(user.created_at)}</p>
+                        <p className="text-sm font-semibold">{formatDate(user.created_at)}</p>
                       </div>
-                      <div className="rounded-lg border bg-muted/20 p-4 space-y-2">
-                        <div className="flex items-center gap-2 text-muted-foreground">
+                      <div className="flex items-center justify-between py-2.5 border-t">
+                        <div className="flex items-center gap-2.5 text-muted-foreground">
                           <Clock className="h-4 w-4" />
-                          <span className="text-xs font-medium uppercase tracking-wider">Last Updated</span>
+                          <span className="text-sm">Last Updated</span>
                         </div>
-                        <p className="text-base font-semibold">{formatDate(user.updated_at)}</p>
+                        <p className="text-sm font-semibold">{formatDate(user.updated_at)}</p>
                       </div>
                     </div>
                   </div>
 
                   <Separator />
 
-                  {/* Session / Danger Zone */}
-                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 flex items-center justify-between">
-                    <div className="space-y-0.5">
+                  {/* Sign Out — flat, just a row with a button */}
+                  <div className="flex items-center justify-between py-1">
+                    <div>
                       <p className="font-medium text-sm">Sign Out</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         End your current session and return to the login page
                       </p>
                     </div>
-                    <Button onClick={handleLogout} variant="destructive" size="sm">
+                    <Button onClick={handleLogout} variant="outline" size="sm" className="h-8 text-destructive hover:bg-destructive/5 hover:text-destructive">
                       <LogOut className="h-3.5 w-3.5 mr-1.5" />
                       Sign Out
                     </Button>
@@ -514,42 +526,40 @@ export default function Settings() {
             {user.is_admin && (
               <TabsContent value="admin" className="flex-1 m-0 p-0">
                 <ScrollArea className="h-[calc(88vh-73px)]">
-                  <div className="p-6">
+                  <div className="p-8">
                     <AdminPanel />
                   </div>
                 </ScrollArea>
               </TabsContent>
             )}
 
-            {/* Storage / Danger Zone Tab */}
+            {/* Storage Tab */}
             <TabsContent value="storage" className="flex-1 m-0 p-0">
               <ScrollArea className="h-[calc(88vh-73px)]">
-                <div className="p-6 space-y-6 max-w-3xl mx-auto">
+                <div className="p-8 space-y-6 max-w-2xl mx-auto">
                   <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                      Storage & Cache
-                    </h3>
-                    <p className="text-xs text-muted-foreground">Manage cached data and local storage</p>
+                    <h3 className="text-base font-semibold tracking-tight">Storage & Cache</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Manage cached data and local storage</p>
                   </div>
 
                   <Separator />
 
                   {/* Danger Zone - Clear Cache */}
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-4">
+                  <div className="space-y-4">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-destructive" />
                       <h4 className="text-sm font-semibold text-destructive">Danger Zone</h4>
                     </div>
                     <div className="space-y-1">
                       <p className="font-medium text-sm">Clear All Cache & Storage</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground leading-relaxed max-w-lg">
                         Removes all localStorage, sessionStorage, and zustand persisted state (chat sessions, model selection, workspace paths, UI preferences) except login token and authentication data. The page will reload.
                       </p>
                     </div>
                     <Button
                       variant="destructive"
                       size="sm"
-                      className="gap-1.5"
+                      className="gap-1.5 h-8"
                       onClick={() => {
                         if (!window.confirm('This will clear ALL cached data except login token. The page will reload. Continue?')) return;
                         const PRESERVE_KEYS = new Set([
