@@ -44,7 +44,7 @@ export type NodeExecutionStatus = 'idle' | 'queued' | 'running' | 'completed' | 
 
 // Define unified output type
 export interface UnifiedOutput {
-  type: 'text' | 'rich' | 'error' | 'higlass' | 'ngl';
+  type: 'text' | 'rich' | 'error' | 'higlass' | 'ngl' | 'image' | 'dataframe' | 'dict' | 'list';
   content: unknown;
   order: number;
   var_name?: string;
@@ -409,6 +409,20 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                 const finalMsg = msg as unknown as Record<string, unknown>;
                 const finalUnifiedOutputs = finalMsg.unified_outputs as Array<Record<string, unknown>> | undefined;
                 const finalOutputHtml = finalMsg.output_html as Record<string, unknown> | undefined;
+
+                // Safety net: if the final unified_outputs is missing rich/image/higlass/ngl
+                // outputs that were already streamed via __DISPLAY__ markers, preserve the
+                // streamed outputs so images don't disappear when the final status replaces.
+                const currentOutputs = (n.data.unified_outputs as Array<Record<string, unknown>>) || [];
+                const finalHasRich = (finalUnifiedOutputs || []).some(o => o.type === 'rich' || o.type === 'higlass' || o.type === 'ngl');
+                const currentHasRich = currentOutputs.some(o => o.type === 'rich' || o.type === 'higlass' || o.type === 'ngl');
+                const mergedOutputs = (finalUnifiedOutputs && finalUnifiedOutputs.length > 0)
+                  ? finalUnifiedOutputs
+                  : (currentHasRich ? currentOutputs : (finalUnifiedOutputs || currentOutputs));
+                const safeOutputHtml = (finalOutputHtml && Object.keys(finalOutputHtml).length > 0)
+                  ? finalOutputHtml
+                  : (n.data.output_html || {});
+
                 return {
                   ...n,
                   data: {
@@ -418,8 +432,8 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                     logs: finalUnifiedOutputs
                       ? finalUnifiedOutputs.filter((o) => o.type === 'text').map((o) => ({ timestamp: new Date().toISOString(), level: 'INFO', message: o.content as string, source: 'stdout' }))
                       : n.data.logs,
-                    output_html: finalOutputHtml || n.data.output_html || {},
-                    unified_outputs: finalUnifiedOutputs || n.data.unified_outputs || [],
+                    output_html: safeOutputHtml,
+                    unified_outputs: mergedOutputs,
                     error_message: msg.error_message || undefined,
                     error_traceback: msg.error_traceback || undefined,
                     duration_seconds: finalMsg.duration_seconds as number | undefined,
@@ -428,8 +442,8 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                       status: msg.status,
                       duration_seconds: finalMsg.duration_seconds as number | undefined,
                       output_variables: finalMsg.output_variables as Record<string, unknown> | undefined,
-                      output_html: finalOutputHtml || {},
-                      unified_outputs: finalUnifiedOutputs || [],
+                      output_html: safeOutputHtml,
+                      unified_outputs: mergedOutputs,
                       error_message: msg.error_message,
                       error_traceback: msg.error_traceback,
                     },
@@ -482,16 +496,27 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
               nds.map((n: Node) => {
                 if (n.id !== id) return n;
                 const finalStatus = status.failed_nodes?.includes(id) ? 'failed' : 'completed';
+                // Safety net: preserve streamed rich outputs if polling result lacks them
+                const currentOutputs = (n.data.unified_outputs as Array<Record<string, unknown>>) || [];
+                const pollOutputs = nodeResult?.unified_outputs as Array<Record<string, unknown>> | undefined;
+                const pollHasRich = (pollOutputs || []).some(o => o.type === 'rich' || o.type === 'higlass' || o.type === 'ngl');
+                const currentHasRich = currentOutputs.some(o => o.type === 'rich' || o.type === 'higlass' || o.type === 'ngl');
+                const mergedOutputs = (pollOutputs && pollOutputs.length > 0)
+                  ? pollOutputs
+                  : (currentHasRich ? currentOutputs : (pollOutputs || currentOutputs));
+                const safeOutputHtml = (nodeResult?.output_html && Object.keys(nodeResult.output_html).length > 0)
+                  ? nodeResult.output_html
+                  : (n.data.output_html || {});
                 return {
                   ...n,
                   data: {
                     ...n.data,
                     status: finalStatus,
-                    logs: nodeResult?.unified_outputs
-                      ? nodeResult.unified_outputs.filter((o: Record<string, unknown>) => o.type === 'text').map((o: Record<string, unknown>) => ({ timestamp: new Date().toISOString(), level: 'INFO', message: o.content as string, source: 'stdout' }))
+                    logs: pollOutputs
+                      ? pollOutputs.filter((o: Record<string, unknown>) => o.type === 'text').map((o: Record<string, unknown>) => ({ timestamp: new Date().toISOString(), level: 'INFO', message: o.content as string, source: 'stdout' }))
                       : n.data.logs,
-                    output_html: nodeResult?.output_html || n.data.output_html || {},
-                    unified_outputs: nodeResult?.unified_outputs || n.data.unified_outputs || [],
+                    output_html: safeOutputHtml,
+                    unified_outputs: mergedOutputs,
                     error_message: nodeResult?.error_message || undefined,
                     error_traceback: nodeResult?.error_traceback || undefined,
                     duration_seconds: nodeResult?.duration_seconds,
@@ -500,8 +525,8 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
                       status: finalStatus,
                       duration_seconds: nodeResult?.duration_seconds,
                       output_variables: nodeResult?.output_variables,
-                      output_html: nodeResult?.output_html || {},
-                      unified_outputs: nodeResult?.unified_outputs || [],
+                      output_html: safeOutputHtml,
+                      unified_outputs: mergedOutputs,
                       error_message: nodeResult?.error_message,
                       error_traceback: nodeResult?.error_traceback,
                     },
@@ -1288,6 +1313,9 @@ export const CustomNode = ({ id, data, selected, onExecutionComplete }: CustomNo
             if (output.type === 'error') return true;
             if (output.type === 'higlass') return true;
             if (output.type === 'ngl') return true;
+            if (output.type === 'image') return true;
+            if (output.type === 'dataframe') return true;
+            if (output.type === 'dict') return true;
             if (output.type === 'rich') {
               if (output.var_name && internalVars.includes(output.var_name)) return false;
               if ((output.content as any)?.text && (output.content as any).text.includes('module') && (output.content as any).text.includes('from')) return false;

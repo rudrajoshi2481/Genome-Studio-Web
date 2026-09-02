@@ -50,6 +50,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.36.8
         version: 6.36.8
+      '@firecms/neat':
+        specifier: ^1.0.2
+        version: 1.0.2
       '@heroicons/react':
         specifier: ^2.2.0
         version: 2.2.0(react@19.1.0)
@@ -709,6 +712,9 @@ packages:
   '@eslint/plugin-kit@0.3.5':
     resolution: {integrity: sha512-Z5kJ+wU3oA7MMIqVR9tyZRtjYPr4OC004Q4Rw7pgOKUOKkJfZ3O24nz3WYfGRpMDNmcOi3TwQOmgm7B7Tpii0w==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@firecms/neat@1.0.2':
+    resolution: {integrity: sha512-hP9Qqz3mPEgwMKOZygjkFMqDyKjrQwuSYt352+QJfg1SfAlGOfHzpQSeIAgeeLmdtSjE45zekBpnJPgtRhxclA==}
 
   '@floating-ui/core@1.7.0':
     resolution: {integrity: sha512-FRdBLykrPPA6P76GGGqlex/e7fbe0F1ykgxHYNXQsH/iTEtjMj/f9bpY5oQqbjt5VgZvgz/uKXbGuROijh3VLA==}
@@ -7014,6 +7020,8 @@ snapshots:
     dependencies:
       '@eslint/core': 0.15.2
       levn: 0.4.1
+
+  '@firecms/neat@1.0.2': {}
 
   '@floating-ui/core@1.7.0':
     dependencies:

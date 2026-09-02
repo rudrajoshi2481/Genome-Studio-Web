@@ -6,7 +6,7 @@ import { HiGlassViewer } from '@/components/Editorwindow_new/editors/canvas/HiGl
 import { NGLViewer } from '@/components/Editorwindow_new/editors/canvas/NGLViewer';
 
 interface UnifiedOutput {
-  type: 'text' | 'rich' | 'error' | 'higlass' | 'ngl';
+  type: 'text' | 'rich' | 'error' | 'higlass' | 'ngl' | 'image' | 'dataframe' | 'dict' | 'list';
   content: string | any;
   var_name?: string;
   traceback?: string;
@@ -35,11 +35,11 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
 
   const hasHiglass = displayOutputs.some(o => o.type === 'higlass');
 
-  // If the only outputs are viewer types (higlass/ngl), render them bare —
+  // If the only outputs are viewer types (higlass/ngl/image), render them bare —
   // skip the "output" terminal box so the viewer fills the node cleanly.
   const viewerOnly =
     displayOutputs.length > 0 &&
-    displayOutputs.every(o => o.type === 'higlass' || o.type === 'ngl') &&
+    displayOutputs.every(o => o.type === 'higlass' || o.type === 'ngl' || o.type === 'image') &&
     !isRunning;
 
   const renderOutput = (output: UnifiedOutput, index: number) => {
@@ -100,6 +100,19 @@ const TerminalOutput: React.FC<TerminalOutputProps> = ({ outputs, logs, isRunnin
       return (
         <div key={index} className="mt-1.5 w-full">
           <NGLViewer spec={spec} height={400} className="w-full" />
+        </div>
+      );
+    }
+
+    if (output.type === 'image') {
+      const htmlContent = typeof output.content === 'string' ? output.content : output.content?.html;
+      if (!htmlContent) return null;
+      return (
+        <div
+          key={index}
+          className="rich-terminal-output mt-1.5 rounded-md bg-muted/40 border border-border p-2"
+        >
+          <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
         </div>
       );
     }

@@ -199,23 +199,41 @@ function AIChat({ onClose }: { onClose?: () => void }) {
         const data = await response.json();
         // Transform backend messages into frontend Message format
         const transformed: any[] = [];
+        // Track tool parts from assistant messages so we can match them to
+        // the following tool result messages (which have no parts of their own).
+        let pendingToolParts: any[] = [];
         for (const msg of data) {
           if (msg.type === 'tool') {
-            // Reconstruct tool message from stored content
+            // Tool result messages (role='tool') have no parts — the tool name/args
+            // are stored on the preceding assistant message's tool parts.
+            // Try msg.parts first (some backends may include them), then fall
+            // back to pendingToolParts from the preceding assistant message.
+            let toolPart = msg.parts?.find((p: any) => p.type === 'tool');
+            if (!toolPart && pendingToolParts.length > 0) {
+              // Match by tool_call_id if available in metadata, else take the next one
+              toolPart = pendingToolParts.shift();
+            }
+            const toolName = toolPart?.metadata?.tool || 'tool';
+            let toolArgs: any = {};
+            if (toolPart?.content) {
+              try {
+                const parsed = JSON.parse(toolPart.content);
+                // Content is {name, args} — extract args
+                toolArgs = parsed?.args || parsed || {};
+              } catch { toolArgs = {}; }
+            }
             transformed.push({
               id: msg.id,
               type: 'tool',
               role: 'tool',
               content: '',
               result: msg.content || '',
-              toolName: msg.parts?.find((p: any) => p.type === 'tool')?.metadata?.tool || 'tool',
+              toolName,
               timestamp: msg.created_at,
               isRunning: false,
               metadata: {
-                toolName: msg.parts?.find((p: any) => p.type === 'tool')?.metadata?.tool || 'tool',
-                toolArgs: msg.parts?.find((p: any) => p.type === 'tool')?.content
-                  ? (() => { try { return JSON.parse(msg.parts.find((p: any) => p.type === 'tool').content); } catch { return {}; } })()
-                  : {},
+                toolName,
+                toolArgs,
                 toolMessageId: msg.id,
               },
             });
@@ -231,6 +249,11 @@ function AIChat({ onClose }: { onClose?: () => void }) {
             // AI message — check for reasoning parts
             const reasoningPart = msg.parts?.find((p: any) => p.type === 'reasoning');
             const toolParts = msg.parts?.filter((p: any) => p.type === 'tool') || [];
+            // Save tool parts so the following tool result messages can use them
+            // to recover tool name and args (tool result messages have no parts).
+            if (toolParts.length > 0) {
+              pendingToolParts = [...toolParts];
+            }
             transformed.push({
               id: msg.id,
               type: 'ai',

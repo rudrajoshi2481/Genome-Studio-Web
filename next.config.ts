@@ -17,6 +17,16 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // --- Dev server performance ---
+  experimental: {
+    // Faster package resolution by pre-bundling large icon/utility deps
+    optimizePackageImports: [
+      'lucide-react',
+      'date-fns',
+      '@heroicons/react',
+      'recharts',
+    ],
+  },
 };
 
 export default nextConfig;
