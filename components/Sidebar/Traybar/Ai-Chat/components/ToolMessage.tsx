@@ -53,29 +53,59 @@ function ToolMessage({ message, isLast, onStopCommand, onApprove, onReject }: To
   // --- Parse todo_write args into QueueTodoItem[] for AgentTaskPanel ---
   const todoItems: QueueTodoItem[] = isTodoWrite
     ? (() => {
+        // toolArgs may be {todos: [...]} (live) or {name: "todo_write", args: {todos: [...]}} (history)
+        const argsRoot = (toolArgs?.args && typeof toolArgs.args === 'object') ? toolArgs.args : toolArgs;
+
+        // 1. Try parsing from args.todos (JSON array or JSON string)
         try {
-          let rawTodos = toolArgs?.todos;
+          let rawTodos = argsRoot?.todos;
           if (typeof rawTodos === "string") {
             rawTodos = JSON.parse(rawTodos);
           }
-          if (!Array.isArray(rawTodos)) return [];
-          return rawTodos.map((item: any, idx: number) => {
-            const status: QueueTodoItem["status"] =
-              item.status === "completed"
-                ? "completed"
-                : item.status === "in_progress" || item.status === "active"
-                  ? "active"
-                  : "pending";
-            return {
-              id: `todo-${idx}-${item.content?.slice(0, 20) || idx}`,
-              title: item.content || item.title || "",
-              description: item.description,
-              status,
-            };
-          });
-        } catch {
-          return [];
+          if (Array.isArray(rawTodos) && rawTodos.length > 0) {
+            return rawTodos.map((item: any, idx: number) => {
+              const status: QueueTodoItem["status"] =
+                item.status === "completed"
+                  ? "completed"
+                  : item.status === "in_progress" || item.status === "active"
+                    ? "active"
+                    : "pending";
+              return {
+                id: `todo-${idx}-${item.content?.slice(0, 20) || idx}`,
+                title: item.content || item.title || "",
+                description: item.priority ? `Priority: ${item.priority}` : item.description,
+                status,
+              };
+            });
+          }
+        } catch {}
+
+        // 2. Fallback: parse the rawOutput text
+        // Format: "Todo list updated:\n  [ ] 1. Task name (priority)\n  [x] 2. ..."
+        if (rawOutput && typeof rawOutput === "string") {
+          const lines = rawOutput.split("\n");
+          const items: QueueTodoItem[] = [];
+          for (const line of lines) {
+            // Match: "  [ ] 1. Task content (priority)" or "  [x] 1. ..." or "  [~] 1. ..."
+            const match = line.match(/^\s*\[(x|~|\s)\]\s*\d+\.\s*(.+?)(?:\s*\((\w+)\))?\s*$/);
+            if (match) {
+              const [, statusIcon, content, priority] = match;
+              const status: QueueTodoItem["status"] =
+                statusIcon === "x" ? "completed"
+                : statusIcon === "~" ? "active"
+                : "pending";
+              items.push({
+                id: `todo-${items.length}-${content.slice(0, 20)}`,
+                title: content.trim(),
+                description: priority ? `Priority: ${priority}` : undefined,
+                status,
+              });
+            }
+          }
+          if (items.length > 0) return items;
         }
+
+        return [];
       })()
     : [];
 

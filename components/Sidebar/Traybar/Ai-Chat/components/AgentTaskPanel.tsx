@@ -127,7 +127,7 @@ const AgentTaskRow = memo(({ todo, onRemove, onEdit, onToggleStatus, readOnly }:
   return (
     <div
       className={cn(
-        'group flex items-start gap-2 px-3 py-1 rounded-lg transition-colors',
+        'group flex items-start gap-2 px-3 py-0.5 rounded-lg transition-colors',
         readOnly ? 'cursor-default' : 'cursor-pointer hover:bg-accent/40',
         isActive && 'bg-primary/5',
       )}
@@ -140,10 +140,10 @@ const AgentTaskRow = memo(({ todo, onRemove, onEdit, onToggleStatus, readOnly }:
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
         <p
           className={cn(
-            'text-xs leading-relaxed truncate transition-opacity',
+            'text-xs leading-tight truncate transition-opacity',
             isCompleted && 'line-through text-muted-foreground/60',
             isActive && 'text-foreground font-medium',
             !isCompleted && !isActive && 'text-muted-foreground',
@@ -152,14 +152,14 @@ const AgentTaskRow = memo(({ todo, onRemove, onEdit, onToggleStatus, readOnly }:
           {todo.title}
         </p>
         {todo.description && (
-          <p
+          <span
             className={cn(
-              'text-[10px] leading-relaxed mt-0.5 truncate',
-              isCompleted ? 'text-muted-foreground/40 line-through' : 'text-muted-foreground/70',
+              'text-[10px] leading-tight shrink-0',
+              isCompleted ? 'text-muted-foreground/40 line-through' : 'text-muted-foreground/60',
             )}
           >
             {todo.description}
-          </p>
+          </span>
         )}
       </div>
 
