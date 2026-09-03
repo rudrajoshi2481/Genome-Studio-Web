@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowUp, Settings, SquareIcon, Pin, PinOff, Paperclip, X, AtSign, Slash, Terminal, RefreshCw, Check, WifiOff, Download, Boxes, ShieldCheck, ShieldAlert, Shield, ChevronDown } from 'lucide-react'
 import ChatFeaturesDialog from './ChatFeaturesDialog'
@@ -338,7 +339,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
     if (fileInputRef.current) fileInputRef.current.value = ''
   }, [addUploadedFile])
 
-  const executeSlashCommand = (cmdName: string) => {
+  const executeSlashCommand = (cmdName: string, args: string[] = []) => {
     const clearInput = () => {
       setInputValue('')
       setMentions([])
@@ -368,7 +369,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
         break
       case 'clear':
         if (onSendCommand) {
-          onSendCommand('clear', [], selectedModel)
+          onSendCommand('clear', args, selectedModel)
         }
         clearMessages()
         clearInput()
@@ -376,19 +377,19 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
       case 'compact':
       case 'compaction':
         if (onSendCommand) {
-          onSendCommand('compact', [], selectedModel)
+          onSendCommand('compact', args, selectedModel)
         }
         clearInput()
         break
       case 'help':
         if (onSendCommand) {
-          onSendCommand('help', [], selectedModel)
+          onSendCommand('help', args, selectedModel)
         }
         clearInput()
         break
       default:
         if (onSendCommand) {
-          onSendCommand(normalized, [], selectedModel)
+          onSendCommand(normalized, args, selectedModel)
         }
         clearInput()
         break
@@ -418,7 +419,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
         const normalized = cmdName.replace(/^\/+/, '')
         const isLast = i === commandMentions.length - 1
         if (builtin.includes(normalized)) {
-          executeSlashCommand(cmdName)
+          executeSlashCommand(cmdName, isLast ? extraArgs : [])
         } else if (onSendCommand) {
           onSendCommand(normalized, isLast ? extraArgs : [], selectedModel)
         }
@@ -441,7 +442,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
         const builtin = ['new', 'clear', 'compact', 'compaction', 'help']
         const normalizedName = cmd.replace(/^\/+/, '')
         if (builtin.includes(normalizedName)) {
-          executeSlashCommand(cmd)
+          executeSlashCommand(cmd, args)
         } else if (onSendCommand) {
           onSendCommand(normalizedName, args, selectedModel)
           setInputValue('')
@@ -589,7 +590,7 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
       {/* Subtle gradient accent at top */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
-      {showSlashMenu && (
+      {showSlashMenu && createPortal(
         <SlashCommandSuggestion
           onSelect={handleSlashCommandSelect}
           onClose={() => setShowSlashMenu(false)}
@@ -597,7 +598,8 @@ function Footer({ onSendMessage, onStop, onSendCommand, setInputRef }: FooterPro
           left={slashPosition.left}
           width={containerRef.current?.offsetWidth || 400}
           searchValue={(inputValue.split(/\s+/).filter(Boolean).pop() || '').replace(/^\//, '')}
-        />
+        />,
+        document.body
       )}
 
       {uploadedFiles.length > 0 && (

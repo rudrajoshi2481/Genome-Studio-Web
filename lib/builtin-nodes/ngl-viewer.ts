@@ -138,7 +138,6 @@ def ngl_viewer(structures=None):
         '__ngl__': True,
         'structures': entries,
     }
-    display(spec)
     return spec
 `;
 

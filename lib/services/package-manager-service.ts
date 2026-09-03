@@ -15,6 +15,26 @@ function getExtensionsHubBase(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Hub health check
+// ---------------------------------------------------------------------------
+export interface HubHealth {
+  connected: boolean;
+  hub_url: string;
+}
+
+export async function checkHubHealth(): Promise<HubHealth> {
+  try {
+    const resp = await fetch(`${getExtensionsHubBase()}/health`, {
+      headers: authHeaders(),
+    });
+    if (!resp.ok) return { connected: false, hub_url: '' };
+    return handleResponse<HubHealth>(resp);
+  } catch {
+    return { connected: false, hub_url: '' };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 export interface PackageNodeIO {
@@ -108,11 +128,14 @@ function authHeaders(): Record<string, string> {
 
 async function handleResponse<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
+    // Read the body once as text, then try to parse as JSON.
+    // Reading .json() then falling back to .text() throws "body stream already read".
+    const text = await resp.text();
     let detail: any;
     try {
-      detail = await resp.json();
+      detail = JSON.parse(text);
     } catch {
-      detail = { detail: await resp.text() };
+      detail = { detail: text };
     }
     const error = new Error(
       typeof detail.detail === 'string'
@@ -150,8 +173,9 @@ export async function backupPackages(): Promise<void> {
     headers: authHeaders(),
   });
   if (!resp.ok) {
+    const text = await resp.text();
     let detail: any;
-    try { detail = await resp.json(); } catch { detail = { detail: await resp.text() }; }
+    try { detail = JSON.parse(text); } catch { detail = { detail: text }; }
     throw new Error(
       typeof detail.detail === 'string'
         ? detail.detail

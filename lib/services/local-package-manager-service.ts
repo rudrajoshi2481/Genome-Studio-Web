@@ -43,11 +43,14 @@ function authHeaders(): Record<string, string> {
 
 async function handleResponse<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
+    // Read the body once as text, then try to parse as JSON.
+    // Reading .json() then falling back to .text() throws "body stream already read".
+    const text = await resp.text();
     let detail: any;
     try {
-      detail = await resp.json();
+      detail = JSON.parse(text);
     } catch {
-      detail = { detail: await resp.text() };
+      detail = { detail: text };
     }
     const error = new Error(
       typeof detail.detail === 'string'
@@ -395,6 +398,18 @@ export async function publishLocalPackage(packageId: number, version: string, ch
     body: JSON.stringify({ version, changelog }),
   });
   return handleResponse<PublishResult>(resp);
+}
+
+// ---------------------------------------------------------------------------
+// Install — install a local package's nodes into the Nodebar (no hub needed)
+// ---------------------------------------------------------------------------
+export async function installLocalPackage(packageId: number, version?: string): Promise<InstallResult> {
+  const resp = await fetch(`${getLocalPackagesBase()}/packages/${packageId}/install`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ version: version || null }),
+  });
+  return handleResponse<InstallResult>(resp);
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import {
   Code2, FileText, Tag as TagIcon, Calendar, GitBranch, Upload, Save,
   ArrowLeft, CheckCircle2, Settings2, RefreshCw, AlertTriangle,
   ImageIcon, X, Terminal, Download, FolderTree,
-  Cloud, LogIn, LogOut,
+  Cloud, LogIn, LogOut, WifiOff,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -60,6 +60,7 @@ import {
   getLocalFile,
   getLocalReadme,
   updateLocalReadme,
+  installLocalPackage,
 } from '@/lib/services/local-package-manager-service'
 import {
   listPackages as listHubPackages,
@@ -80,7 +81,7 @@ import {
   type HubUser,
 } from '@/lib/services/hub-auth-service'
 
-export default function MyPackagesTab() {
+export default function MyPackagesTab({ hubConnected = true }: { hubConnected?: boolean }) {
   const [packages, setPackages] = useState<PackageType[]>([])
   const [cloudPackages, setCloudPackages] = useState<PackageType[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -113,7 +114,7 @@ export default function MyPackagesTab() {
   }
 
   const loadCloudPackages = useCallback(async () => {
-    if (!isHubAuthenticated()) {
+    if (!hubConnected || !isHubAuthenticated()) {
       setCloudPackages([])
       return
     }
@@ -146,13 +147,41 @@ export default function MyPackagesTab() {
     toast.info('Signed out of Extension Hub')
   }
 
-  // Gate publish behind hub auth
+  // Gate publish behind hub auth + hub connectivity
   const handlePublishClick = () => {
+    if (!hubConnected) {
+      toast.error('Extension Hub service is not connected. Start the service to publish.')
+      return
+    }
     if (!isHubAuthenticated()) {
       setPendingPublish(true)
       setIsHubSignInOpen(true)
     } else {
       setIsPublishOpen(true)
+    }
+  }
+
+  // Install a local package's nodes into the Nodebar (no hub needed)
+  const [isInstallingLocal, setIsInstallingLocal] = useState(false)
+  const handleInstallLocal = async () => {
+    if (!selectedPkg) return
+    setIsInstallingLocal(true)
+    try {
+      const result = await installLocalPackage(selectedPkg.id)
+      if (result.failed > 0 && result.installed === 0) {
+        toast.error(`Install failed: ${result.results?.[0]?.error || 'unknown error'}`)
+      } else if (result.failed > 0) {
+        toast.warning(`Installed ${result.installed}/${result.total} nodes from ${selectedPkg.name} (${result.failed} failed)`)
+      } else {
+        toast.success(`Installed ${result.installed}/${result.total} nodes from ${selectedPkg.name} into Nodebar`)
+      }
+      // Notify InstalledTab and Nodebar to refresh — same events as hub install
+      window.dispatchEvent(new Event('package-installed'))
+      window.dispatchEvent(new Event('extension-installed'))
+    } catch (err: any) {
+      toast.error(`Install failed: ${err.message}`)
+    } finally {
+      setIsInstallingLocal(false)
     }
   }
 
@@ -327,7 +356,9 @@ export default function MyPackagesTab() {
           onEditNode={handleEditNode}
           onEditMetadata={() => setIsEditMetadataOpen(true)}
           onPublish={handlePublishClick}
+          onInstall={handleInstallLocal}
           hubAuthed={hubAuthed}
+          hubConnected={hubConnected}
           onRefresh={refreshNodes}
         />
         <NodeEditorDialog
@@ -563,7 +594,7 @@ function PackageListItem({ pkg, source, onOpen, onDelete }: {
 // Package Detail View
 // ---------------------------------------------------------------------------
 function PackageDetailView({
-  pkg, onBack, onAddNode, onEditNode, onEditMetadata, onPublish, onRefresh, hubAuthed,
+  pkg, onBack, onAddNode, onEditNode, onEditMetadata, onPublish, onInstall, onRefresh, hubAuthed, hubConnected = true,
 }: {
   pkg: PackageDetail
   onBack: () => void
@@ -571,8 +602,10 @@ function PackageDetailView({
   onEditNode: (node: PackageNode) => void
   onEditMetadata: () => void
   onPublish: () => void
+  onInstall: () => void
   onRefresh: () => void
   hubAuthed: boolean
+  hubConnected?: boolean
 }) {
   const workingVersion = pkg.working_version
   const publishedVersions = pkg.versions.filter(v => v.published)
@@ -851,13 +884,31 @@ function PackageDetailView({
                 </div>
               )}
             </div>
-            {/* Edit + Publish actions */}
+            {/* Edit + Install + Publish actions */}
             <div className="flex-shrink-0 flex items-center gap-1">
               <Button variant="outline" size="sm" className="text-xs gap-1 h-7" onClick={onEditMetadata}>
                 <Settings2 className="h-3.5 w-3.5" /> Edit
               </Button>
-              <Button variant="default" size="sm" className="text-xs gap-1 h-7" onClick={onPublish} title={hubAuthed ? 'Publish to Extension Hub' : 'Sign in to Extension Hub to publish'}>
-                {hubAuthed ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="text-xs gap-1 h-7"
+                onClick={onInstall}
+                title="Install this package's nodes into your Nodebar (local, no hub required)"
+              >
+                <Download className="h-3.5 w-3.5" /> Install
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="text-xs gap-1 h-7"
+                onClick={onPublish}
+                disabled={!hubConnected}
+                title={!hubConnected ? 'Extension Hub service is not connected' : hubAuthed ? 'Publish to Extension Hub' : 'Sign in to Extension Hub to publish'}
+              >
+                {!hubConnected ? (
+                  <WifiOff className="h-3.5 w-3.5" />
+                ) : hubAuthed ? (
                   <GitBranch className="h-3.5 w-3.5" />
                 ) : (
                   <LogIn className="h-3.5 w-3.5" />

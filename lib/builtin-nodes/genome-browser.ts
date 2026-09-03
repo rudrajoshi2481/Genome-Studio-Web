@@ -167,7 +167,6 @@ def genome_browser(samples, layout='horizontal', sync=True, initial_domain=None)
     if errors:
         print("WARNING: " + str(len(errors)) + " sample(s) skipped:\\n" + "\\n".join(errors), file=sys.stderr)
 
-    display(result)
     return result
 `;
 

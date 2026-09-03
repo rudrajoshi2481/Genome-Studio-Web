@@ -158,6 +158,7 @@ function InstalledPackageCard({
   const successNodes = summary?.results?.filter(r => r.status === 'success') || []
   const nodeTitles = successNodes.map(r => r.title).join(', ')
   const condaEnvs = record.conda_envs || []
+  const [iconError, setIconError] = useState(false)
 
   return (
     <div
@@ -166,9 +167,14 @@ function InstalledPackageCard({
       {/* Top: icon + name + version + checkmark */}
       <div className="flex items-start gap-2">
         <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center overflow-hidden">
-          {record.icon_url ? (
+          {record.icon_url && !iconError ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={getPackageIconUrl(record.package_id)} alt={record.package_display_name} className="w-full h-full object-cover" />
+            <img
+              src={getPackageIconUrl(record.package_id)}
+              alt={record.package_display_name}
+              className="w-full h-full object-cover"
+              onError={() => setIconError(true)}
+            />
           ) : (
             <Package className="h-4 w-4 text-primary/70" />
           )}

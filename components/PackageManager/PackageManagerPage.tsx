@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { Search, Download, Package, ArrowLeft, RefreshCw, Code2, FileText, GitBranch, CheckCircle2, Tag as TagIcon, Plus, Loader2, AlertTriangle, Terminal, FolderTree } from 'lucide-react'
+import { Search, Download, Package, ArrowLeft, RefreshCw, Code2, FileText, GitBranch, CheckCircle2, Tag as TagIcon, Plus, Loader2, AlertTriangle, Terminal, FolderTree, WifiOff, CloudOff } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -16,12 +16,22 @@ import InstalledTab from './tabs/InstalledTab'
 import NewProjectDialog from './NewProjectDialog'
 import CanvasStyleNodeCard from './CanvasStyleNodeCard'
 import FileTreeViewer from './FileTreeViewer'
+import { useHubHealth } from '@/lib/hooks/use-hub-health'
 import { PackageDetail, installPackage, InstallResult, getPackage, getPackageIconUrl, getInstallSh, getTree, getFileByPath, getReadme } from '@/lib/services/package-manager-service'
 
 function PackageManagerPage({ onRegisterNewProjectOpener }: { onRegisterNewProjectOpener?: (open: () => void) => void }) {
   const [activeTab, setActiveTab] = useState<string>('browse')
   const [browseDetail, setBrowseDetail] = useState<PackageDetail | null>(null)
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false)
+  const { isConnected, isChecking } = useHubHealth()
+
+  // If hub is not connected, default to 'installed' tab (works without hub).
+  // Also switch away from 'browse' if hub goes offline while browsing.
+  useEffect(() => {
+    if (!isConnected && !isChecking && activeTab === 'browse') {
+      setActiveTab('installed')
+    }
+  }, [isConnected, isChecking, activeTab])
 
   // Expose a way for the parent to open the New Project dialog without
   // lifting the dialog state out of this component.
@@ -57,12 +67,28 @@ function PackageManagerPage({ onRegisterNewProjectOpener }: { onRegisterNewProje
         <span className="ml-2 text-[10px] font-medium text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 tabular-nums">v0.1.0</span>
       </div>
 
+      {/* Offline banner — shown when Extension Hub service is not connected.
+          Suppressed during the initial health check to avoid flashing. */}
+      {!isChecking && !isConnected && (
+        <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-700 dark:text-amber-400">
+          <WifiOff className="h-3.5 w-3.5 shrink-0" />
+          <span className="text-xs font-medium">
+            Extension Hub service is not connected. Browse, install from hub, and publishing are unavailable.
+            You can still manage your local packages and installed extensions.
+          </span>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex-1 min-h-0 flex flex-col">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col gap-0">
           <div className="flex-shrink-0 border-b px-4 flex items-center justify-between">
             <TabsList className="bg-transparent h-9 p-0 gap-2">
-              <TabsTrigger value="browse" className="text-xs gap-1.5 data-[state=active]:bg-transparent data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-primary rounded-none">
+              <TabsTrigger
+                value="browse"
+                disabled={!isConnected}
+                className="text-xs gap-1.5 data-[state=active]:bg-transparent data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-primary rounded-none disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 <Search className="h-3.5 w-3.5" /> Browse
               </TabsTrigger>
               <TabsTrigger value="installed" className="text-xs gap-1.5 data-[state=active]:bg-transparent data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-primary rounded-none">
@@ -81,12 +107,27 @@ function PackageManagerPage({ onRegisterNewProjectOpener }: { onRegisterNewProje
             </Button>
           </div>
 
-          {/* Browse */}
+          {/* Browse — only render content when hub is connected to avoid
+              firing API calls that will fail with 503. Show a placeholder
+              when the hub is not connected. */}
           <TabsContent value="browse" className="flex-1 min-h-0 m-0 mt-0 flex flex-col">
-            {browseDetail ? (
-              <BrowsePackageDetail pkg={browseDetail} onBack={() => setBrowseDetail(null)} onRefresh={handleRefreshBrowseDetail} />
+            {isConnected ? (
+              browseDetail ? (
+                <BrowsePackageDetail pkg={browseDetail} onBack={() => setBrowseDetail(null)} onRefresh={handleRefreshBrowseDetail} />
+              ) : (
+                <BrowseTab onOpenPackage={setBrowseDetail} />
+              )
             ) : (
-              <BrowseTab onOpenPackage={setBrowseDetail} />
+              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground py-16">
+                <div className="w-12 h-12 rounded-lg bg-muted/50 flex items-center justify-center mb-3">
+                  <CloudOff className="h-6 w-6 opacity-50" />
+                </div>
+                <p className="text-xs font-medium">Extension Hub is not connected</p>
+                <p className="text-[11px] mt-1 text-center max-w-sm opacity-70">
+                  Start the Extension Hub service to browse and install community packages.
+                  You can still manage your local packages and installed extensions in the other tabs.
+                </p>
+              </div>
             )}
           </TabsContent>
 
@@ -97,7 +138,7 @@ function PackageManagerPage({ onRegisterNewProjectOpener }: { onRegisterNewProje
 
           {/* My Packages */}
           <TabsContent value="mine" className="flex-1 min-h-0 m-0 mt-0 flex flex-col">
-            <MyPackagesTab />
+            <MyPackagesTab hubConnected={isConnected} />
           </TabsContent>
         </Tabs>
       </div>
